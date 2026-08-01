@@ -1,0 +1,27 @@
+# root secrets / env
+.env
+
+# frontend
+frontend/node_modules/
+frontend/dist/
+frontend/build/
+frontend/.vite/
+
+# backend / llm-proxy (Gradle)
+backend/.gradle/
+backend/build/
+llm-proxy/.gradle/
+llm-proxy/build/
+**/application-local.yml
+
+# IDE
+.idea/
+.vscode/
+*.iml
+
+# OS
+.DS_Store
+Thumbs.db
+
+# logs
+*.log

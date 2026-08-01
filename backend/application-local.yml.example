@@ -1,0 +1,8 @@
+# 이 파일을 복사해서 같은 위치에 application-local.yml로 만들고
+# 아래 값을 본인 로컬 환경에 맞게 채워주세요.
+# (application-local.yml은 .gitignore에 포함되어 커밋되지 않습니다)
+#
+# docker-compose로 띄운 MySQL 계정/비밀번호와 맞춰주세요 (루트 .env 참고).
+
+DB_USERNAME: game_user
+DB_PASSWORD: change_me
