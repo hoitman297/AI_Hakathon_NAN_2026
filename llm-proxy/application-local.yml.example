@@ -2,6 +2,18 @@
 # 아래 값을 본인 로컬 환경에 맞게 채워주세요.
 # (application-local.yml은 .gitignore에 포함되어 커밋되지 않습니다)
 #
+# docker-compose로 띄운 로컬 MySQL을 쓰는 경우: 아래 기본값만 채우면 됩니다
+# (DB_HOST/DB_PORT/DB_SSL_MODE는 생략 시 localhost:3306, SSL 미강제로 동작합니다).
+#
+# 팀 공유 DB 서버(Aiven 등 SSL 필수 접속)를 쓰는 경우: DB_HOST/DB_PORT를 서버 값으로,
+# DB_SSL_MODE를 REQUIRED로 지정해주세요. 팀 채널에서 공유받은 계정/서버 정보를 쓰세요.
+#
 # 실제 LLM API 연동은 다음 단계에서 진행되며, 지금은 값만 채워두면 됩니다.
+
+DB_USERNAME: game_user
+DB_PASSWORD: change_me
+# DB_HOST: localhost
+# DB_PORT: 3306
+# DB_SSL_MODE: REQUIRED
 
 LLM_API_KEY: change_me
