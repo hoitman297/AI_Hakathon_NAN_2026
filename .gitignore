@@ -25,4 +25,8 @@ Thumbs.db
 
 # logs
 *.log
+<<<<<<< HEAD
 .metadata/
+=======
+/.metadata/
+>>>>>>> develop
