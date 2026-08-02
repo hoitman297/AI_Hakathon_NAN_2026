@@ -25,4 +25,12 @@ Thumbs.db
 
 # logs
 *.log
+<<<<<<< HEAD
 .metadata/
+=======
+<<<<<<< HEAD
+.metadata/
+=======
+/.metadata/
+>>>>>>> develop
+>>>>>>> 4ec84a785b5baf2d92c183ef221d2fe38f40bfaa
