@@ -7,6 +7,7 @@ import java.util.Random;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.gameproject.backend.client.LlmProxyClient;
 import com.gameproject.backend.domain.Account;
 import com.gameproject.backend.domain.Affinity;
 import com.gameproject.backend.domain.ClueCard;
@@ -16,6 +17,7 @@ import com.gameproject.backend.domain.Npc;
 import com.gameproject.backend.domain.NpcCaseAssignment;
 import com.gameproject.backend.domain.PlayerStat;
 import com.gameproject.backend.domain.SabotageEvent;
+import com.gameproject.backend.domain.SabotageType;
 import com.gameproject.backend.domain.SessionStatus;
 import com.gameproject.backend.dto.CreateSessionRequest;
 import com.gameproject.backend.dto.SessionResponse;
@@ -44,6 +46,9 @@ public class SessionService {
     private final ClueCardRepository clueCardRepository;
     private final CulpritProfileRegistry culpritProfileRegistry;
     private final NpcLocationResolver locationResolver;
+    private final StaminaService staminaService;
+    private final GameSaveService gameSaveService;
+    private final LlmProxyClient llmProxyClient;
 
     private final Random random = new Random();
 
@@ -66,11 +71,12 @@ public class SessionService {
                 .build());
 
         CulpritProfile profile = culpritProfileRegistry.get(culprit.getName());
+        SabotageType secondaryType = culpritProfileRegistry.pickSecondaryType(random, profile.primaryType());
         caseAssignmentRepository.save(NpcCaseAssignment.builder()
                 .session(session)
                 .npc(culprit)
                 .primaryType(profile.primaryType())
-                .secondaryType(null) // 기획서 미확정
+                .secondaryType(secondaryType)
                 .motiveText(profile.motiveText())
                 .targetPoolDesc(profile.describePool())
                 .build());
@@ -92,6 +98,11 @@ public class SessionService {
                 .gold(0)
                 .fainted(false)
                 .build());
+
+        // 이전 판이 끝난 채로(success/bad_ending) 남아있는 세이브가 있다면, 새 판을 시작하는
+        // 시점에 ending_state를 in_progress로 되돌린다 — game_save는 "현재 진행 중인 판"의
+        // 상태를 반영해야 한다는 원칙(TODO.md 7번)을 세션 시작 시점까지 일관되게 적용.
+        gameSaveService.syncEndingState(account, GameSaveService.ENDING_STATE_IN_PROGRESS);
 
         return toResponse(session, stat);
     }
@@ -124,6 +135,7 @@ public class SessionService {
             session.setStatus(SessionStatus.BAD_ENDING);
             session.setEndedAt(LocalDateTime.now());
             sessionRepository.save(session);
+            gameSaveService.syncEndingState(session.getAccount(), GameSaveService.ENDING_STATE_BAD_ENDING);
             return toResponse(session, today);
         }
 
@@ -147,6 +159,24 @@ public class SessionService {
         return toResponse(session, next);
     }
 
+    /**
+     * 낮 이동 1회에 대한 체력 소모만 처리한다. 프론트의 실제 이동 방식(자유이동/타일 등)에
+     * 대해서는 이 API가 관여하지 않고, "이동 1회"로 볼 시점마다 이 API를 호출하는 것을
+     * 프론트에 맡긴다 — 운동화 착용 시 5→4 할인만 서버가 보장한다.
+     */
+    @Transactional
+    public SessionResponse move(Long sessionId) {
+        GameSession session = findSession(sessionId);
+        if (session.getStatus() != SessionStatus.IN_PROGRESS) {
+            throw new IllegalStateException("이미 종료된 세션입니다.");
+        }
+        int cost = Boolean.TRUE.equals(session.getSneakersEquipped())
+                ? GameConstants.MOVE_STAMINA_WITH_SNEAKERS
+                : GameConstants.MOVE_STAMINA;
+        PlayerStat stat = staminaService.consume(session, cost);
+        return toResponse(session, stat);
+    }
+
     private void generateNightSabotage(GameSession session, int day) {
         NpcCaseAssignment assignment = caseAssignmentRepository.findBySession(session)
                 .orElseThrow(() -> new IllegalStateException("범인 배정 정보가 없습니다."));
@@ -160,33 +190,49 @@ public class SessionService {
 
         boolean selfDecoy = random.nextInt(100) < 10; // 낮은 확률(10%)로 자작극
         Npc witness = findWitness(session, assignment.getNpc(), tonight.location());
+        SabotageType tonightType = pickTonightType(assignment, random);
 
         SabotageEvent event = sabotageEventRepository.save(SabotageEvent.builder()
                 .session(session)
                 .day(day)
                 .location(tonight.location())
-                .type(assignment.getPrimaryType())
+                .type(tonightType)
                 .subTarget(tonight.subTarget())
                 .selfDecoy(selfDecoy)
                 .witnessNpc(witness)
                 .createdAt(LocalDateTime.now())
                 .build());
 
-        // 단서 카드 5장 총량에 맞춰 1~5일차 밤마다 주제를 하나씩 순환 배정 (실제 문구는 추후 작가 콘텐츠로 교체 필요)
+        // 단서 카드 5장 총량에 맞춰 1~5일차 밤마다 주제를 하나씩 순환 배정
         ClueTopic topic = ClueTopic.values()[(day - 1) % ClueTopic.values().length];
         String witnessHint = witness != null
                 ? " 그 시각 근처에 " + witness.getName() + "이(가) 있었다는 이야기도 있다."
                 : "";
+        Npc culprit = assignment.getNpc();
+        String clueText = llmProxyClient.generateClueContent(
+                topic.name(), culprit.getAppearanceDesc(), culprit.getPersonalityDesc(),
+                tonight.location(), tonight.subTarget()) + witnessHint;
         clueCardRepository.save(ClueCard.builder()
                 .session(session)
                 .sabotageEvent(event)
                 .topic(topic)
-                .textAmbiguous(topic.name() + " 관련 단서 — 그날 밤 " + tonight.location() + "의 "
-                        + tonight.subTarget() + " 부근에서 발견됨." + witnessHint)
+                .textAmbiguous(clueText)
                 .textClarified(null)
                 .acquired(false)
                 .acquiredAt(null)
                 .build());
+    }
+
+    /**
+     * 유형만으로 범인이 특정되지 않도록, 주 유형을 기본으로 하되 보조 유형이 배정돼 있으면
+     * 낮은 확률(기본 20%)로 그날 밤은 보조 유형을 대신 쓴다.
+     */
+    private SabotageType pickTonightType(NpcCaseAssignment assignment, Random random) {
+        if (assignment.getSecondaryType() == null) {
+            return assignment.getPrimaryType();
+        }
+        boolean useSecondary = random.nextInt(100) < GameConstants.SECONDARY_SABOTAGE_TYPE_CHANCE_PERCENT;
+        return useSecondary ? assignment.getSecondaryType() : assignment.getPrimaryType();
     }
 
     /** 사보타주 발생 장소에 그 시간 실제로 있었을 법한(낮 동선상 그 장소인) 범인 외 NPC를 찾는다. 없으면 null. */

@@ -6,13 +6,16 @@ import java.util.List;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.gameproject.backend.client.LlmProxyClient;
 import com.gameproject.backend.domain.ClueCard;
 import com.gameproject.backend.domain.GameSession;
 import com.gameproject.backend.domain.InventoryItemType;
+import com.gameproject.backend.domain.NpcCaseAssignment;
 import com.gameproject.backend.domain.ShopItemMaster;
 import com.gameproject.backend.dto.ClueCardResponse;
 import com.gameproject.backend.repository.ClueCardRepository;
 import com.gameproject.backend.repository.GameSessionRepository;
+import com.gameproject.backend.repository.NpcCaseAssignmentRepository;
 import com.gameproject.backend.repository.ShopItemMasterRepository;
 
 import lombok.RequiredArgsConstructor;
@@ -26,6 +29,8 @@ public class ClueService {
     private final GameSessionRepository sessionRepository;
     private final InventoryService inventoryService;
     private final SessionService sessionService;
+    private final NpcCaseAssignmentRepository caseAssignmentRepository;
+    private final LlmProxyClient llmProxyClient;
 
     @Transactional(readOnly = true)
     public List<ClueCardResponse> listAcquired(Long sessionId) {
@@ -70,7 +75,11 @@ public class ClueService {
         session.setLastMagnifierUseDay(session.getCurrentDay());
         sessionRepository.save(session);
 
-        clue.setTextClarified(clue.getTextAmbiguous() + " (돋보기로 확인: 좀 더 구체적인 정황이 드러났다)");
+        NpcCaseAssignment assignment = caseAssignmentRepository.findBySession(session)
+                .orElseThrow(() -> new IllegalStateException("범인 배정 정보가 없습니다."));
+        String clarifiedText = llmProxyClient.clarifyClueContent(
+                clue.getTopic().name(), assignment.getNpc().getAppearanceDesc(), clue.getTextAmbiguous());
+        clue.setTextClarified(clarifiedText);
         return toResponse(clueCardRepository.save(clue));
     }
 

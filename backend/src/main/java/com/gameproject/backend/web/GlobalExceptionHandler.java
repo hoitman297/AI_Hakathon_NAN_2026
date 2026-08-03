@@ -12,6 +12,7 @@ import org.springframework.web.client.ResourceAccessException;
 
 import com.gameproject.backend.service.AuthException;
 import com.gameproject.backend.service.ForbiddenException;
+import com.gameproject.backend.service.LlmRateLimitExceededException;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
@@ -55,5 +56,11 @@ public class GlobalExceptionHandler {
     public ResponseEntity<Map<String, String>> handleOptimisticLock(ObjectOptimisticLockingFailureException e) {
         return ResponseEntity.status(HttpStatus.CONFLICT)
                 .body(Map.of("error", "다른 요청과 동시에 처리되어 충돌했습니다. 다시 시도해주세요."));
+    }
+
+    /** 계정당 LLM 호출 빈도 제한(LlmRateLimiter) 초과 — 버그/재시도 루프로부터 비용을 보호. */
+    @ExceptionHandler(LlmRateLimitExceededException.class)
+    public ResponseEntity<Map<String, String>> handleLlmRateLimit(LlmRateLimitExceededException e) {
+        return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS).body(Map.of("error", e.getMessage()));
     }
 }

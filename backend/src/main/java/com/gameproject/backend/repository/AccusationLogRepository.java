@@ -10,4 +10,6 @@ import com.gameproject.backend.domain.GameSession;
 public interface AccusationLogRepository extends JpaRepository<AccusationLog, Long> {
 
     List<AccusationLog> findBySession(GameSession session);
+
+    boolean existsBySessionAndDay(GameSession session, Integer day);
 }

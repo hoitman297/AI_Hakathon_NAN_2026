@@ -43,6 +43,7 @@ public class DialogueService {
     private final StaminaService staminaService;
     private final NpcService npcService;
     private final LlmProxyClient llmProxyClient;
+    private final LlmRateLimiter llmRateLimiter;
 
     private final Random random = new Random();
 
@@ -59,6 +60,11 @@ public class DialogueService {
     public DialogueReplyResponse send(Long sessionId, Long npcId, String userMessage) {
         GameSession session = sessionService.findSession(sessionId);
         Npc npc = findNpc(npcId);
+
+        // 대화는 체력 소모(하루 최대 ~12회)로만 자연스럽게 제한돼 있고 별도 횟수 제한이 없어서,
+        // 프론트 버그/재시도 루프가 있으면 이 한도 안에서도 짧은 시간에 LLM 호출이 몰릴 수 있다.
+        // 실제 상태 변경(체력 소모 등) 전에 먼저 검사해서, 막힐 요청은 아무 부작용 없이 막는다.
+        llmRateLimiter.checkAllowed(session.getAccount().getAccountId());
 
         // 7일차부터는 기획서상 "간단한 대화만 가능(추리 대화 불가)" 이지만, 대화 내용 자체의
         // 주제를 서버가 판별하기는 어려워 현재는 별도 제한을 걸지 않았다 (기획 확정 필요 항목).

@@ -34,4 +34,7 @@ public final class GameConstants {
     public static final int AFFINITY_DIALOGUE_GAIN_MAX = 5;
     public static final int AFFINITY_GIFT_MIN = 10;
     public static final int AFFINITY_GIFT_MAX = 15;
+
+    /** 사보타주 유형만으로 범인이 특정되는 것을 막기 위한 보조 유형 등장 확률(기획 방향성: 주 80% + 보조 20%) */
+    public static final int SECONDARY_SABOTAGE_TYPE_CHANCE_PERCENT = 20;
 }

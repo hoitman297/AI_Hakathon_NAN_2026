@@ -5,9 +5,17 @@ import java.util.List;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 
+import com.gameproject.backend.dto.llm.ClueClarifyRequest;
+import com.gameproject.backend.dto.llm.ClueClarifyResponse;
+import com.gameproject.backend.dto.llm.ClueContentRequest;
+import com.gameproject.backend.dto.llm.ClueContentResponse;
 import com.gameproject.backend.dto.llm.DialogueChatRequest;
 import com.gameproject.backend.dto.llm.DialogueChatResponse;
 import com.gameproject.backend.dto.llm.DialogueTurn;
+import com.gameproject.backend.dto.llm.EndingContentRequest;
+import com.gameproject.backend.dto.llm.EndingContentResponse;
+import com.gameproject.backend.dto.llm.EventContentRequest;
+import com.gameproject.backend.dto.llm.EventContentResponse;
 import com.gameproject.backend.dto.llm.PersonaGenerateRequest;
 import com.gameproject.backend.dto.llm.PersonaGenerateResponse;
 
@@ -44,5 +52,48 @@ public class LlmProxyClient {
                 .retrieve()
                 .body(DialogueChatResponse.class);
         return response != null ? response.reply() : null;
+    }
+
+    public String generateEventContent(String eventType, String target, int day, String accusedNpcName) {
+        EventContentRequest request = new EventContentRequest(eventType, target, day, accusedNpcName);
+        EventContentResponse response = llmProxyRestClient.post()
+                .uri("/internal/llm/event")
+                .body(request)
+                .retrieve()
+                .body(EventContentResponse.class);
+        return response != null ? response.description() : null;
+    }
+
+    public String generateEndingStory(Long npcId, String name, String role, Integer age, String personalityDesc,
+                                       String speechStyle, String motiveText, String primaryType, String targetPoolDesc) {
+        EndingContentRequest request = new EndingContentRequest(
+                npcId, name, role, age, personalityDesc, speechStyle, motiveText, primaryType, targetPoolDesc);
+        EndingContentResponse response = llmProxyRestClient.post()
+                .uri("/internal/llm/ending")
+                .body(request)
+                .retrieve()
+                .body(EndingContentResponse.class);
+        return response != null ? response.story() : null;
+    }
+
+    public String generateClueContent(String topic, String npcAppearanceDesc, String npcPersonalityDesc,
+                                       String location, String subTarget) {
+        ClueContentRequest request = new ClueContentRequest(topic, npcAppearanceDesc, npcPersonalityDesc, location, subTarget);
+        ClueContentResponse response = llmProxyRestClient.post()
+                .uri("/internal/llm/clue")
+                .body(request)
+                .retrieve()
+                .body(ClueContentResponse.class);
+        return response != null ? response.text() : null;
+    }
+
+    public String clarifyClueContent(String topic, String npcAppearanceDesc, String previousText) {
+        ClueClarifyRequest request = new ClueClarifyRequest(topic, npcAppearanceDesc, previousText);
+        ClueClarifyResponse response = llmProxyRestClient.post()
+                .uri("/internal/llm/clue/clarify")
+                .body(request)
+                .retrieve()
+                .body(ClueClarifyResponse.class);
+        return response != null ? response.text() : null;
     }
 }

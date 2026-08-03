@@ -26,8 +26,9 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public class GameSaveService {
 
-    /** ending_state는 원 요구사항에 갱신 방법이 정의되어 있지 않아, 지금은 항상 기본값으로 저장한다. */
-    private static final String DEFAULT_ENDING_STATE = "in_progress";
+    public static final String ENDING_STATE_IN_PROGRESS = "in_progress";
+    public static final String ENDING_STATE_SUCCESS = "success";
+    public static final String ENDING_STATE_BAD_ENDING = "bad_ending";
 
     private final GameSaveRepository gameSaveRepository;
     private final ObjectMapper objectMapper;
@@ -39,7 +40,7 @@ public class GameSaveService {
         GameSave save = gameSaveRepository.findById(account.getAccountId())
                 .orElseGet(() -> GameSave.builder().account(account).build());
         save.setSaveData(json);
-        save.setEndingState(DEFAULT_ENDING_STATE);
+        save.setEndingState(ENDING_STATE_IN_PROGRESS);
         save.setUpdatedAt(LocalDateTime.now());
         GameSave saved = gameSaveRepository.save(save);
 
@@ -53,12 +54,25 @@ public class GameSaveService {
                 .orElseGet(this::defaultSave);
     }
 
+    /**
+     * 게임 종료(성공/배드엔딩) 시점에 그 계정의 기존 세이브가 있으면 ending_state만 갱신한다.
+     * save_data(진행 스냅샷) 자체는 건드리지 않음 — 세이브가 아예 없는 계정(한 번도 저장 안 함)은
+     * 갱신할 대상이 없으므로 아무 일도 하지 않는다.
+     */
+    @Transactional
+    public void syncEndingState(Account account, String endingState) {
+        gameSaveRepository.findById(account.getAccountId()).ifPresent(save -> {
+            save.setEndingState(endingState);
+            gameSaveRepository.save(save);
+        });
+    }
+
     /** 저장된 세이브가 없을 때(신규 플레이어) 반환하는 기본값. */
     private SaveResponse defaultSave() {
         SaveRequest fresh = new SaveRequest(
                 1, "day", 100,
                 Map.of(), Map.of(), List.of(), null, List.of(), 0, Map.of());
-        return new SaveResponse(fresh, DEFAULT_ENDING_STATE, null);
+        return new SaveResponse(fresh, ENDING_STATE_IN_PROGRESS, null);
     }
 
     private String serialize(SaveRequest request) {

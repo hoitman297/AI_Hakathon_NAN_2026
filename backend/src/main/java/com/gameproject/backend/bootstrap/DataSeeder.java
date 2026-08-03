@@ -53,14 +53,22 @@ public class DataSeeder implements CommandLineRunner {
 
     private void seedNpcs() {
         record NpcSeed(String name, String role, int age, String personality, String speech, String sample,
-                        List<Object[]> schedule) {
+                        String appearance, List<Object[]> schedule) {
         }
 
+        // appearance는 `기타/2. 에셋/NPC/*/metadata.json`의 캐릭터 생성 프롬프트에서
+        // 머리카락/체격/복장 등 단서 카드 생성 LLM이 참고할 부분만 추려온 것 (원문은 영어).
         List<NpcSeed> seeds = List.of(
                 new NpcSeed("현수동", "이장", 70,
                         "마을 최고령. 마을 애정도 높지만 변화를 싫어함. 겉은 퉁명스럽고 잔소리 많지만 마을 일엔 발 벗고 나섬. 고집 셈",
                         "반말 섞인 명령조, 옛날식 표현, 짧고 직설적",
                         "요즘 것들은 말이야, 마을이 뭔지도 모르면서… 쯧.",
+                        "An elderly Korean man in his seventies. He has neatly combed short white hair with a "
+                                + "slightly receding hairline, thick white eyebrows, deep wrinkles, and a stern "
+                                + "grumpy expression. His posture is slightly bent with age. He wears a faded white "
+                                + "long-sleeved shirt, a dark forest-green buttoned vest, loose dark brown trousers, "
+                                + "and worn black slip-on shoes. Short elderly proportions with slightly narrow "
+                                + "shoulders and a round head.",
                         List.of(
                                 new Object[]{LocationSlot.PRIMARY, "마을회관", 70},
                                 new Object[]{LocationSlot.SECONDARY, "마을 어귀 순찰", 20},
@@ -70,6 +78,11 @@ public class DataSeeder implements CommandLineRunner {
                         "상냥·사교적으로 보이나 낯선 사람에겐 거리를 둠. 남편(전주인)에겐 다정하고 신뢰",
                         "존댓말 기본, 부드럽고 다정한 어조",
                         "어머, 오늘 날씨 좋죠? 산책하기 딱이에요~",
+                        "A Korean woman in her early thirties. She has feminine facial features, warm eyes, and "
+                                + "long neat black hair tied in a low bun, with softly curved side bangs. She wears "
+                                + "a muted lavender blouse with a rounded collar, a dusty rose calf-length skirt, a "
+                                + "simple warm-beige waist apron, and practical dark brown shoes. Feminine average "
+                                + "build with narrow shoulders and a defined waist.",
                         List.of(
                                 new Object[]{LocationSlot.PRIMARY, "자택 정원", 60},
                                 new Object[]{LocationSlot.SECONDARY, "상점", 25},
@@ -79,6 +92,11 @@ public class DataSeeder implements CommandLineRunner {
                         "친절, 손님 응대 능숙, 눈치 빠르고 계산적. 은근히 승부욕 있음. 소비 패턴 파악 가능. 아내(나주부)와 신혼부부 느낌",
                         "상냥한 존댓말 + 장사꾼 멘트",
                         "어서 오세요! 오늘은 뭐 필요하신 거 있으세요?",
+                        "A Korean man in his mid-thirties. He has neatly side-parted short black hair, alert eyes, "
+                                + "and a polished friendly shopkeeper smile with a slightly calculating expression. "
+                                + "He wears a faded light-blue collared shirt, a muted rust-brown shop apron, dark "
+                                + "charcoal trousers, and clean brown shoes. Average adult proportions with a "
+                                + "slightly large head and tidy posture.",
                         List.of(
                                 new Object[]{LocationSlot.PRIMARY, "상점", 80},
                                 new Object[]{LocationSlot.SECONDARY, "창고 정리", 20}
@@ -87,6 +105,11 @@ public class DataSeeder implements CommandLineRunner {
                         "활발·사교적, 마을 소식통 자처. 오지랖 넓고 입이 가벼움. 정 많음",
                         "친근한 반말 섞인 존댓말, 빠른 말투",
                         "얘, 그거 들었어? 아유 말도 마, 내가 다 들었잖아~",
+                        "A Korean woman in her early forties. She has feminine facial features, lively eyes, and "
+                                + "short-to-medium curly black permed hair that reaches her neck and creates a "
+                                + "round fluffy silhouette. She wears a faded mustard-yellow work blouse, a dark "
+                                + "teal full apron, loose warm-brown work pants, and dark green rubber farm boots. "
+                                + "Sturdy feminine build with a slightly large head.",
                         List.of(
                                 new Object[]{LocationSlot.PRIMARY, "양계장", 60},
                                 new Object[]{LocationSlot.SECONDARY, "마을회관", 25},
@@ -96,6 +119,12 @@ public class DataSeeder implements CommandLineRunner {
                         "내향적, 히키코모리에 가까움. 겁 많고 예민하나 악의는 없음",
                         "짧고 단답형, 형식적 존댓말",
                         "…네, 뭐.",
+                        "A Korean woman in her mid-twenties. She has pale feminine facial features, tired eyes, "
+                                + "and very long slightly unkempt straight black hair reaching below her shoulders, "
+                                + "with heavy bangs partially covering one eye. She has a slightly hunched posture. "
+                                + "She wears an oversized muted blue-gray cardigan over a plain cream blouse, a long "
+                                + "dark charcoal skirt, and simple faded brown slip-on shoes. Slim feminine build "
+                                + "with narrow shoulders.",
                         List.of(
                                 new Object[]{LocationSlot.PRIMARY, "자택", 80},
                                 new Object[]{LocationSlot.SECONDARY, "자택 인근 텃밭", 20}
@@ -104,6 +133,11 @@ public class DataSeeder implements CommandLineRunner {
                         "차분·예의 바름. 감정 표현 적음. 뒤끝 있음. 나박수와 앙숙",
                         "정중한 존댓말, 담담한 어조",
                         "네, 손님. 필요한 거 있으시면 말씀하세요.",
+                        "A Korean man in his late twenties. He has neatly trimmed straight black hair with a "
+                                + "simple side part, calm eyes, and a polite but emotionally restrained expression. "
+                                + "His posture is straight and formal. He wears a clean off-white collared shirt, a "
+                                + "muted navy sleeveless sweater vest, dark gray trousers, and simple black shoes. "
+                                + "Slim average build with slightly narrow shoulders.",
                         List.of(
                                 new Object[]{LocationSlot.PRIMARY, "상점(근무)", 70},
                                 new Object[]{LocationSlot.SECONDARY, "마을회관 구석(이력서 작성)", 30}
@@ -112,6 +146,11 @@ public class DataSeeder implements CommandLineRunner {
                         "열정파, 화끈하고 직설적, 감정 숨기지 못함. 김치준과 앙숙일 때만 뒤끝",
                         "사투리 섞인 거친 말투, 큰 목소리",
                         "아이고, 이 수박 좀 봐! 올해 최고작이여!",
+                        "A Korean man in his early thirties. He has short rough black hair, thick eyebrows, "
+                                + "sun-tanned skin, and a passionate loud expression. He wears a faded brick-red "
+                                + "short-sleeved work shirt, loose dark olive work trousers, a light beige towel "
+                                + "loosely wrapped around his neck, and dark brown rubber farm boots. Broad sturdy "
+                                + "build with wide shoulders and strong arms.",
                         List.of(
                                 new Object[]{LocationSlot.PRIMARY, "수박밭", 75},
                                 new Object[]{LocationSlot.SECONDARY, "상점(납품)", 25}
@@ -126,6 +165,7 @@ public class DataSeeder implements CommandLineRunner {
                     .personalityDesc(seed.personality())
                     .speechStyle(seed.speech())
                     .sampleLine(seed.sample())
+                    .appearanceDesc(seed.appearance())
                     .build());
 
             for (Object[] row : seed.schedule()) {

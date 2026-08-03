@@ -17,6 +17,14 @@ repositories {
 	mavenCentral()
 }
 
+// Mockito 5's inline mock maker(기본값)는 실행 중 자기 자신을 Java agent로 self-attach하는데,
+// JDK 21 + Gradle 테스트 워커 환경에서 이게 완전히 성공하지 못해 Anthropic SDK의 final 클래스
+// (Message, StructuredMessage 등)를 mock()할 때 UnfinishedStubbingException이 났다.
+// JVM 시작 시점에 -javaagent로 미리 로드하면 이 문제가 해결된다(Mockito 공식 권장 방식).
+configurations {
+	mockitoAgent
+}
+
 dependencies {
 	implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
 	implementation 'org.springframework.boot:spring-boot-starter-webmvc'
@@ -30,8 +38,12 @@ dependencies {
 	testCompileOnly 'org.projectlombok:lombok'
 	testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 	testAnnotationProcessor 'org.projectlombok:lombok'
+	mockitoAgent('org.mockito:mockito-core') {
+		transitive = false
+	}
 }
 
 tasks.named('test') {
 	useJUnitPlatform()
+	jvmArgs "-javaagent:${configurations.mockitoAgent.asPath}"
 }

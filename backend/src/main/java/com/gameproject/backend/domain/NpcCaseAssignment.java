@@ -22,7 +22,8 @@ import org.hibernate.annotations.Comment;
 /**
  * 판마다 랜덤 배정되는 범인(culprit)의 사보타주 유형/동기.
  * 기획서상 "범인별 사보타주 대상 풀" 표(💡 최종 확정 아님)에 대응.
- * secondaryType은 기획서에서 방향성만 논의되고 미확정이라 nullable로 둠.
+ * secondaryType은 세션 생성 시 항상 배정됨(주 유형 제외 나머지 중 랜덤) — nullable인 이유는
+ * 과거 세션 호환 목적일 뿐, 신규 세션은 항상 값이 채워짐.
  */
 @Entity
 @Table(name = "npc_case_assignment")
@@ -51,7 +52,7 @@ public class NpcCaseAssignment {
     @Column(name = "primary_type", nullable = false, length = 20)
     private SabotageType primaryType;
 
-    @Comment("보조 사보타주 유형 — 기획서상 \"주 80% + 보조 20%\" 방향성만 있고 미확정이라 nullable")
+    @Comment("보조 사보타주 유형 — 세션 생성 시 항상 배정됨(주 유형 제외 랜덤), 매일 밤 20% 확률로 사용")
     @Enumerated(EnumType.STRING)
     @Column(name = "secondary_type", length = 20)
     private SabotageType secondaryType;
@@ -65,4 +66,9 @@ public class NpcCaseAssignment {
     @Lob
     @Column(name = "target_pool_desc", columnDefinition = "TEXT")
     private String targetPoolDesc;
+
+    @Comment("정답 고발 성공 시 공개되는 범인 개별 엔딩 스토리 (LLM 생성, 최초 1회 생성 후 캐시)")
+    @Lob
+    @Column(name = "ending_story_text", columnDefinition = "TEXT")
+    private String endingStoryText;
 }

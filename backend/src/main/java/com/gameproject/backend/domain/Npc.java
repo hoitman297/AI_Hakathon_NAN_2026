@@ -55,4 +55,9 @@ public class Npc {
     @Lob
     @Column(name = "sample_line", columnDefinition = "TEXT")
     private String sampleLine;
+
+    @Comment("외형 묘사 (캐릭터 에셋 생성 프롬프트 원문 — 단서 카드 생성 LLM 입력값)")
+    @Lob
+    @Column(name = "appearance_desc", columnDefinition = "TEXT")
+    private String appearanceDesc;
 }

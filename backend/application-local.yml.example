@@ -17,3 +17,11 @@ DB_PASSWORD: change_me
 # DB에 테이블이 아직 없다면(최초 1회) update로 Hibernate가 엔티티 기준 스키마를 생성/갱신.
 # 이미 스키마가 있는 DB(특히 팀 공유 DB)에 붙는 거라면 충돌 방지 위해 none 권장.
 # DB_DDL_AUTO: update
+
+# backend -> llm-proxy 내부 API 호출을 검증하는 공유 비밀키.
+# llm-proxy/application-local.yml의 INTERNAL_API_KEY와 반드시 같은 값이어야 함.
+INTERNAL_API_KEY: change_me
+
+# 계정당 대화(dialogue) LLM 호출 빈도 제한 (버그/재시도 루프로부터 비용 보호). 기본값 분당 20회.
+# LLM_RATE_LIMIT_MAX_CALLS: 20
+# LLM_RATE_LIMIT_WINDOW_SECONDS: 60

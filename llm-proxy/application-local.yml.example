@@ -16,3 +16,7 @@ DB_PASSWORD: change_me
 
 # 실제 LLM 연동 전이라 임의 문자열이어도 서버 실행에는 문제없음
 LLM_API_KEY: change_me
+
+# backend -> llm-proxy 내부 API 호출을 검증하는 공유 비밀키.
+# backend/application-local.yml의 INTERNAL_API_KEY와 반드시 같은 값이어야 함.
+INTERNAL_API_KEY: change_me

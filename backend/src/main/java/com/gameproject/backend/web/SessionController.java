@@ -44,4 +44,13 @@ public class SessionController {
     public ResponseEntity<SessionResponse> advanceDay(@PathVariable Long sessionId) {
         return ResponseEntity.ok(sessionService.advanceDay(sessionId));
     }
+
+    /**
+     * 이동 1회에 대한 체력 소모(운동화 장착 시 5→4 할인 적용). 프론트가 "이동 1회"로
+     * 판단하는 시점(예: 타일 1칸, 일정 거리)마다 호출한다.
+     */
+    @PostMapping("/{sessionId}/move")
+    public ResponseEntity<SessionResponse> move(@PathVariable Long sessionId) {
+        return ResponseEntity.ok(sessionService.move(sessionId));
+    }
 }

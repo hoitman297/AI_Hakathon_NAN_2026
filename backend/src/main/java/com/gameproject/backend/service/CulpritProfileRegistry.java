@@ -11,7 +11,7 @@ import com.gameproject.backend.domain.SabotageType;
 /**
  * 기획서 "범인별 사보타주 대상 풀" 표(💡 최종 확정 아님)를 코드로 옮긴 정적 룩업.
  * NPC 이름으로 조회해서, 해당 NPC가 이번 판의 범인으로 뽑혔을 때 쓸 주 유형/동기/대상 풀을 가져온다.
- * secondaryType(보조 유형)은 기획서에서 방향성만 논의되고 미확정이라 아직 없음.
+ * secondaryType(보조 유형)은 NPC별 고정이 아니라 {@link #pickSecondaryType}으로 세션마다 랜덤 배정된다.
  *
  * Target.location()은 DataSeeder의 NpcLocationSchedule locationName과 문자열이 정확히
  * 일치해야 한다 — SessionService가 이 값으로 "그 시간 그 장소에 있던 목격 NPC"를 찾기 때문.
@@ -93,5 +93,16 @@ public class CulpritProfileRegistry {
             throw new IllegalStateException("정의되지 않은 NPC입니다: " + npcName);
         }
         return profile;
+    }
+
+    /**
+     * 판마다 보조 유형을 주 유형이 아닌 나머지 2개 중 랜덤으로 배정한다.
+     * NPC별 주 유형이 고정이라 반복 플레이 시 유형만으로 범인이 특정되는 문제를 완화하기 위함.
+     */
+    public SabotageType pickSecondaryType(Random random, SabotageType primaryType) {
+        List<SabotageType> candidates = java.util.Arrays.stream(SabotageType.values())
+                .filter(type -> type != primaryType)
+                .toList();
+        return candidates.get(random.nextInt(candidates.size()));
     }
 }
