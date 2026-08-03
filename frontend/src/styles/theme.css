@@ -1,0 +1,99 @@
+:root {
+  --ink: #3b2b20;
+  --ink-soft: #6b5642;
+  --paper: #fff8ec;
+  --paper-dim: #f1e4cc;
+  --accent: #ff5b3d;
+  --accent-dark: #c73f26;
+  --leaf: #4c7a3d;
+  --leaf-dark: #345429;
+  --danger: #b23a2f;
+  --shadow: rgba(59, 43, 32, 0.45);
+}
+
+.pixel-art {
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+  user-select: none;
+  pointer-events: none;
+}
+
+.pixel-button {
+  font-family: inherit;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--paper);
+  background: var(--leaf);
+  border: 3px solid var(--ink);
+  border-radius: 6px;
+  padding: 10px 22px;
+  cursor: pointer;
+  box-shadow: 0 4px 0 var(--leaf-dark);
+  transition: transform 0.08s ease, box-shadow 0.08s ease;
+}
+
+.pixel-button:hover:not(:disabled) {
+  transform: translateY(-1px);
+}
+
+.pixel-button:active:not(:disabled) {
+  transform: translateY(3px);
+  box-shadow: 0 1px 0 var(--leaf-dark);
+}
+
+.pixel-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+  box-shadow: 0 4px 0 var(--ink-soft);
+  background: var(--ink-soft);
+}
+
+.pixel-button--accent {
+  background: var(--accent);
+  box-shadow: 0 4px 0 var(--accent-dark);
+}
+
+.pixel-button--accent:active:not(:disabled) {
+  box-shadow: 0 1px 0 var(--accent-dark);
+}
+
+.pixel-button--danger {
+  background: var(--danger);
+  box-shadow: 0 4px 0 #7a251d;
+}
+
+.pixel-button--danger:active:not(:disabled) {
+  box-shadow: 0 1px 0 #7a251d;
+}
+
+.pixel-input {
+  display: block;
+  width: 100%;
+  margin-top: 4px;
+  padding: 8px 10px;
+  font: inherit;
+  font-size: 0.95rem;
+  border: 2px solid var(--ink);
+  border-radius: 6px;
+  background: var(--paper);
+  color: var(--ink);
+}
+
+.pixel-input:focus {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.pixel-error {
+  margin: 0;
+  color: var(--danger);
+  font-size: 0.85rem;
+}
+
+.pixel-panel {
+  background: var(--paper);
+  border: 3px solid var(--ink);
+  border-radius: 10px;
+  box-shadow: 0 6px 0 var(--shadow);
+  color: var(--ink);
+}

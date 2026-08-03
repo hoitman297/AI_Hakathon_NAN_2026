@@ -1,0 +1,10 @@
+.login-mode-toggle {
+  align-self: center;
+  margin-top: 6px;
+  background: none;
+  border: none;
+  color: var(--ink-soft);
+  text-decoration: underline;
+  cursor: pointer;
+  font-size: 0.8rem;
+}

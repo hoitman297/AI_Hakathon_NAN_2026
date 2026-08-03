@@ -1,0 +1,108 @@
+import { useEffect, useRef, useState } from 'react'
+import Phaser from 'phaser'
+import { gameConfig } from '../game/config'
+import { DayScene, type DaySceneInitData } from '../game/DayScene'
+import { StaminaBar } from '../components/StaminaBar'
+import { DialogueBox } from '../components/DialogueBox'
+import { EscMenu } from '../components/EscMenu'
+import type { SessionResponse } from '../api/sessionApi'
+import './DayScreen.css'
+
+// 백엔드 GameConstants.FIRST_ACCUSATION_DAY / LAST_ACCUSATION_DAY 와 맞춰야 한다.
+// 이 값을 조회하는 API가 없어 프론트에 그대로 하드코딩했다.
+const FIRST_ACCUSATION_DAY = 7
+const LAST_ACCUSATION_DAY = 9
+
+interface DayScreenProps {
+  session: SessionResponse
+  advancing: boolean
+  advanceError: string | null
+  onAdvanceDay: () => void
+  onOpenAccusation: () => void
+  onQuitToTitle: () => void
+}
+
+export function DayScreen({
+  session,
+  advancing,
+  advanceError,
+  onAdvanceDay,
+  onOpenAccusation,
+  onQuitToTitle,
+}: DayScreenProps) {
+  const containerRef = useRef<HTMLDivElement>(null)
+  const gameRef = useRef<Phaser.Game | null>(null)
+  const [stamina, setStamina] = useState(() => session.staminaCurrent)
+  const [dialogueNpc, setDialogueNpc] = useState<{ name: string; role: string } | null>(null)
+  const [escOpen, setEscOpen] = useState(false)
+
+  useEffect(() => {
+    if (!containerRef.current) return
+
+    const game = new Phaser.Game({ ...gameConfig, parent: containerRef.current })
+    gameRef.current = game
+    game.scene.add('DayScene', DayScene, false)
+    const initData: DaySceneInitData = {
+      day: session.currentDay,
+      staminaCurrent: session.staminaCurrent,
+      staminaMax: session.staminaMax,
+      onStaminaChange: setStamina,
+      onNpcClick: (name, role) => setDialogueNpc({ name, role }),
+    }
+    game.scene.start('DayScene', initData)
+
+    return () => {
+      game.destroy(true)
+      gameRef.current = null
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [session.currentDay])
+
+  useEffect(() => {
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key !== 'Escape') return
+      if (dialogueNpc) {
+        setDialogueNpc(null)
+        return
+      }
+      setEscOpen((open) => !open)
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [dialogueNpc])
+
+  const canAccuse =
+    session.status === 'IN_PROGRESS' &&
+    session.currentDay >= FIRST_ACCUSATION_DAY &&
+    session.currentDay <= LAST_ACCUSATION_DAY
+
+  return (
+    <div className="day-screen">
+      <div className="day-hud">
+        <StaminaBar value={stamina} max={session.staminaMax} day={session.currentDay} />
+        <div className="day-hud-actions">
+          {canAccuse && (
+            <button className="pixel-button pixel-button--danger" onClick={onOpenAccusation}>
+              범인 고발하기
+            </button>
+          )}
+          <button className="pixel-button pixel-button--accent" onClick={onAdvanceDay} disabled={advancing}>
+            {advancing ? '밤이 오는 중...' : '밤으로 넘어가기'}
+          </button>
+        </div>
+      </div>
+
+      {advanceError && <p className="day-advance-error pixel-error">{advanceError}</p>}
+
+      <div ref={containerRef} className="day-canvas-wrap" />
+
+      <p className="day-hint">방향키 / WASD로 이동, NPC를 클릭해 대화하세요. ESC로 메뉴를 엽니다.</p>
+
+      {dialogueNpc && (
+        <DialogueBox npcName={dialogueNpc.name} npcRole={dialogueNpc.role} onClose={() => setDialogueNpc(null)} />
+      )}
+
+      {escOpen && <EscMenu onResume={() => setEscOpen(false)} onQuit={onQuitToTitle} />}
+    </div>
+  )
+}

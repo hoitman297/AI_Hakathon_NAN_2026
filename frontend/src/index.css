@@ -1,5 +1,18 @@
+@import './styles/theme.css';
+
 :root {
-  color-scheme: light dark;
+  color-scheme: light;
+  font-family: 'Malgun Gothic', 'Apple SD Gothic Neo', sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
 }
 
 body {
@@ -8,4 +21,5 @@ body {
   justify-content: center;
   align-items: center;
   min-height: 100svh;
+  background: #1d1d1d;
 }

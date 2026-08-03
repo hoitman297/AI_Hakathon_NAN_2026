@@ -1,0 +1,59 @@
+.title-screen {
+  position: relative;
+  width: 100vw;
+  height: 100vh;
+  background-size: cover;
+  background-position: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.title-overlay {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(20, 15, 10, 0.35) 0%, rgba(20, 15, 10, 0.75) 100%);
+}
+
+.title-content {
+  position: relative;
+  z-index: 1;
+  text-align: center;
+  color: var(--paper);
+  padding: 32px;
+}
+
+.title-logo {
+  font-size: clamp(1.6rem, 4vw, 2.6rem);
+  margin: 0 0 12px;
+  text-shadow: 0 3px 0 var(--ink), 0 6px 10px rgba(0, 0, 0, 0.5);
+}
+
+.title-tagline {
+  margin: 0 0 32px;
+  color: var(--paper-dim);
+  font-size: 0.95rem;
+}
+
+.title-buttons {
+  display: flex;
+  gap: 16px;
+  justify-content: center;
+}
+
+.title-account {
+  margin-top: 24px;
+  font-size: 0.85rem;
+  color: var(--paper-dim);
+}
+
+.title-logout {
+  background: none;
+  border: none;
+  color: var(--paper);
+  text-decoration: underline;
+  cursor: pointer;
+  font: inherit;
+  padding: 0;
+}
