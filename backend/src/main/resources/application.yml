@@ -9,8 +9,12 @@ spring:
     password: ${DB_PASSWORD}
   jpa:
     hibernate:
-      ddl-auto: none
+      ddl-auto: ${DB_DDL_AUTO:none}
     open-in-view: false
 
 server:
   port: ${SERVER_PORT:8080}
+
+app:
+  llm-proxy:
+    base-url: ${LLM_PROXY_URL:http://localhost:8081}
