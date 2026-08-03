@@ -145,8 +145,13 @@ public class InventoryService {
                 if (targetNpcId == null) {
                     throw new IllegalArgumentException("거짓말탐지기는 대상 NPC(targetNpcId)가 필요합니다.");
                 }
+                if (session.getLastLieDetectorUseDay() != null
+                        && session.getLastLieDetectorUseDay().equals(session.getCurrentDay())) {
+                    throw new IllegalStateException("거짓말탐지기는 하루에 한 번만 사용할 수 있습니다.");
+                }
                 session.setHonestModeNpcId(targetNpcId);
                 session.setHonestModeDay(session.getCurrentDay());
+                session.setLastLieDetectorUseDay(session.getCurrentDay());
                 sessionRepository.save(session);
                 consumeOne(session, item);
                 yield "다음 대화 1턴 동안 정직 모드가 적용됩니다.";

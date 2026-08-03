@@ -13,6 +13,7 @@ import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
+import jakarta.persistence.Version;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
@@ -40,9 +41,9 @@ public class GameSession {
     @Column(name = "player_id", length = 100)
     private String playerId;
 
-    @Comment("로그인해서 시작한 세션일 경우의 계정 (게스트 플레이는 null)")
+    @Comment("세션 소유 계정 (로그인 필수 — 게스트 플레이 없음)")
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "account_id")
+    @JoinColumn(name = "account_id", nullable = false)
     private Account account;
 
     @Comment("이번 판의 범인으로 랜덤 배정된 NPC")
@@ -76,4 +77,15 @@ public class GameSession {
     @Comment("정직 모드가 적용되는 일차 (honest_mode_npc_id와 함께 사용)")
     @Column(name = "honest_mode_day")
     private Integer honestModeDay;
+
+    @Comment("거짓말탐지기를 마지막으로 사용한 일차 (\"1일 1회\" 제한 체크용, honest_mode_day와 별개)")
+    @Column(name = "last_lie_detector_use_day")
+    private Integer lastLieDetectorUseDay;
+
+    @Comment("돋보기를 마지막으로 사용한 일차 (\"1일 1회\" 제한 체크용)")
+    @Column(name = "last_magnifier_use_day")
+    private Integer lastMagnifierUseDay;
+
+    @Version
+    private Long version;
 }

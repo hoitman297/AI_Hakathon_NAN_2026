@@ -10,6 +10,7 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
+import jakarta.persistence.Version;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
@@ -47,4 +48,7 @@ public class FruitForageState {
     @Comment("가장 최근 채집한 일차 (null이면 아직 채집한 적 없음)")
     @Column(name = "last_foraged_day")
     private Integer lastForagedDay;
+
+    @Version
+    private Long version;
 }

@@ -13,6 +13,7 @@ import com.gameproject.backend.dto.AccuseResultResponse;
 import com.gameproject.backend.dto.EndingResponse;
 import com.gameproject.backend.service.AccusationService;
 
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 
 @RestController
@@ -23,7 +24,7 @@ public class AccusationController {
     private final AccusationService accusationService;
 
     @PostMapping("/accuse")
-    public ResponseEntity<AccuseResultResponse> accuse(@PathVariable Long sessionId, @RequestBody AccuseRequest request) {
+    public ResponseEntity<AccuseResultResponse> accuse(@PathVariable Long sessionId, @Valid @RequestBody AccuseRequest request) {
         return ResponseEntity.ok(accusationService.accuse(sessionId, request.accusedNpcId()));
     }
 

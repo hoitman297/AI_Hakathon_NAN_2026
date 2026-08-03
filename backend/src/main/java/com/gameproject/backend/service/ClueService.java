@@ -12,6 +12,7 @@ import com.gameproject.backend.domain.InventoryItemType;
 import com.gameproject.backend.domain.ShopItemMaster;
 import com.gameproject.backend.dto.ClueCardResponse;
 import com.gameproject.backend.repository.ClueCardRepository;
+import com.gameproject.backend.repository.GameSessionRepository;
 import com.gameproject.backend.repository.ShopItemMasterRepository;
 
 import lombok.RequiredArgsConstructor;
@@ -22,6 +23,7 @@ public class ClueService {
 
     private final ClueCardRepository clueCardRepository;
     private final ShopItemMasterRepository shopItemMasterRepository;
+    private final GameSessionRepository sessionRepository;
     private final InventoryService inventoryService;
     private final SessionService sessionService;
 
@@ -45,7 +47,7 @@ public class ClueService {
         return toResponse(clueCardRepository.save(clue));
     }
 
-    /** 돋보기 1개를 소모해서 단서 문구를 더 명확하게 갱신 */
+    /** 돋보기 1개를 소모해서 단서 문구를 더 명확하게 갱신 (1일 1회, 이미 명확화된 단서는 재사용 불가) */
     @Transactional
     public ClueCardResponse clarify(Long sessionId, Long clueId) {
         GameSession session = sessionService.findSession(sessionId);
@@ -53,10 +55,20 @@ public class ClueService {
         if (!Boolean.TRUE.equals(clue.getAcquired())) {
             throw new IllegalStateException("아직 습득하지 않은 단서입니다.");
         }
+        if (clue.getTextClarified() != null) {
+            throw new IllegalStateException("이미 명확화된 단서입니다.");
+        }
+        if (session.getLastMagnifierUseDay() != null
+                && session.getLastMagnifierUseDay().equals(session.getCurrentDay())) {
+            throw new IllegalStateException("돋보기는 하루에 한 번만 사용할 수 있습니다.");
+        }
 
         ShopItemMaster magnifier = shopItemMasterRepository.findByName("돋보기")
                 .orElseThrow(() -> new IllegalStateException("돋보기 마스터 데이터가 없습니다."));
         inventoryService.removeItem(session, InventoryItemType.SHOP_ITEM, magnifier.getItemId(), 1);
+
+        session.setLastMagnifierUseDay(session.getCurrentDay());
+        sessionRepository.save(session);
 
         clue.setTextClarified(clue.getTextAmbiguous() + " (돋보기로 확인: 좀 더 구체적인 정황이 드러났다)");
         return toResponse(clueCardRepository.save(clue));

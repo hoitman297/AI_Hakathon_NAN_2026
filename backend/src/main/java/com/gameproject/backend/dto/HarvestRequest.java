@@ -1,4 +1,6 @@
 package com.gameproject.backend.dto;
 
-public record HarvestRequest(Long farmPlotId) {
+import jakarta.validation.constraints.NotNull;
+
+public record HarvestRequest(@NotNull Long farmPlotId) {
 }

@@ -15,6 +15,7 @@ import com.gameproject.backend.dto.DialogueReplyResponse;
 import com.gameproject.backend.dto.DialogueRequest;
 import com.gameproject.backend.service.DialogueService;
 
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 
 @RestController
@@ -31,7 +32,7 @@ public class DialogueController {
 
     @PostMapping
     public ResponseEntity<DialogueReplyResponse> send(@PathVariable Long sessionId, @PathVariable Long npcId,
-                                                        @RequestBody DialogueRequest request) {
+                                                        @Valid @RequestBody DialogueRequest request) {
         return ResponseEntity.ok(dialogueService.send(sessionId, npcId, request.message()));
     }
 }

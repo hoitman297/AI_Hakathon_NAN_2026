@@ -1,4 +1,6 @@
 package com.gameproject.backend.dto;
 
-public record AccuseRequest(Long accusedNpcId) {
+import jakarta.validation.constraints.NotNull;
+
+public record AccuseRequest(@NotNull Long accusedNpcId) {
 }

@@ -27,6 +27,7 @@ import com.gameproject.backend.repository.NpcRepository;
 import com.gameproject.backend.repository.PlayerStatRepository;
 import com.gameproject.backend.repository.SabotageEventRepository;
 import com.gameproject.backend.service.CulpritProfileRegistry.CulpritProfile;
+import com.gameproject.backend.service.CulpritProfileRegistry.Target;
 
 import lombok.RequiredArgsConstructor;
 
@@ -42,6 +43,7 @@ public class SessionService {
     private final SabotageEventRepository sabotageEventRepository;
     private final ClueCardRepository clueCardRepository;
     private final CulpritProfileRegistry culpritProfileRegistry;
+    private final NpcLocationResolver locationResolver;
 
     private final Random random = new Random();
 
@@ -70,7 +72,7 @@ public class SessionService {
                 .primaryType(profile.primaryType())
                 .secondaryType(null) // 기획서 미확정
                 .motiveText(profile.motiveText())
-                .targetPoolDesc(profile.targetPoolDesc())
+                .targetPoolDesc(profile.describePool())
                 .build());
 
         for (Npc npc : npcs) {
@@ -114,6 +116,17 @@ public class SessionService {
             generateNightSabotage(session, day);
         }
 
+        // 9일차(마지막 재도전일)까지 정답 고발을 못 했다면 더 이상 다음 날로 넘어가지 않고
+        // 배드엔딩으로 종료한다. (정답 고발 시 이미 accuse()에서 SUCCESS로 끝나 여기까지 오지 않고,
+        // 9일차 오답도 accuse()에서 이미 BAD_ENDING 처리되므로, 여기서 걸리는 건 "9일차에
+        // 고발을 아예 하지 않고 넘기려는 경우"뿐이다.)
+        if (day >= GameConstants.LAST_ACCUSATION_DAY) {
+            session.setStatus(SessionStatus.BAD_ENDING);
+            session.setEndedAt(LocalDateTime.now());
+            sessionRepository.save(session);
+            return toResponse(session, today);
+        }
+
         int nextDay = day + 1;
         session.setCurrentDay(nextDay);
         sessionRepository.save(session);
@@ -137,31 +150,55 @@ public class SessionService {
     private void generateNightSabotage(GameSession session, int day) {
         NpcCaseAssignment assignment = caseAssignmentRepository.findBySession(session)
                 .orElseThrow(() -> new IllegalStateException("범인 배정 정보가 없습니다."));
+        CulpritProfile profile = culpritProfileRegistry.get(assignment.getNpc().getName());
+
+        Target previousTarget = sabotageEventRepository.findBySessionAndDay(session, day - 1).stream()
+                .findFirst()
+                .map(prev -> new Target(prev.getLocation(), prev.getSubTarget()))
+                .orElse(null);
+        Target tonight = profile.pickTonight(random, previousTarget);
 
         boolean selfDecoy = random.nextInt(100) < 10; // 낮은 확률(10%)로 자작극
+        Npc witness = findWitness(session, assignment.getNpc(), tonight.location());
 
         SabotageEvent event = sabotageEventRepository.save(SabotageEvent.builder()
                 .session(session)
                 .day(day)
-                .location(assignment.getTargetPoolDesc())
+                .location(tonight.location())
                 .type(assignment.getPrimaryType())
-                .subTarget(null)
+                .subTarget(tonight.subTarget())
                 .selfDecoy(selfDecoy)
-                .witnessNpc(null)
+                .witnessNpc(witness)
                 .createdAt(LocalDateTime.now())
                 .build());
 
         // 단서 카드 5장 총량에 맞춰 1~5일차 밤마다 주제를 하나씩 순환 배정 (실제 문구는 추후 작가 콘텐츠로 교체 필요)
         ClueTopic topic = ClueTopic.values()[(day - 1) % ClueTopic.values().length];
+        String witnessHint = witness != null
+                ? " 그 시각 근처에 " + witness.getName() + "이(가) 있었다는 이야기도 있다."
+                : "";
         clueCardRepository.save(ClueCard.builder()
                 .session(session)
                 .sabotageEvent(event)
                 .topic(topic)
-                .textAmbiguous(topic.name() + " 관련 단서 — 그날 밤 " + assignment.getTargetPoolDesc() + " 부근에서 발견됨. 정확한 정황은 알 수 없다.")
+                .textAmbiguous(topic.name() + " 관련 단서 — 그날 밤 " + tonight.location() + "의 "
+                        + tonight.subTarget() + " 부근에서 발견됨." + witnessHint)
                 .textClarified(null)
                 .acquired(false)
                 .acquiredAt(null)
                 .build());
+    }
+
+    /** 사보타주 발생 장소에 그 시간 실제로 있었을 법한(낮 동선상 그 장소인) 범인 외 NPC를 찾는다. 없으면 null. */
+    private Npc findWitness(GameSession session, Npc culprit, String sabotageLocation) {
+        List<Npc> candidates = npcRepository.findAll().stream()
+                .filter(npc -> !npc.getNpcId().equals(culprit.getNpcId()))
+                .filter(npc -> sabotageLocation.equals(locationResolver.resolveToday(session, npc)))
+                .toList();
+        if (candidates.isEmpty()) {
+            return null;
+        }
+        return candidates.get(random.nextInt(candidates.size()));
     }
 
     public GameSession findSession(Long sessionId) {

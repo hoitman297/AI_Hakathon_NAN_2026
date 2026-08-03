@@ -10,6 +10,7 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
+import jakarta.persistence.Version;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
@@ -59,4 +60,7 @@ public class PlayerStat {
     @Comment("이날 기절했는지 여부 (체력 0 도달)")
     @Column(nullable = false)
     private Boolean fainted;
+
+    @Version
+    private Long version;
 }

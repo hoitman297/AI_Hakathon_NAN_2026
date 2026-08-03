@@ -20,6 +20,7 @@ import com.gameproject.backend.service.FarmService;
 import com.gameproject.backend.service.ForageService;
 import com.gameproject.backend.service.SessionService;
 
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 
 @RestController
@@ -32,13 +33,13 @@ public class FarmController {
     private final SessionService sessionService;
 
     @PostMapping("/farm/plant")
-    public ResponseEntity<SessionResponse> plant(@PathVariable Long sessionId, @RequestBody PlantRequest request) {
+    public ResponseEntity<SessionResponse> plant(@PathVariable Long sessionId, @Valid @RequestBody PlantRequest request) {
         farmService.plant(sessionId, request.cropId());
         return ResponseEntity.ok(sessionService.getSession(sessionId));
     }
 
     @PostMapping("/farm/harvest")
-    public ResponseEntity<SessionResponse> harvest(@PathVariable Long sessionId, @RequestBody HarvestRequest request) {
+    public ResponseEntity<SessionResponse> harvest(@PathVariable Long sessionId, @Valid @RequestBody HarvestRequest request) {
         farmService.harvest(sessionId, request.farmPlotId());
         return ResponseEntity.ok(sessionService.getSession(sessionId));
     }
@@ -49,7 +50,7 @@ public class FarmController {
     }
 
     @PostMapping("/forage")
-    public ResponseEntity<ForageResponse> forage(@PathVariable Long sessionId, @RequestBody ForageRequest request) {
+    public ResponseEntity<ForageResponse> forage(@PathVariable Long sessionId, @Valid @RequestBody ForageRequest request) {
         return ResponseEntity.ok(forageService.forage(sessionId, request.fruitId()));
     }
 }

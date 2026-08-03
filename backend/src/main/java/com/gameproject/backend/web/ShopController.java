@@ -17,6 +17,7 @@ import com.gameproject.backend.dto.ShopItemResponse;
 import com.gameproject.backend.service.SessionService;
 import com.gameproject.backend.service.ShopService;
 
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 
 @RestController
@@ -33,13 +34,13 @@ public class ShopController {
     }
 
     @PostMapping("/purchase")
-    public ResponseEntity<SessionResponse> purchase(@PathVariable Long sessionId, @RequestBody PurchaseRequest request) {
+    public ResponseEntity<SessionResponse> purchase(@PathVariable Long sessionId, @Valid @RequestBody PurchaseRequest request) {
         shopService.purchase(sessionId, request.itemId());
         return ResponseEntity.ok(sessionService.getSession(sessionId));
     }
 
     @PostMapping("/sell")
-    public ResponseEntity<SessionResponse> sell(@PathVariable Long sessionId, @RequestBody SellRequest request) {
+    public ResponseEntity<SessionResponse> sell(@PathVariable Long sessionId, @Valid @RequestBody SellRequest request) {
         shopService.sell(sessionId, request);
         return ResponseEntity.ok(sessionService.getSession(sessionId));
     }

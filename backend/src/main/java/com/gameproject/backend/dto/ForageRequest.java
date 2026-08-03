@@ -1,4 +1,6 @@
 package com.gameproject.backend.dto;
 
-public record ForageRequest(Long fruitId) {
+import jakarta.validation.constraints.NotNull;
+
+public record ForageRequest(@NotNull Long fruitId) {
 }

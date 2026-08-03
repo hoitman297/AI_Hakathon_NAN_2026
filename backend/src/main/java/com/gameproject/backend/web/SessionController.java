@@ -4,15 +4,14 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestAttribute;
 import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.gameproject.backend.domain.Account;
 import com.gameproject.backend.dto.CreateSessionRequest;
 import com.gameproject.backend.dto.SessionResponse;
-import com.gameproject.backend.service.AuthService;
 import com.gameproject.backend.service.SessionService;
 
 import lombok.RequiredArgsConstructor;
@@ -23,26 +22,17 @@ import lombok.RequiredArgsConstructor;
 public class SessionController {
 
     private final SessionService sessionService;
-    private final AuthService authService;
 
     /**
-     * Authorization 헤더가 있으면 로그인 계정으로 세션을 소유시키고, 없으면
-     * (프론트 로그인 연동 전이거나 게스트 플레이) body의 playerId만으로 기존처럼 동작한다.
+     * 로그인이 필수다 (게스트 플레이 없음). Authorization 검증과 계정 조회는
+     * SessionOwnershipInterceptor가 먼저 처리해서 "account" 요청 속성으로 넘겨준다.
      */
     @PostMapping
     public ResponseEntity<SessionResponse> create(
             @RequestBody(required = false) CreateSessionRequest request,
-            @RequestHeader(value = "Authorization", required = false) String authorization) {
+            @RequestAttribute(SessionOwnershipInterceptor.ACCOUNT_ATTRIBUTE) Account account) {
         CreateSessionRequest body = request != null ? request : new CreateSessionRequest(null);
-        Account account = resolveAccount(authorization);
         return ResponseEntity.ok(sessionService.createSession(body, account));
-    }
-
-    private Account resolveAccount(String authorization) {
-        if (authorization == null || !authorization.startsWith("Bearer ")) {
-            return null;
-        }
-        return authService.requireValidToken(authorization.substring("Bearer ".length()));
     }
 
     @GetMapping("/{sessionId}")

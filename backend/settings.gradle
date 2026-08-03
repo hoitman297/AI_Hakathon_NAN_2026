@@ -1,1 +1,13 @@
+pluginManagement {
+    repositories {
+        // Gradle의 plugin-resolution API(/api/gradle/.../plugin/use/...)가
+        // org.springframework.boot:4.1.0을 아직 색인 못 해서 gradlePluginPortal()만으로는
+        // 실패한다. 실제 마커 아티팩트는 /m2/ 경로에 정상적으로 존재하므로 일반 Maven
+        // 저장소로 직접 등록해서 그 API를 우회한다.
+        maven { url 'https://plugins.gradle.org/m2/' }
+        gradlePluginPortal()
+        mavenCentral()
+    }
+}
+
 rootProject.name = 'backend'

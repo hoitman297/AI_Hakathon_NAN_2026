@@ -14,3 +14,7 @@ spring:
 
 server:
   port: ${SERVER_PORT:8081}
+
+anthropic:
+  api-key: ${LLM_API_KEY}
+  model: ${LLM_MODEL:claude-opus-5}

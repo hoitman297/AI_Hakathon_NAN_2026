@@ -5,10 +5,13 @@ import java.util.Map;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.client.ResourceAccessException;
 
 import com.gameproject.backend.service.AuthException;
+import com.gameproject.backend.service.ForbiddenException;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
@@ -32,5 +35,25 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(AuthException.class)
     public ResponseEntity<Map<String, String>> handleAuth(AuthException e) {
         return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("error", e.getMessage()));
+    }
+
+    /** 로그인은 됐지만 본인 소유가 아닌 세션에 접근한 경우 (IDOR 방지). */
+    @ExceptionHandler(ForbiddenException.class)
+    public ResponseEntity<Map<String, String>> handleForbidden(ForbiddenException e) {
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("error", e.getMessage()));
+    }
+
+    /** llm-proxy(대화/페르소나 생성) 호출이 타임아웃되거나 연결 실패한 경우. */
+    @ExceptionHandler(ResourceAccessException.class)
+    public ResponseEntity<Map<String, String>> handleUpstreamTimeout(ResourceAccessException e) {
+        return ResponseEntity.status(HttpStatus.GATEWAY_TIMEOUT)
+                .body(Map.of("error", "LLM 서버 응답이 지연되고 있습니다. 잠시 후 다시 시도해주세요."));
+    }
+
+    /** 같은 세션 상태(체력/골드/인벤토리 등)를 동시에 수정하려다 낙관적 락(@Version)에 걸린 경우. */
+    @ExceptionHandler(ObjectOptimisticLockingFailureException.class)
+    public ResponseEntity<Map<String, String>> handleOptimisticLock(ObjectOptimisticLockingFailureException e) {
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(Map.of("error", "다른 요청과 동시에 처리되어 충돌했습니다. 다시 시도해주세요."));
     }
 }

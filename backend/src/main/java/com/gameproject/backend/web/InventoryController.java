@@ -16,6 +16,7 @@ import com.gameproject.backend.dto.UseItemRequest;
 import com.gameproject.backend.service.InventoryService;
 import com.gameproject.backend.service.SessionService;
 
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 
 @RestController
@@ -33,7 +34,7 @@ public class InventoryController {
     }
 
     @PostMapping("/use")
-    public ResponseEntity<String> use(@PathVariable Long sessionId, @RequestBody UseItemRequest request) {
+    public ResponseEntity<String> use(@PathVariable Long sessionId, @Valid @RequestBody UseItemRequest request) {
         GameSession session = sessionService.findSession(sessionId);
         String result = inventoryService.useItem(session, request.slotIndex(), request.targetNpcId());
         return ResponseEntity.ok(result);

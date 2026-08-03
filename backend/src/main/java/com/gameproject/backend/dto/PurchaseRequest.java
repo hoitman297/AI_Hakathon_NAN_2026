@@ -1,4 +1,6 @@
 package com.gameproject.backend.dto;
 
-public record PurchaseRequest(Long itemId) {
+import jakarta.validation.constraints.NotNull;
+
+public record PurchaseRequest(@NotNull Long itemId) {
 }
