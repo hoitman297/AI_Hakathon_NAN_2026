@@ -1,0 +1,36 @@
+{
+  "group_id": "5ce82caa-070b-4bb0-9998-311c66042420",
+  "states": [
+    {
+      "character": {
+        "id": "3ff13c98-a77f-4fbe-a777-c097e42f4668",
+        "name": "Idle",
+        "prompt": "A Korean man in his late twenties who works part-time at a small village shop while preparing for job applications. He has neatly trimmed straight black hair with a simple side part, calm eyes, and a polite but emotionally restrained expression. His posture is straight and formal, but he looks slightly tired.\n\nHe wears a clean off-white collared shirt, a muted navy sleeveless sweater vest, dark gray trousers, and simple black shoes. Slim average build with slightly narrow shoulders, a slightly large head, and a clear tidy silhouette.\n\nCozy Korean countryside mystery game character, muted natural colors, simple low-detail pixel art, restrained two-step shading, subtle dark-brown selective outlines, low top-down camera view.\n\nNo hat, no glasses, no tie, no weapon, no papers, no item in hands, no modern accessories, no text, plain transparent background.",
+        "size": {
+          "width": 48,
+          "height": 48
+        },
+        "template_id": "mannequin",
+        "directions": 8,
+        "view": "low top-down",
+        "created_at": "2026-08-02T12:11:17.454871+00:00"
+      },
+      "folder": "Idle",
+      "frames": {
+        "rotations": {
+          "south": "Idle/rotations/south.png",
+          "south-east": "Idle/rotations/south-east.png",
+          "east": "Idle/rotations/east.png",
+          "north-east": "Idle/rotations/north-east.png",
+          "north": "Idle/rotations/north.png",
+          "north-west": "Idle/rotations/north-west.png",
+          "west": "Idle/rotations/west.png",
+          "south-west": "Idle/rotations/south-west.png"
+        },
+        "animations": {}
+      }
+    }
+  ],
+  "export_version": "3.1",
+  "export_date": "2026-08-02T12:12:56.025078"
+}

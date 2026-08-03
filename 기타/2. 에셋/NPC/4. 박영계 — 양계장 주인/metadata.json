@@ -1,0 +1,36 @@
+{
+  "group_id": "39bc63b4-4825-4f68-ba79-dd1f6294673e",
+  "states": [
+    {
+      "character": {
+        "id": "525ede8f-0051-45d6-a283-0346ccf02915",
+        "name": "Idle",
+        "prompt": "A clearly recognizable Korean woman in her early forties who owns a chicken farm in a 1990s rural village. She has feminine facial features, lively eyes, and short-to-medium curly black permed hair that reaches her neck and creates a round fluffy silhouette. She has an energetic, cheerful, talkative expression.\n\nShe wears a faded mustard-yellow work blouse, a dark teal full apron, loose warm-brown work pants, and dark green rubber farm boots. Sturdy feminine build with a slightly large head, practical posture, and a clear readable silhouette.\n\nCozy Korean countryside mystery game character, muted natural colors, simple low-detail pixel art, restrained two-step shading, subtle dark-brown selective outlines, low top-down camera view.\n\nHer curly neck-length perm must remain clearly visible from every direction. No masculine haircut, no hat, no weapon, no chicken, no item in hands, no modern accessories, no jewelry, no text, plain transparent background.",
+        "size": {
+          "width": 48,
+          "height": 48
+        },
+        "template_id": "mannequin",
+        "directions": 8,
+        "view": "low top-down",
+        "created_at": "2026-08-02T11:55:39.272287+00:00"
+      },
+      "folder": "Idle",
+      "frames": {
+        "rotations": {
+          "south": "Idle/rotations/south.png",
+          "south-east": "Idle/rotations/south-east.png",
+          "east": "Idle/rotations/east.png",
+          "north-east": "Idle/rotations/north-east.png",
+          "north": "Idle/rotations/north.png",
+          "north-west": "Idle/rotations/north-west.png",
+          "west": "Idle/rotations/west.png",
+          "south-west": "Idle/rotations/south-west.png"
+        },
+        "animations": {}
+      }
+    }
+  ],
+  "export_version": "3.1",
+  "export_date": "2026-08-02T11:57:23.918572"
+}
