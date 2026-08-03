@@ -36,10 +36,11 @@ import org.hibernate.annotations.Comment;
 public class GameSave {
 
     @Id
+    @Comment("세이브 소유 계정 ID (PK이자 FK — 1계정 1세이브)")
     @Column(name = "account_id")
     private Long accountId;
 
-    @Comment("세이브 소유 계정 (PK이자 FK — 1계정 1세이브)")
+    /** account_id 컬럼을 accountId(@Id)와 공유하는 연관관계 — @Comment는 accountId 쪽에만 붙인다. */
     @OneToOne(fetch = FetchType.LAZY)
     @MapsId
     @JoinColumn(name = "account_id")

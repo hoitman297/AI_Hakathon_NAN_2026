@@ -70,7 +70,10 @@ public class LlmService {
                     .addUserMessage(userPrompt)
                     .build();
 
-            GeneratedPersona persona = anthropicClient.messages().create(params).content().stream()
+            var response = anthropicClient.messages().create(params);
+            checkRefusal(response.stopReason(), "페르소나 생성");
+
+            GeneratedPersona persona = response.content().stream()
                     .flatMap(block -> block.text().stream())
                     .findFirst()
                     .map(typed -> typed.text())
@@ -120,6 +123,8 @@ public class LlmService {
                     .build();
 
             Message response = anthropicClient.messages().create(params);
+            checkRefusal(response.stopReason(), "대화 응답");
+
             return response.content().stream()
                     .flatMap(block -> block.text().stream())
                     .findFirst()
@@ -128,6 +133,17 @@ public class LlmService {
         } catch (RuntimeException e) {
             log.error("대화 LLM 호출 실패", e);
             return "(연결이 불안정한지 대답을 잇지 못했습니다. 잠시 후 다시 말을 걸어주세요.)";
+        }
+    }
+
+    /**
+     * Claude가 안전 정책상 응답을 거부하면 stop_reason이 "refusal"로 온다 (content는
+     * 비어있거나 일부만 옴). 여기서 미리 걸러서 명확한 예외로 던지면, 호출부의 기존
+     * catch(RuntimeException) 폴백 로직으로 자연스럽게 이어진다.
+     */
+    private void checkRefusal(Object stopReason, String context) {
+        if ("refusal".equals(String.valueOf(stopReason))) {
+            throw new IllegalStateException("LLM이 안전 정책상 응답을 거부했습니다 (" + context + ")");
         }
     }
 
