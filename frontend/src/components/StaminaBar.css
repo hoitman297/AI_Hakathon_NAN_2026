@@ -1,0 +1,53 @@
+.stamina-hud {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(59, 43, 32, 0.55);
+  padding: 8px 14px;
+  border-radius: 10px;
+  color: var(--paper);
+  font-weight: 700;
+  font-size: 0.85rem;
+}
+
+.stamina-day {
+  white-space: nowrap;
+}
+
+.stamina-icon {
+  width: 28px;
+}
+
+.stamina-bar {
+  position: relative;
+  width: 160px;
+  height: 41px;
+}
+
+.stamina-frame {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 2;
+}
+
+.stamina-fill-clip {
+  position: absolute;
+  left: 5%;
+  top: 27%;
+  width: 90%;
+  height: 46%;
+  overflow: hidden;
+  z-index: 1;
+}
+
+.stamina-fill {
+  width: 144px;
+  height: 100%;
+  max-width: none;
+}
+
+.stamina-value {
+  white-space: nowrap;
+}

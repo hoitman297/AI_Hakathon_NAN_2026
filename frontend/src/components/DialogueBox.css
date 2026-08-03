@@ -1,0 +1,55 @@
+.dialogue-overlay {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  justify-content: center;
+  padding: 16px;
+  z-index: 20;
+}
+
+.dialogue-box {
+  display: flex;
+  gap: 16px;
+  width: min(560px, 100%);
+  padding: 16px 20px;
+  align-items: flex-start;
+}
+
+.dialogue-portrait {
+  width: 64px;
+  height: 64px;
+  flex-shrink: 0;
+  background: var(--paper-dim);
+  border: 2px solid var(--ink);
+  border-radius: 8px;
+  padding: 6px;
+}
+
+.dialogue-content {
+  flex: 1;
+}
+
+.dialogue-name {
+  font-weight: 700;
+  margin-bottom: 6px;
+}
+
+.dialogue-role {
+  font-weight: 400;
+  color: var(--ink-soft);
+  font-size: 0.85rem;
+}
+
+.dialogue-text {
+  min-height: 42px;
+  margin: 0 0 12px;
+  line-height: 1.5;
+}
+
+.dialogue-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}

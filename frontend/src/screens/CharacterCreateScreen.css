@@ -1,0 +1,89 @@
+.character-create-screen {
+  width: 100vw;
+  height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: radial-gradient(circle at top, #4c7a3d 0%, #2f4b26 100%);
+}
+
+.character-create-panel {
+  width: min(420px, 92vw);
+  padding: 28px 26px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.character-create-panel h2 {
+  margin: 0 0 4px;
+  text-align: center;
+}
+
+.character-nickname-label {
+  font-weight: 700;
+  font-size: 0.9rem;
+}
+
+.character-gender-label {
+  font-weight: 700;
+  font-size: 0.9rem;
+  margin-top: 6px;
+}
+
+.character-gender-options {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.character-gender-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 14px 8px;
+  background: var(--paper-dim);
+  border: 3px solid var(--ink);
+  border-radius: 10px;
+  cursor: pointer;
+  font: inherit;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.character-gender-card.is-selected {
+  background: var(--accent);
+  color: var(--paper);
+  box-shadow: 0 0 0 3px var(--ink) inset;
+}
+
+.character-gender-badge {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.3rem;
+  color: var(--paper);
+  border: 2px solid var(--ink);
+}
+
+.character-gender-badge--male {
+  background: #3f7fb0;
+}
+
+.character-gender-badge--female {
+  background: #d1568c;
+}
+
+.character-create-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.character-create-actions .pixel-button {
+  flex: 1;
+}

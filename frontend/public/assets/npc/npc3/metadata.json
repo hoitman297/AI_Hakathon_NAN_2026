@@ -1,0 +1,36 @@
+{
+  "group_id": "836f54a5-1fb4-4baa-8889-cd754f5936b7",
+  "states": [
+    {
+      "character": {
+        "id": "a2bfbc6b-10aa-43f6-aba6-0eba0a13ac45",
+        "name": "Idle",
+        "prompt": "A Korean man in his mid-thirties who owns a small general store in a 1990s rural village. He has neatly side-parted short black hair, alert eyes, and a polished friendly shopkeeper smile with a slightly calculating expression. He looks tidy, confident, and attentive to customers.\n\nHe wears a faded light-blue collared shirt with rolled sleeves, a muted rust-brown shop apron, dark charcoal trousers, and clean brown shoes. Average adult proportions with a slightly large head, tidy posture, and a clear readable silhouette.\n\nCozy Korean countryside mystery game character, muted natural colors, simple low-detail pixel art, restrained two-step shading, subtle dark-brown selective outlines, low top-down camera view.\n\nNo hat, no glasses, no weapon, no item in hands, no modern accessories, no text, plain transparent background.",
+        "size": {
+          "width": 48,
+          "height": 48
+        },
+        "template_id": "mannequin",
+        "directions": 8,
+        "view": "low top-down",
+        "created_at": "2026-08-02T11:52:48.326321+00:00"
+      },
+      "folder": "Idle",
+      "frames": {
+        "rotations": {
+          "south": "Idle/rotations/south.png",
+          "south-east": "Idle/rotations/south-east.png",
+          "east": "Idle/rotations/east.png",
+          "north-east": "Idle/rotations/north-east.png",
+          "north": "Idle/rotations/north.png",
+          "north-west": "Idle/rotations/north-west.png",
+          "west": "Idle/rotations/west.png",
+          "south-west": "Idle/rotations/south-west.png"
+        },
+        "animations": {}
+      }
+    }
+  ],
+  "export_version": "3.1",
+  "export_date": "2026-08-02T11:54:46.166262"
+}
