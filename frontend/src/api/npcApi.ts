@@ -1,6 +1,5 @@
 import { getAuthToken } from './authToken'
-
-const API_BASE_URL = 'http://localhost:8080'
+import { API_BASE_URL } from './config'
 
 export interface NpcSummary {
   npcId: number
