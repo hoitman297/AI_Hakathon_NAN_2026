@@ -37,6 +37,19 @@ public class SessionController {
         return ResponseEntity.ok(sessionService.createSession(body, account));
     }
 
+    /**
+     * "이어서하기"가 클라이언트에 저장된 세션 ID 없이도 동작하도록, 이 계정의 진행 중인
+     * 세션을 서버 기준으로 조회한다. 없으면 204(본문 없음) — 프론트는 이걸 "이어서할 게임 없음"
+     * 신호로 사용한다.
+     */
+    @GetMapping("/current")
+    public ResponseEntity<SessionResponse> getCurrent(
+            @RequestAttribute(SessionOwnershipInterceptor.ACCOUNT_ATTRIBUTE) Account account) {
+        return sessionService.getCurrentSession(account)
+                .map(ResponseEntity::ok)
+                .orElseGet(() -> ResponseEntity.noContent().build());
+    }
+
     @GetMapping("/{sessionId}")
     public ResponseEntity<SessionResponse> get(@PathVariable Long sessionId) {
         return ResponseEntity.ok(sessionService.getSession(sessionId));

@@ -2,6 +2,7 @@ package com.gameproject.backend.service;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 import java.util.Random;
 
 import org.springframework.stereotype.Service;
@@ -112,6 +113,20 @@ public class SessionService {
         GameSession session = findSession(sessionId);
         PlayerStat stat = currentStat(session);
         return toResponse(session, stat);
+    }
+
+    /**
+     * "이어서하기"용 — 이 계정의 진행 중인(IN_PROGRESS) 세션을 찾는다. 프론트가 세션 ID를
+     * localStorage에만 들고 있다 보니, 그 값이 사라지면(다른 기기/브라우저 저장소 초기화 등)
+     * 실제로는 서버에 진행 중인 게임이 있어도 "이어서하기"가 새 게임을 만들어버리는 문제가
+     * 있었다 — 이 API로 클라이언트 상태와 무관하게 서버가 진실 공급원이 되게 한다.
+     * 같은 계정에 IN_PROGRESS 세션이 여러 개 있을 수 있는 상황(과거 버그로 인한 잔재 등)을
+     * 대비해 가장 최근에 시작한 세션을 반환한다.
+     */
+    @Transactional(readOnly = true)
+    public Optional<SessionResponse> getCurrentSession(Account account) {
+        return sessionRepository.findFirstByAccountAndStatusOrderByStartedAtDesc(account, SessionStatus.IN_PROGRESS)
+                .map(session -> toResponse(session, currentStat(session)));
     }
 
     @Transactional

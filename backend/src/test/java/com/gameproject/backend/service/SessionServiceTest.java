@@ -125,6 +125,33 @@ class SessionServiceTest {
     }
 
     @Test
+    void getCurrentSession_hasInProgressSession_returnsIt() {
+        PlayerStat stat = PlayerStat.builder().session(session).day(2)
+                .staminaCurrent(77.0).staminaMax(100).gold(3).fainted(false).build();
+        when(sessionRepository.findFirstByAccountAndStatusOrderByStartedAtDesc(account, SessionStatus.IN_PROGRESS))
+                .thenReturn(Optional.of(session));
+        when(playerStatRepository.findBySessionAndDay(session, 2)).thenReturn(Optional.of(stat));
+
+        Optional<SessionResponse> result = sessionService.getCurrentSession(account);
+
+        assertThat(result).isPresent();
+        assertThat(result.get().sessionId()).isEqualTo(100L);
+        assertThat(result.get().staminaCurrent()).isEqualTo(77.0);
+    }
+
+    @Test
+    void getCurrentSession_noInProgressSession_returnsEmpty() {
+        // "이어서하기"가 클라이언트 저장 상태 없이도 서버 기준으로 정확히 판단해야 하는
+        // 핵심 케이스 — 진행 중인 세션이 없으면 (과거처럼 새 세션을 몰래 만들지 않고) 빈 값을 반환한다.
+        when(sessionRepository.findFirstByAccountAndStatusOrderByStartedAtDesc(account, SessionStatus.IN_PROGRESS))
+                .thenReturn(Optional.empty());
+
+        Optional<SessionResponse> result = sessionService.getCurrentSession(account);
+
+        assertThat(result).isEmpty();
+    }
+
+    @Test
     void advanceDay_normalTransition_incrementsDayAndResetsStamina() {
         PlayerStat today = PlayerStat.builder().session(session).day(2)
                 .staminaCurrent(40.0).staminaMax(100).gold(10).fainted(false).build();

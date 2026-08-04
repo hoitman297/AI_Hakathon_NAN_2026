@@ -51,6 +51,19 @@ export async function getSession(sessionId: number): Promise<SessionResponse> {
   return parseOrThrow<SessionResponse>(response, '세션 정보를 불러오지 못했습니다.')
 }
 
+/**
+ * 이 계정에 진행 중인(IN_PROGRESS) 세션이 있으면 반환한다. localStorage에 저장된 세션 ID에
+ * 의존하지 않고 서버가 직접 판단하므로, "게임종료"로 로컬 상태가 지워졌거나 다른 기기/브라우저로
+ * 접속해도 "이어서하기"가 정확히 동작한다. 진행 중인 세션이 없으면 null.
+ */
+export async function getCurrentSession(): Promise<SessionResponse | null> {
+  const response = await fetch(`${API_BASE_URL}/api/sessions/current`, {
+    headers: authHeaders(),
+  })
+  if (response.status === 204) return null
+  return parseOrThrow<SessionResponse>(response, '진행 중인 게임을 확인하지 못했습니다.')
+}
+
 /** 낮 -> 밤(사보타주 발생) -> 다음날. 9일차에 고발 없이 호출하면 서버가 배드엔딩으로 종료한다. */
 export async function advanceDay(sessionId: number): Promise<SessionResponse> {
   const response = await fetch(`${API_BASE_URL}/api/sessions/${sessionId}/day/advance`, {

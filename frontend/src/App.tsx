@@ -8,13 +8,11 @@ import { AccusationScreen } from './screens/AccusationScreen'
 import { EndingScreen } from './screens/EndingScreen'
 import { Modal } from './components/Modal'
 import { fetchMe, logout as logoutRequest, type AccountInfo, type AuthResult } from './api/authApi'
-import { createSession, getSession, advanceDay, type SessionResponse } from './api/sessionApi'
+import { createSession, getCurrentSession, advanceDay, type SessionResponse } from './api/sessionApi'
 import type { AccuseResult } from './api/accusationApi'
 import { getAuthToken, clearAuthToken } from './api/authToken'
-import { loadGame } from './api/saveApi'
 import { createDayChangeAutoSave } from './game/autoSave'
-import { getPlayerProfile, setPlayerProfile, type CharacterGender } from './state/playerProfile'
-import { getStoredSessionId, setStoredSessionId, clearStoredSessionId } from './state/gameSession'
+import { setPlayerProfile, type CharacterGender } from './state/playerProfile'
 
 type Screen = 'title' | 'character-create' | 'day' | 'night' | 'accusation' | 'ending'
 
@@ -76,7 +74,6 @@ function App() {
     const token = getAuthToken()
     if (token) await logoutRequest(token)
     clearAuthToken()
-    clearStoredSessionId()
     setAccount(null)
     setSession(null)
     setScreen('title')
@@ -93,7 +90,6 @@ function App() {
     try {
       setPlayerProfile({ nickname, gender })
       const newSession = await createSession(nickname)
-      setStoredSessionId(newSession.sessionId)
       setSession(newSession)
       autoSaveFnRef.current?.(newSession.currentDay)
       setScreen('day')
@@ -108,33 +104,12 @@ function App() {
     setContinueError(null)
     setContinueLoading(true)
     try {
-      const saveRes = await loadGame()
-      if (saveRes.updatedAt === null) {
+      const current = await getCurrentSession()
+      if (!current) {
         setShowNoSaveModal(true)
         return
       }
-
-      let resumed: SessionResponse | null = null
-      const storedId = getStoredSessionId()
-      if (storedId) {
-        try {
-          const candidate = await getSession(storedId)
-          if (candidate.status === 'IN_PROGRESS' && candidate.accountId === account?.accountId) {
-            resumed = candidate
-          }
-        } catch {
-          resumed = null
-        }
-      }
-
-      if (!resumed) {
-        const profile = getPlayerProfile()
-        const playerId = profile?.nickname ?? account?.nickname ?? '플레이어'
-        resumed = await createSession(playerId)
-      }
-
-      setStoredSessionId(resumed.sessionId)
-      setSession(resumed)
+      setSession(current)
       setScreen('day')
     } catch (err) {
       setContinueError(err instanceof Error ? err.message : '이어서하기에 실패했습니다.')
@@ -173,7 +148,6 @@ function App() {
   }
 
   function handleQuitToTitle() {
-    clearStoredSessionId()
     setSession(null)
     setScreen('title')
   }
