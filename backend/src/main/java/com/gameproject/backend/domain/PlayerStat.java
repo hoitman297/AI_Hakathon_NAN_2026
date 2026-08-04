@@ -45,9 +45,9 @@ public class PlayerStat {
     @Column(nullable = false)
     private Integer day;
 
-    @Comment("현재 체력")
+    @Comment("현재 체력 (이동 체력 소모가 초당 연속형이라 소수점 정밀도가 필요함)")
     @Column(name = "stamina_current", nullable = false)
-    private Integer staminaCurrent;
+    private Double staminaCurrent;
 
     @Comment("최대 체력 (기획 미확정, 잠정값 100)")
     @Column(name = "stamina_max", nullable = false)

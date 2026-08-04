@@ -5,7 +5,7 @@ import { DayScene, type DaySceneInitData } from '../game/DayScene'
 import { StaminaBar } from '../components/StaminaBar'
 import { DialogueBox } from '../components/DialogueBox'
 import { EscMenu } from '../components/EscMenu'
-import type { SessionResponse } from '../api/sessionApi'
+import { moveSession, type SessionResponse } from '../api/sessionApi'
 import './DayScreen.css'
 
 // 백엔드 GameConstants.FIRST_ACCUSATION_DAY / LAST_ACCUSATION_DAY 와 맞춰야 한다.
@@ -39,6 +39,17 @@ export function DayScreen({
   useEffect(() => {
     if (!containerRef.current) return
 
+    // 이동으로 실제 경과한 시간(초)을 서버에 보고하고, 서버가 계산한 값(운동화 착용 시 20% 할인 반영)으로
+    // 로컬 체력 표시를 다시 맞춘다 — 프레임마다 로컬로 미리 깎아둔 값은 예측치일 뿐, 서버 응답이 최종값이다.
+    async function handleMove(seconds: number) {
+      try {
+        const updated = await moveSession(session.sessionId, seconds)
+        setStamina(updated.staminaCurrent)
+      } catch (err) {
+        console.error('이동 체력 반영에 실패했습니다.', err)
+      }
+    }
+
     const game = new Phaser.Game({ ...gameConfig, parent: containerRef.current })
     gameRef.current = game
     game.scene.add('DayScene', DayScene, false)
@@ -46,7 +57,9 @@ export function DayScreen({
       day: session.currentDay,
       staminaCurrent: session.staminaCurrent,
       staminaMax: session.staminaMax,
+      sneakersEquipped: session.sneakersEquipped ?? false,
       onStaminaChange: setStamina,
+      onMove: handleMove,
       onNpcClick: (name, role) => setDialogueNpc({ name, role }),
     }
     game.scene.start('DayScene', initData)

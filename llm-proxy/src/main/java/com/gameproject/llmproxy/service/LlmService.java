@@ -17,6 +17,7 @@ import com.anthropic.models.messages.ThinkingConfigDisabled;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.gameproject.llmproxy.dto.DialogueChatRequest;
+import com.gameproject.llmproxy.dto.DialogueChatResponse;
 import com.gameproject.llmproxy.dto.DialogueTurn;
 import com.gameproject.llmproxy.dto.GeneratedPersona;
 
@@ -32,6 +33,11 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 @RequiredArgsConstructor
 public class LlmService {
+
+    /** JSON Schema는 숫자 범위(minimum/maximum)를 강제할 수 없어("Not supported" — 구조화 출력 제약),
+     * LLM이 이 범위를 벗어난 값을 낼 가능성에 대비해 애플리케이션 코드에서 방어적으로 clamp한다. */
+    private static final int AFFINITY_DELTA_MIN = -5;
+    private static final int AFFINITY_DELTA_MAX = 5;
 
     private final AnthropicClient anthropicClient;
     private final ObjectMapper objectMapper;
@@ -91,7 +97,7 @@ public class LlmService {
         }
     }
 
-    public String chat(DialogueChatRequest request) {
+    public DialogueChatResponse chat(DialogueChatRequest request) {
         GeneratedPersona persona = parsePersona(request.personaJson());
 
         StringBuilder systemPrompt = new StringBuilder();
@@ -105,6 +111,14 @@ public class LlmService {
             systemPrompt.append("지금은 '정직 모드'입니다: 알리바이 관련 질문에 평소보다 더 구체적으로 답하되, ")
                     .append("본인이 범인인지 여부는 절대 직접 밝히지 마세요.\n");
         }
+        systemPrompt.append("""
+                또한 이 캐릭터의 성격·가치관·말투에 비추어, 방금 플레이어 발화가 이 캐릭터의
+                호감도에 어떤 영향을 줬는지 판단하세요. 예의 바르거나 이 캐릭터가 흥미로워할
+                만한 화제거나 다정한 태도면 호감도를 올리고, 무례하거나 캐묻거나 이 캐릭터가
+                싫어할 만한 태도면 내리세요. 특별히 영향이 없는 평범한 대화면 0으로 두세요.
+                실제 게임 밸런스상 한 턴의 변화 폭은 보통 작습니다 — 평범한 대화는 -2~+3 정도,
+                뚜렷하게 무례하거나 인상적인 경우에만 그보다 큰 값을 쓰세요.
+                """);
 
         List<MessageParam> messages = new ArrayList<>();
         for (DialogueTurn turn : request.history()) {
@@ -116,26 +130,36 @@ public class LlmService {
         messages.add(MessageParam.builder().role(MessageParam.Role.USER).content(request.userMessage()).build());
 
         try {
-            MessageCreateParams params = MessageCreateParams.builder()
+            StructuredMessageCreateParams<DialogueChatResponse> params = MessageCreateParams.builder()
                     .model(model)
                     .maxTokens(1024L)
                     .system(systemPrompt.toString())
                     .thinking(ThinkingConfigDisabled.builder().build())
+                    .outputConfig(DialogueChatResponse.class)
                     .messages(messages)
                     .build();
 
-            Message response = anthropicClient.messages().create(params);
+            var response = anthropicClient.messages().create(params);
             checkRefusal(response.stopReason(), "대화 응답");
 
-            return response.content().stream()
+            DialogueChatResponse result = response.content().stream()
                     .flatMap(block -> block.text().stream())
                     .findFirst()
-                    .map(text -> text.text())
-                    .orElse("...");
+                    .map(typed -> typed.text())
+                    .orElseThrow(() -> new IllegalStateException("LLM 응답에 대화 텍스트 블록이 없습니다"));
+
+            return new DialogueChatResponse(result.reply(), clampAffinityDelta(result.affinityDelta()));
         } catch (RuntimeException e) {
             log.error("대화 LLM 호출 실패", e);
-            return "(연결이 불안정한지 대답을 잇지 못했습니다. 잠시 후 다시 말을 걸어주세요.)";
+            return new DialogueChatResponse("(연결이 불안정한지 대답을 잇지 못했습니다. 잠시 후 다시 말을 걸어주세요.)", 0);
         }
+    }
+
+    private int clampAffinityDelta(Integer affinityDelta) {
+        if (affinityDelta == null) {
+            return 0;
+        }
+        return Math.max(AFFINITY_DELTA_MIN, Math.min(AFFINITY_DELTA_MAX, affinityDelta));
     }
 
     /**

@@ -20,16 +20,28 @@ repositories {
 dependencies {
 	implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
 	implementation 'org.springframework.boot:spring-boot-starter-validation'
-	implementation 'org.springframework.boot:spring-boot-starter-webmvc'
+	
+	// 기존 코드 유지 (주석 처리)
+	// implementation 'org.springframework.boot:spring-boot-starter-webmvc'
+	// 올바른 웹 스타터 패키지로 변경
+	implementation 'org.springframework.boot:spring-boot-starter-web'
+	
 	implementation 'com.fasterxml.jackson.core:jackson-databind'
 	implementation 'com.fasterxml.jackson.datatype:jackson-datatype-jsr310'
 	implementation 'org.springframework.security:spring-security-crypto'
+	
 	compileOnly 'org.projectlombok:lombok'
 	runtimeOnly 'com.mysql:mysql-connector-j'
 	annotationProcessor 'org.projectlombok:lombok'
+	
 	testImplementation 'org.springframework.boot:spring-boot-starter-data-jpa-test'
 	testImplementation 'org.springframework.boot:spring-boot-starter-validation-test'
-	testImplementation 'org.springframework.boot:spring-boot-starter-webmvc-test'
+	
+	// 기존 코드 유지 (주석 처리)
+	// testImplementation 'org.springframework.boot:spring-boot-starter-webmvc-test'
+	// 올바른 테스트 스타터 패키지로 변경
+	testImplementation 'org.springframework.boot:spring-boot-starter-test'
+	
 	testCompileOnly 'org.projectlombok:lombok'
 	testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 	testAnnotationProcessor 'org.projectlombok:lombok'

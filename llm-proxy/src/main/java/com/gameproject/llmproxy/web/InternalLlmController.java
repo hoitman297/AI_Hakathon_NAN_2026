@@ -40,8 +40,7 @@ public class InternalLlmController {
 
     @PostMapping("/dialogue")
     public ResponseEntity<DialogueChatResponse> chat(@RequestBody DialogueChatRequest request) {
-        String reply = llmService.chat(request);
-        return ResponseEntity.ok(new DialogueChatResponse(reply));
+        return ResponseEntity.ok(llmService.chat(request));
     }
 
     @PostMapping("/event")

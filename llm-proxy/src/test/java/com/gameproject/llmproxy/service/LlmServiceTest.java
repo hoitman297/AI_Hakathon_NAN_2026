@@ -26,6 +26,7 @@ import com.anthropic.models.messages.Usage;
 import com.anthropic.services.blocking.MessageService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.gameproject.llmproxy.dto.DialogueChatRequest;
+import com.gameproject.llmproxy.dto.DialogueChatResponse;
 import com.gameproject.llmproxy.dto.DialogueTurn;
 import com.gameproject.llmproxy.dto.GeneratedPersona;
 
@@ -112,44 +113,62 @@ class LlmServiceTest {
     // ------------------------------------------------------------------
 
     @Test
-    void chat_success_returnsLlmReply() {
-        when(messageService.create(any(MessageCreateParams.class)))
-                .thenReturn(message(StopReason.END_TURN, "마을 일은 제가 챙깁니다."));
+    void chat_success_returnsLlmReplyAndAffinityDelta() throws Exception {
+        DialogueChatResponse llmOutput = new DialogueChatResponse("마을 일은 제가 챙깁니다.", 3);
+        when(messageService.create(any(StructuredMessageCreateParams.class)))
+                .thenReturn(structuredMessage(StopReason.END_TURN,
+                        new ObjectMapper().writeValueAsString(llmOutput), DialogueChatResponse.class));
 
-        String reply = llmService.chat(new DialogueChatRequest(personaJson(),
+        DialogueChatResponse result = llmService.chat(new DialogueChatRequest(personaJson(),
                 List.of(new DialogueTurn("USER", "안녕하세요")), "요즘 별일 없나요?", false));
 
-        assertThat(reply).isEqualTo("마을 일은 제가 챙깁니다.");
+        assertThat(result.reply()).isEqualTo("마을 일은 제가 챙깁니다.");
+        assertThat(result.affinityDelta()).isEqualTo(3);
     }
 
     @Test
-    void chat_llmRefuses_returnsFallbackMessage() {
-        when(messageService.create(any(MessageCreateParams.class)))
-                .thenReturn(message(StopReason.REFUSAL, null));
+    void chat_affinityDeltaOutOfRange_isClamped() throws Exception {
+        DialogueChatResponse llmOutput = new DialogueChatResponse("무례하시네요.", 999);
+        when(messageService.create(any(StructuredMessageCreateParams.class)))
+                .thenReturn(structuredMessage(StopReason.END_TURN,
+                        new ObjectMapper().writeValueAsString(llmOutput), DialogueChatResponse.class));
 
-        String reply = llmService.chat(new DialogueChatRequest(personaJson(), List.of(), "질문", false));
+        DialogueChatResponse result = llmService.chat(new DialogueChatRequest(personaJson(), List.of(), "욕설", false));
 
-        assertThat(reply).contains("잠시 후 다시 말을 걸어주세요");
+        assertThat(result.affinityDelta()).isEqualTo(5);
     }
 
     @Test
-    void chat_emptyContent_returnsEllipsisPlaceholder() {
-        when(messageService.create(any(MessageCreateParams.class)))
-                .thenReturn(message(StopReason.END_TURN, null));
+    void chat_llmRefuses_returnsFallbackMessageWithZeroDelta() {
+        when(messageService.create(any(StructuredMessageCreateParams.class)))
+                .thenReturn(structuredMessage(StopReason.REFUSAL, null, DialogueChatResponse.class));
 
-        String reply = llmService.chat(new DialogueChatRequest(personaJson(), List.of(), "질문", false));
+        DialogueChatResponse result = llmService.chat(new DialogueChatRequest(personaJson(), List.of(), "질문", false));
 
-        assertThat(reply).isEqualTo("...");
+        assertThat(result.reply()).contains("잠시 후 다시 말을 걸어주세요");
+        assertThat(result.affinityDelta()).isZero();
+    }
+
+    @Test
+    void chat_emptyContent_returnsFallbackMessage() {
+        when(messageService.create(any(StructuredMessageCreateParams.class)))
+                .thenReturn(structuredMessage(StopReason.END_TURN, null, DialogueChatResponse.class));
+
+        DialogueChatResponse result = llmService.chat(new DialogueChatRequest(personaJson(), List.of(), "질문", false));
+
+        assertThat(result.reply()).contains("잠시 후 다시 말을 걸어주세요");
+        assertThat(result.affinityDelta()).isZero();
     }
 
     @Test
     void chat_llmThrows_returnsFallbackMessage() {
-        when(messageService.create(any(MessageCreateParams.class)))
+        when(messageService.create(any(StructuredMessageCreateParams.class)))
                 .thenThrow(new RuntimeException("timeout"));
 
-        String reply = llmService.chat(new DialogueChatRequest(personaJson(), List.of(), "질문", false));
+        DialogueChatResponse result = llmService.chat(new DialogueChatRequest(personaJson(), List.of(), "질문", false));
 
-        assertThat(reply).contains("잠시 후 다시 말을 걸어주세요");
+        assertThat(result.reply()).contains("잠시 후 다시 말을 걸어주세요");
+        assertThat(result.affinityDelta()).isZero();
     }
 
     // ------------------------------------------------------------------

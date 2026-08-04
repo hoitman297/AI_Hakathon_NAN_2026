@@ -93,7 +93,7 @@ public class SessionService {
         PlayerStat stat = playerStatRepository.save(PlayerStat.builder()
                 .session(session)
                 .day(1)
-                .staminaCurrent(GameConstants.DEFAULT_STAMINA_MAX)
+                .staminaCurrent((double) GameConstants.DEFAULT_STAMINA_MAX)
                 .staminaMax(GameConstants.DEFAULT_STAMINA_MAX)
                 .gold(0)
                 .fainted(false)
@@ -143,7 +143,7 @@ public class SessionService {
         session.setCurrentDay(nextDay);
         sessionRepository.save(session);
 
-        int newStamina = Boolean.TRUE.equals(today.getFainted())
+        double newStamina = Boolean.TRUE.equals(today.getFainted())
                 ? GameConstants.FAINT_RESTART_STAMINA
                 : GameConstants.DEFAULT_STAMINA_MAX;
 
@@ -160,20 +160,20 @@ public class SessionService {
     }
 
     /**
-     * 낮 이동 1회에 대한 체력 소모만 처리한다. 프론트의 실제 이동 방식(자유이동/타일 등)에
-     * 대해서는 이 API가 관여하지 않고, "이동 1회"로 볼 시점마다 이 API를 호출하는 것을
-     * 프론트에 맡긴다 — 운동화 착용 시 5→4 할인만 서버가 보장한다.
+     * 이동으로 실제 경과한 시간(초)만큼 체력을 소모한다 (기획서 체력 세부 수치, ✅ 확정:
+     * 초당 0.15 소모, 정지 시 없음, 운동화 착용 시 초당 0.12로 20% 감소). 프론트가 캐릭터가
+     * 실제로 움직인 시간을 누적해서 이 API로 보고하는 방식을 전제로 한다.
      */
     @Transactional
-    public SessionResponse move(Long sessionId) {
+    public SessionResponse move(Long sessionId, double movedSeconds) {
         GameSession session = findSession(sessionId);
         if (session.getStatus() != SessionStatus.IN_PROGRESS) {
             throw new IllegalStateException("이미 종료된 세션입니다.");
         }
-        int cost = Boolean.TRUE.equals(session.getSneakersEquipped())
-                ? GameConstants.MOVE_STAMINA_WITH_SNEAKERS
-                : GameConstants.MOVE_STAMINA;
-        PlayerStat stat = staminaService.consume(session, cost);
+        double ratePerSecond = Boolean.TRUE.equals(session.getSneakersEquipped())
+                ? GameConstants.MOVE_STAMINA_PER_SECOND_WITH_SNEAKERS
+                : GameConstants.MOVE_STAMINA_PER_SECOND;
+        PlayerStat stat = staminaService.consume(session, ratePerSecond * movedSeconds);
         return toResponse(session, stat);
     }
 
@@ -267,6 +267,7 @@ public class SessionService {
                 stat.getStaminaCurrent(),
                 stat.getStaminaMax(),
                 stat.getGold(),
+                session.getSneakersEquipped(),
                 session.getStartedAt(),
                 session.getEndedAt()
         );

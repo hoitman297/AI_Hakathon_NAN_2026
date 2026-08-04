@@ -28,6 +28,7 @@ import com.gameproject.backend.domain.NpcPersonaState;
 import com.gameproject.backend.domain.PlayerStat;
 import com.gameproject.backend.domain.SessionStatus;
 import com.gameproject.backend.dto.DialogueReplyResponse;
+import com.gameproject.backend.dto.llm.DialogueChatResponse;
 import com.gameproject.backend.repository.DialogueLogRepository;
 import com.gameproject.backend.repository.GameSessionRepository;
 import com.gameproject.backend.repository.NpcCaseAssignmentRepository;
@@ -105,14 +106,16 @@ class DialogueServiceTest {
         when(personaStateRepository.findBySessionAndNpc(session, npc)).thenReturn(Optional.of(existingPersona));
         when(dialogueLogRepository.findBySessionAndNpcOrderByCreatedAtAsc(session, npc)).thenReturn(List.of());
         PlayerStat stat = PlayerStat.builder().session(session).day(2)
-                .staminaCurrent(92).staminaMax(100).gold(0).fainted(false).build();
+                .staminaCurrent(92.0).staminaMax(100).gold(0).fainted(false).build();
         when(staminaService.consume(session, GameConstants.DIALOGUE_STAMINA)).thenReturn(stat);
-        when(llmProxyClient.chat("{}", List.of(), "안녕하세요", false)).thenReturn("반갑습니다.");
+        when(llmProxyClient.chat("{}", List.of(), "안녕하세요", false))
+                .thenReturn(new DialogueChatResponse("반갑습니다.", 3));
         when(npcService.adjustAffinity(any(), any(), anyInt())).thenReturn(55);
 
         DialogueReplyResponse response = dialogueService.send(100L, 1L, "안녕하세요");
 
         verify(llmRateLimiter).checkAllowed(1L);
+        verify(npcService).adjustAffinity(session, npc, 3);
         assertThat(response.npcReply()).isEqualTo("반갑습니다.");
         assertThat(response.staminaCurrent()).isEqualTo(92);
     }

@@ -21,7 +21,7 @@ export function StaminaBar({ value, max, day }: StaminaBarProps) {
         <img className="stamina-frame pixel-art" src={villageAssets.ui.stamina.frame} alt="" />
       </div>
       <div className="stamina-value">
-        {value} / {max}
+        {Math.round(value)} / {max}
       </div>
     </div>
   )

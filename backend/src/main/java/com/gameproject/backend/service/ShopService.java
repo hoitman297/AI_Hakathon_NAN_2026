@@ -9,6 +9,7 @@ import com.gameproject.backend.domain.CropMaster;
 import com.gameproject.backend.domain.FruitMaster;
 import com.gameproject.backend.domain.GameSession;
 import com.gameproject.backend.domain.InventoryItemType;
+import com.gameproject.backend.domain.ItemCategory;
 import com.gameproject.backend.domain.PlayerStat;
 import com.gameproject.backend.domain.ShopItemMaster;
 import com.gameproject.backend.dto.SellRequest;
@@ -44,6 +45,11 @@ public class ShopService {
         GameSession session = sessionService.findSession(sessionId);
         ShopItemMaster item = shopItemMasterRepository.findById(itemId)
                 .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 아이템입니다: " + itemId));
+
+        // "1회 구매, 영구" 아이템(운동화)은 이미 장착했으면 다시 살 수 없다.
+        if (item.getCategory() == ItemCategory.PERMANENT_EQUIPMENT && Boolean.TRUE.equals(session.getSneakersEquipped())) {
+            throw new IllegalStateException("이미 영구 장착한 아이템입니다: " + item.getName());
+        }
 
         PlayerStat stat = staminaService.currentStat(session);
         if (stat.getGold() < item.getPrice()) {

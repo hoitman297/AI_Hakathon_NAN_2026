@@ -2,7 +2,6 @@ package com.gameproject.backend.service;
 
 import java.time.LocalDateTime;
 import java.util.List;
-import java.util.Random;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -16,6 +15,7 @@ import com.gameproject.backend.domain.NpcPersonaState;
 import com.gameproject.backend.domain.PlayerStat;
 import com.gameproject.backend.dto.DialogueMessageResponse;
 import com.gameproject.backend.dto.DialogueReplyResponse;
+import com.gameproject.backend.dto.llm.DialogueChatResponse;
 import com.gameproject.backend.dto.llm.DialogueTurn;
 import com.gameproject.backend.repository.DialogueLogRepository;
 import com.gameproject.backend.repository.GameSessionRepository;
@@ -44,8 +44,6 @@ public class DialogueService {
     private final NpcService npcService;
     private final LlmProxyClient llmProxyClient;
     private final LlmRateLimiter llmRateLimiter;
-
-    private final Random random = new Random();
 
     @Transactional(readOnly = true)
     public List<DialogueMessageResponse> history(Long sessionId, Long npcId) {
@@ -78,7 +76,8 @@ public class DialogueService {
         boolean honestMode = npc.getNpcId().equals(session.getHonestModeNpcId())
                 && session.getCurrentDay().equals(session.getHonestModeDay());
 
-        String reply = llmProxyClient.chat(personaJson, history, userMessage, honestMode);
+        DialogueChatResponse llmResult = llmProxyClient.chat(personaJson, history, userMessage, honestMode);
+        String reply = llmResult.reply();
 
         dialogueLogRepository.save(DialogueLog.builder()
                 .session(session).npc(npc).day(session.getCurrentDay())
@@ -95,9 +94,10 @@ public class DialogueService {
             sessionRepository.save(session);
         }
 
-        int gain = GameConstants.AFFINITY_DIALOGUE_GAIN_MIN
-                + random.nextInt(GameConstants.AFFINITY_DIALOGUE_GAIN_MAX - GameConstants.AFFINITY_DIALOGUE_GAIN_MIN + 1);
-        int newAffinity = npcService.adjustAffinity(session, npc, gain);
+        // 호감도 증감은 더 이상 고정 랜덤이 아니라, NPC 성격에 비추어 이번 발화가 어땠는지 LLM이
+        // 직접 판단한 값(llm-proxy에서 -5~+5로 clamp됨)을 그대로 반영한다.
+        int affinityDelta = llmResult.affinityDelta() != null ? llmResult.affinityDelta() : 0;
+        int newAffinity = npcService.adjustAffinity(session, npc, affinityDelta);
 
         return new DialogueReplyResponse(reply, newAffinity, stat.getStaminaCurrent());
     }

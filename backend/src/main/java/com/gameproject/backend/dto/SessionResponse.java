@@ -8,9 +8,10 @@ public record SessionResponse(
         Long accountId,
         Integer currentDay,
         String status,
-        Integer staminaCurrent,
+        Double staminaCurrent,
         Integer staminaMax,
         Integer gold,
+        Boolean sneakersEquipped,
         LocalDateTime startedAt,
         LocalDateTime endedAt
 ) {

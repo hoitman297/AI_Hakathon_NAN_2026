@@ -11,9 +11,11 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.gameproject.backend.domain.Account;
 import com.gameproject.backend.dto.CreateSessionRequest;
+import com.gameproject.backend.dto.MoveRequest;
 import com.gameproject.backend.dto.SessionResponse;
 import com.gameproject.backend.service.SessionService;
 
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 
 @RestController
@@ -46,11 +48,11 @@ public class SessionController {
     }
 
     /**
-     * 이동 1회에 대한 체력 소모(운동화 장착 시 5→4 할인 적용). 프론트가 "이동 1회"로
-     * 판단하는 시점(예: 타일 1칸, 일정 거리)마다 호출한다.
+     * 이동으로 경과한 시간(초)만큼 체력 소모 (초당 0.15, 운동화 장착 시 초당 0.12로 20% 할인).
+     * 프론트가 캐릭터가 실제로 움직인 시간을 누적해서 주기적으로 호출한다.
      */
     @PostMapping("/{sessionId}/move")
-    public ResponseEntity<SessionResponse> move(@PathVariable Long sessionId) {
-        return ResponseEntity.ok(sessionService.move(sessionId));
+    public ResponseEntity<SessionResponse> move(@PathVariable Long sessionId, @Valid @RequestBody MoveRequest request) {
+        return ResponseEntity.ok(sessionService.move(sessionId, request.seconds()));
     }
 }

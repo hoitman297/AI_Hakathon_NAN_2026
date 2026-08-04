@@ -47,7 +47,7 @@ function App() {
       return {
         day: current?.currentDay ?? 1,
         phase: 'day',
-        playerHp: current?.staminaCurrent ?? 100,
+        playerHp: Math.round(current?.staminaCurrent ?? 100),
         inventory: {},
         affection: {},
         cluesCollected: [],

@@ -11,6 +11,7 @@ export interface SessionResponse {
   staminaCurrent: number
   staminaMax: number
   gold: number
+  sneakersEquipped: boolean | null
   startedAt: string | null
   endedAt: string | null
 }
@@ -58,4 +59,17 @@ export async function advanceDay(sessionId: number): Promise<SessionResponse> {
     headers: authHeaders(),
   })
   return parseOrThrow<SessionResponse>(response, '다음 날로 넘어가지 못했습니다.')
+}
+
+/**
+ * 캐릭터가 실제로 움직인 경과 시간(초)을 보고해 체력을 소모시킨다.
+ * 초당 0.15 소모(운동화 착용 시 0.12, 20% 감소)는 서버가 계산한다 — 여기서는 경과 시간만 넘긴다.
+ */
+export async function moveSession(sessionId: number, seconds: number): Promise<SessionResponse> {
+  const response = await fetch(`${API_BASE_URL}/api/sessions/${sessionId}/move`, {
+    method: 'POST',
+    headers: authHeaders(),
+    body: JSON.stringify({ seconds }),
+  })
+  return parseOrThrow<SessionResponse>(response, '이동 체력 반영에 실패했습니다.')
 }

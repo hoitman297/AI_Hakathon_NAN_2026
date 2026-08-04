@@ -14,8 +14,9 @@ public final class GameConstants {
 
     public static final int FAINT_RESTART_STAMINA = 70;
 
-    public static final int MOVE_STAMINA = 5;
-    public static final int MOVE_STAMINA_WITH_SNEAKERS = 4;
+    /** 기획서(체력 세부 수치, ✅ 확정): 이동은 초당 소모되는 연속형 모델. 운동화 착용 시 20% 감소. */
+    public static final double MOVE_STAMINA_PER_SECOND = 0.15;
+    public static final double MOVE_STAMINA_PER_SECOND_WITH_SNEAKERS = 0.12;
     public static final int DIALOGUE_STAMINA = 8;
 
     public static final int INVENTORY_SLOT_COUNT = 7;
@@ -30,8 +31,6 @@ public final class GameConstants {
     public static final int AFFINITY_WRONG_CLOSE_PENALTY_MAGNITUDE_MIN = 10;
     public static final int AFFINITY_WRONG_CLOSE_PENALTY_MAGNITUDE_MAX = 15;
     public static final int AFFINITY_WRONG_UNRELATED_PENALTY = -5;
-    public static final int AFFINITY_DIALOGUE_GAIN_MIN = 2;
-    public static final int AFFINITY_DIALOGUE_GAIN_MAX = 5;
     public static final int AFFINITY_GIFT_MIN = 10;
     public static final int AFFINITY_GIFT_MAX = 15;
 

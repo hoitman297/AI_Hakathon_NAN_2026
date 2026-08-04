@@ -127,7 +127,7 @@ class SessionServiceTest {
     @Test
     void advanceDay_normalTransition_incrementsDayAndResetsStamina() {
         PlayerStat today = PlayerStat.builder().session(session).day(2)
-                .staminaCurrent(40).staminaMax(100).gold(10).fainted(false).build();
+                .staminaCurrent(40.0).staminaMax(100).gold(10).fainted(false).build();
         when(playerStatRepository.findBySessionAndDay(session, 2)).thenReturn(Optional.of(today));
         when(playerStatRepository.save(any(PlayerStat.class))).thenAnswer(inv -> inv.getArgument(0));
         stubNightSabotageCollaborators();
@@ -145,7 +145,7 @@ class SessionServiceTest {
     @Test
     void advanceDay_faintedToday_nextDayStartsAtFaintRestartStamina() {
         PlayerStat today = PlayerStat.builder().session(session).day(2)
-                .staminaCurrent(0).staminaMax(100).gold(5).fainted(true).build();
+                .staminaCurrent(0.0).staminaMax(100).gold(5).fainted(true).build();
         when(playerStatRepository.findBySessionAndDay(session, 2)).thenReturn(Optional.of(today));
         when(playerStatRepository.save(any(PlayerStat.class))).thenAnswer(inv -> inv.getArgument(0));
         stubNightSabotageCollaborators();
@@ -159,7 +159,7 @@ class SessionServiceTest {
     void advanceDay_lastAccusationDayWithoutAccusation_setsBadEndingAndSyncsSave() {
         session.setCurrentDay(GameConstants.LAST_ACCUSATION_DAY); // 9일차, 사보타주 발생일(1~5) 아님
         PlayerStat today = PlayerStat.builder().session(session).day(9)
-                .staminaCurrent(50).staminaMax(100).gold(0).fainted(false).build();
+                .staminaCurrent(50.0).staminaMax(100).gold(0).fainted(false).build();
         when(playerStatRepository.findBySessionAndDay(session, 9)).thenReturn(Optional.of(today));
 
         SessionResponse response = sessionService.advanceDay(100L);

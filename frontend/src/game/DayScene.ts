@@ -5,9 +5,19 @@ export interface DaySceneInitData {
   day: number
   staminaCurrent: number
   staminaMax: number
+  sneakersEquipped: boolean
   onStaminaChange: (value: number) => void
+  /** 이동으로 실제 경과한 시간(초)을 주기적으로 보고 — 서버가 초당 소모량을 반영해 체력을 깎는다. */
+  onMove: (seconds: number) => void
   onNpcClick: (npcName: string, npcRole: string) => void
 }
+
+// 기획서 체력 세부 수치(✅ 확정): 이동 초당 0.15 소모, 운동화 착용 시 초당 0.12(20% 감소).
+// 백엔드 GameConstants.MOVE_STAMINA_PER_SECOND(_WITH_SNEAKERS)와 값이 일치해야 한다.
+const MOVE_STAMINA_PER_SECOND = 0.15
+const MOVE_STAMINA_PER_SECOND_WITH_SNEAKERS = 0.12
+// 이동 체력 소모를 이 정도 간격(초)으로 모아서 서버에 보고한다 — 매 프레임 호출하지 않는다.
+const MOVE_REPORT_INTERVAL_SECONDS = 1
 
 const TILE = 32
 const WORLD_TILES_W = 30
@@ -50,7 +60,7 @@ export class DayScene extends Phaser.Scene {
   private keyA?: Phaser.Input.Keyboard.Key
   private keyS?: Phaser.Input.Keyboard.Key
   private keyD?: Phaser.Input.Keyboard.Key
-  private lastStepAt = 0
+  private pendingMovedSeconds = 0
 
   constructor() {
     super('DayScene')
@@ -59,6 +69,7 @@ export class DayScene extends Phaser.Scene {
   init(data: DaySceneInitData) {
     this.initData = data
     this.stamina = data.staminaCurrent
+    this.pendingMovedSeconds = 0
   }
 
   preload() {
@@ -135,9 +146,12 @@ export class DayScene extends Phaser.Scene {
       this.keyS = this.input.keyboard.addKey('S')
       this.keyD = this.input.keyboard.addKey('D')
     }
+
+    // 씬을 벗어날 때(밤으로 전환 등) 아직 서버에 보고 안 된 이동 시간이 남아있으면 마저 보고한다.
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.flushPendingMove())
   }
 
-  update(time: number) {
+  update(_time: number, delta: number) {
     if (this.stamina <= 0) return
 
     let dx = 0
@@ -154,10 +168,23 @@ export class DayScene extends Phaser.Scene {
     this.player.x = Phaser.Math.Clamp(this.player.x + (dx / length) * speed, TILE / 2, WORLD_W - TILE / 2)
     this.player.y = Phaser.Math.Clamp(this.player.y + (dy / length) * speed, TILE / 2, WORLD_H - TILE / 2)
 
-    if (time - this.lastStepAt > 260) {
-      this.lastStepAt = time
-      this.stamina = Math.max(0, this.stamina - 1)
-      this.initData.onStaminaChange(this.stamina)
+    // 정지 시 소모 없음 — 실제로 움직인 프레임에서만 경과 시간(초)만큼 체력을 깎는다.
+    const deltaSeconds = delta / 1000
+    const ratePerSecond = this.initData.sneakersEquipped
+      ? MOVE_STAMINA_PER_SECOND_WITH_SNEAKERS
+      : MOVE_STAMINA_PER_SECOND
+    this.stamina = Math.max(0, this.stamina - ratePerSecond * deltaSeconds)
+    this.initData.onStaminaChange(this.stamina)
+
+    this.pendingMovedSeconds += deltaSeconds
+    if (this.pendingMovedSeconds >= MOVE_REPORT_INTERVAL_SECONDS) {
+      this.flushPendingMove()
     }
+  }
+
+  private flushPendingMove() {
+    if (this.pendingMovedSeconds <= 0) return
+    this.initData.onMove(this.pendingMovedSeconds)
+    this.pendingMovedSeconds = 0
   }
 }

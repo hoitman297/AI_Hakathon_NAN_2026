@@ -17,7 +17,7 @@ public class StaminaService {
     private final PlayerStatRepository playerStatRepository;
 
     @Transactional
-    public PlayerStat consume(GameSession session, int amount) {
+    public PlayerStat consume(GameSession session, double amount) {
         PlayerStat stat = playerStatRepository.findBySessionAndDay(session, session.getCurrentDay())
                 .orElseThrow(() -> new IllegalStateException("현재 일차의 플레이어 상태가 없습니다."));
 
@@ -25,7 +25,7 @@ public class StaminaService {
             throw new IllegalStateException("이미 기절 상태입니다. 오늘은 더 행동할 수 없습니다.");
         }
 
-        int newStamina = stat.getStaminaCurrent() - amount;
+        double newStamina = stat.getStaminaCurrent() - amount;
         if (newStamina <= 0) {
             newStamina = 0;
             stat.setFainted(true);
@@ -35,7 +35,7 @@ public class StaminaService {
     }
 
     @Transactional
-    public PlayerStat restore(GameSession session, int amount) {
+    public PlayerStat restore(GameSession session, double amount) {
         PlayerStat stat = currentStat(session);
         stat.setStaminaCurrent(Math.min(stat.getStaminaMax(), stat.getStaminaCurrent() + amount));
         return playerStatRepository.save(stat);
