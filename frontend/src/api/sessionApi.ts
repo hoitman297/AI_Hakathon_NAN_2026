@@ -1,5 +1,6 @@
 import { getAuthToken } from './authToken'
-import { API_BASE_URL } from './config'
+
+const API_BASE_URL = 'http://localhost:8080'
 
 export interface SessionResponse {
   sessionId: number
