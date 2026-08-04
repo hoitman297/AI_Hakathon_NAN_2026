@@ -32,9 +32,14 @@ public class ShopItemMaster {
     @Column(name = "item_id")
     private Long itemId;
 
-    @Comment("아이템 이름")
+    @Comment("아이템 이름 (화면 표시용 — 게임 로직에서는 item_code로 식별할 것)")
     @Column(nullable = false, length = 30)
     private String name;
+
+    @Comment("게임 로직에서 아이템을 식별하는 코드 (표시 이름과 분리 — 이름이 바뀌어도 로직에 영향 없음)")
+    @Enumerated(EnumType.STRING)
+    @Column(name = "item_code", nullable = false, length = 20)
+    private ShopItemCode itemCode;
 
     @Comment("영구 장비(PERMANENT_EQUIPMENT) 또는 소모품(CONSUMABLE)")
     @Enumerated(EnumType.STRING)

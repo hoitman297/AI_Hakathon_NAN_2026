@@ -17,13 +17,16 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import com.gameproject.backend.domain.Account;
 import com.gameproject.backend.domain.GameSession;
+import com.gameproject.backend.domain.InventoryItem;
 import com.gameproject.backend.domain.InventoryItemType;
 import com.gameproject.backend.domain.ItemCategory;
 import com.gameproject.backend.domain.PlayerStat;
 import com.gameproject.backend.domain.SessionStatus;
+import com.gameproject.backend.domain.ShopItemCode;
 import com.gameproject.backend.domain.ShopItemMaster;
 import com.gameproject.backend.repository.CropMasterRepository;
 import com.gameproject.backend.repository.FruitMasterRepository;
+import com.gameproject.backend.repository.InventoryItemRepository;
 import com.gameproject.backend.repository.ShopItemMasterRepository;
 
 @ExtendWith(MockitoExtension.class)
@@ -35,6 +38,8 @@ class ShopServiceTest {
     private CropMasterRepository cropMasterRepository;
     @Mock
     private FruitMasterRepository fruitMasterRepository;
+    @Mock
+    private InventoryItemRepository inventoryItemRepository;
     @Mock
     private SessionService sessionService;
     @Mock
@@ -50,7 +55,7 @@ class ShopServiceTest {
     @BeforeEach
     void setUp() {
         shopService = new ShopService(shopItemMasterRepository, cropMasterRepository, fruitMasterRepository,
-                sessionService, staminaService, inventoryService);
+                inventoryItemRepository, sessionService, staminaService, inventoryService);
 
         Account account = Account.builder().accountId(1L).username("u").passwordHash("h").nickname("n")
                 .createdAt(LocalDateTime.now()).build();
@@ -61,8 +66,8 @@ class ShopServiceTest {
                 .sneakersEquipped(false)
                 .build();
         sneakers = ShopItemMaster.builder()
-                .itemId(1L).name("운동화").category(ItemCategory.PERMANENT_EQUIPMENT)
-                .price(50).effectDesc("이동 시 체력 소모량 감소").usageLimit("1회 구매, 영구")
+                .itemId(1L).name("운동화").itemCode(ShopItemCode.SNEAKERS).category(ItemCategory.PERMANENT_EQUIPMENT)
+                .price(50).effectDesc("이동 중 체력 소모량 감소").usageLimit("1회 구매, 영구")
                 .build();
 
         when(sessionService.findSession(100L)).thenReturn(session);
@@ -70,12 +75,12 @@ class ShopServiceTest {
     }
 
     @Test
-    void purchase_sneakersAlreadyEquipped_throwsWithoutDeductingGold() {
+    void purchase_alreadyEquipped_throwsWithoutDeductingGold() {
         session.setSneakersEquipped(true);
 
         assertThatThrownBy(() -> shopService.purchase(100L, 1L))
                 .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("이미 영구 장착");
+                .hasMessageContaining("이미 보유했거나 장착");
 
         verify(staminaService, never()).currentStat(any());
         verify(staminaService, never()).addGold(any(), org.mockito.ArgumentMatchers.anyInt());
@@ -83,7 +88,25 @@ class ShopServiceTest {
     }
 
     @Test
-    void purchase_sneakersNotYetEquipped_deductsGoldAndAddsItem() {
+    void purchase_alreadyOwnedButNotYetEquipped_throwsWithoutDeductingGold() {
+        // 구매만 하고 아직 장착(useItem)은 안 한 상태 — sneakersEquipped 플래그만 보던 예전
+        // 로직이면 이 상태에서 중복 구매로 골드가 또 빠져나갔다. 인벤토리 보유 여부까지 확인해야 막힌다.
+        when(inventoryItemRepository.findBySessionAndItemTypeAndItemRefId(session, InventoryItemType.SHOP_ITEM, 1L))
+                .thenReturn(Optional.of(InventoryItem.builder().session(session).slotIndex(1)
+                        .itemType(InventoryItemType.SHOP_ITEM).itemRefId(1L).quantity(1).build()));
+
+        assertThatThrownBy(() -> shopService.purchase(100L, 1L))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("이미 보유했거나 장착");
+
+        verify(staminaService, never()).addGold(any(), org.mockito.ArgumentMatchers.anyInt());
+        verify(inventoryService, never()).addItem(any(), any(), any(), org.mockito.ArgumentMatchers.anyInt());
+    }
+
+    @Test
+    void purchase_notYetOwnedOrEquipped_deductsGoldAndAddsItem() {
+        when(inventoryItemRepository.findBySessionAndItemTypeAndItemRefId(session, InventoryItemType.SHOP_ITEM, 1L))
+                .thenReturn(Optional.empty());
         PlayerStat stat = PlayerStat.builder().session(session).day(2)
                 .staminaCurrent(100.0).staminaMax(100).gold(100).fainted(false).build();
         when(staminaService.currentStat(session)).thenReturn(stat);
@@ -96,6 +119,8 @@ class ShopServiceTest {
 
     @Test
     void purchase_insufficientGold_throws() {
+        when(inventoryItemRepository.findBySessionAndItemTypeAndItemRefId(session, InventoryItemType.SHOP_ITEM, 1L))
+                .thenReturn(Optional.empty());
         PlayerStat stat = PlayerStat.builder().session(session).day(2)
                 .staminaCurrent(100.0).staminaMax(100).gold(10).fainted(false).build();
         when(staminaService.currentStat(session)).thenReturn(stat);

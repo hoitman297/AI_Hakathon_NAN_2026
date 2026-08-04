@@ -66,7 +66,7 @@ public class GameSession {
     @Column(name = "ended_at")
     private LocalDateTime endedAt;
 
-    @Comment("운동화 구매 후 장착 여부 (SessionService.move()에서 이동 체력 소모 5→4 할인에 사용)")
+    @Comment("운동화 구매 후 장착 여부 (SessionService.move()에서 이동 체력 소모 초당 0.15→0.12 할인에 사용)")
     @Column(name = "sneakers_equipped", nullable = false)
     private Boolean sneakersEquipped;
 

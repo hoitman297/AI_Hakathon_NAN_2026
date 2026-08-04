@@ -4,9 +4,10 @@ import java.util.Optional;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 
+import com.gameproject.backend.domain.ShopItemCode;
 import com.gameproject.backend.domain.ShopItemMaster;
 
 public interface ShopItemMasterRepository extends JpaRepository<ShopItemMaster, Long> {
 
-    Optional<ShopItemMaster> findByName(String name);
+    Optional<ShopItemMaster> findByItemCode(ShopItemCode itemCode);
 }

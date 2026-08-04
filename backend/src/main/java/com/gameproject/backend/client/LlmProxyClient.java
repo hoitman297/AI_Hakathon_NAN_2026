@@ -44,8 +44,10 @@ public class LlmProxyClient {
         return response != null ? response.personaJson() : null;
     }
 
-    public DialogueChatResponse chat(String personaJson, List<DialogueTurn> history, String userMessage, boolean honestMode) {
-        DialogueChatRequest request = new DialogueChatRequest(personaJson, history, userMessage, honestMode);
+    public DialogueChatResponse chat(String personaJson, List<DialogueTurn> history, String userMessage,
+                                      boolean honestMode, int affinityScore, boolean restrictDetectiveTalk) {
+        DialogueChatRequest request = new DialogueChatRequest(personaJson, history, userMessage, honestMode,
+                affinityScore, restrictDetectiveTalk);
         DialogueChatResponse response = llmProxyRestClient.post()
                 .uri("/internal/llm/dialogue")
                 .body(request)

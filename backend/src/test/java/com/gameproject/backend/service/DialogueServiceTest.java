@@ -95,7 +95,7 @@ class DialogueServiceTest {
                 .isInstanceOf(LlmRateLimitExceededException.class);
 
         verify(staminaService, never()).consume(any(), anyInt());
-        verify(llmProxyClient, never()).chat(any(), any(), any(), anyBoolean());
+        verify(llmProxyClient, never()).chat(any(), any(), any(), anyBoolean(), anyInt(), anyBoolean());
         verify(dialogueLogRepository, never()).save(any());
     }
 
@@ -108,7 +108,8 @@ class DialogueServiceTest {
         PlayerStat stat = PlayerStat.builder().session(session).day(2)
                 .staminaCurrent(92.0).staminaMax(100).gold(0).fainted(false).build();
         when(staminaService.consume(session, GameConstants.DIALOGUE_STAMINA)).thenReturn(stat);
-        when(llmProxyClient.chat("{}", List.of(), "안녕하세요", false))
+        when(npcService.getAffinityScore(session, npc)).thenReturn(50);
+        when(llmProxyClient.chat("{}", List.of(), "안녕하세요", false, 50, false))
                 .thenReturn(new DialogueChatResponse("반갑습니다.", 3));
         when(npcService.adjustAffinity(any(), any(), anyInt())).thenReturn(55);
 
@@ -118,5 +119,32 @@ class DialogueServiceTest {
         verify(npcService).adjustAffinity(session, npc, 3);
         assertThat(response.npcReply()).isEqualTo("반갑습니다.");
         assertThat(response.staminaCurrent()).isEqualTo(92);
+    }
+
+    @Test
+    void send_day7OrLater_passesRestrictDetectiveTalkTrueToLlm() {
+        session = GameSession.builder()
+                .sessionId(100L).account(account).culprit(npc)
+                .currentDay(GameConstants.FIRST_ACCUSATION_DAY).status(SessionStatus.IN_PROGRESS)
+                .startedAt(LocalDateTime.now())
+                .sneakersEquipped(false)
+                .build();
+        when(sessionService.findSession(100L)).thenReturn(session);
+
+        NpcPersonaState existingPersona = NpcPersonaState.builder()
+                .session(session).npc(npc).generatedPersonaJson("{}").generatedAt(LocalDateTime.now()).build();
+        when(personaStateRepository.findBySessionAndNpc(session, npc)).thenReturn(Optional.of(existingPersona));
+        when(dialogueLogRepository.findBySessionAndNpcOrderByCreatedAtAsc(session, npc)).thenReturn(List.of());
+        PlayerStat stat = PlayerStat.builder().session(session).day(GameConstants.FIRST_ACCUSATION_DAY)
+                .staminaCurrent(92.0).staminaMax(100).gold(0).fainted(false).build();
+        when(staminaService.consume(session, GameConstants.DIALOGUE_STAMINA)).thenReturn(stat);
+        when(npcService.getAffinityScore(session, npc)).thenReturn(50);
+        when(llmProxyClient.chat("{}", List.of(), "범인이 누구예요?", false, 50, true))
+                .thenReturn(new DialogueChatResponse("글쎄, 그건 나도 모르겠구먼.", 0));
+        when(npcService.adjustAffinity(any(), any(), anyInt())).thenReturn(50);
+
+        dialogueService.send(100L, 1L, "범인이 누구예요?");
+
+        verify(llmProxyClient).chat("{}", List.of(), "범인이 누구예요?", false, 50, true);
     }
 }

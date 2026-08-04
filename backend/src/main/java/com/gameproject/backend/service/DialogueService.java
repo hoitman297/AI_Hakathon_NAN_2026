@@ -64,8 +64,6 @@ public class DialogueService {
         // 실제 상태 변경(체력 소모 등) 전에 먼저 검사해서, 막힐 요청은 아무 부작용 없이 막는다.
         llmRateLimiter.checkAllowed(session.getAccount().getAccountId());
 
-        // 7일차부터는 기획서상 "간단한 대화만 가능(추리 대화 불가)" 이지만, 대화 내용 자체의
-        // 주제를 서버가 판별하기는 어려워 현재는 별도 제한을 걸지 않았다 (기획 확정 필요 항목).
         PlayerStat stat = staminaService.consume(session, GameConstants.DIALOGUE_STAMINA);
 
         String personaJson = getOrGeneratePersona(session, npc);
@@ -76,7 +74,15 @@ public class DialogueService {
         boolean honestMode = npc.getNpcId().equals(session.getHonestModeNpcId())
                 && session.getCurrentDay().equals(session.getHonestModeDay());
 
-        DialogueChatResponse llmResult = llmProxyClient.chat(personaJson, history, userMessage, honestMode);
+        // 기획서 확정 스펙(70점 이상 우호적/단서 먼저 제공, 30~70 기본 대화만, 30 미만 회피·단답)을
+        // 대화 LLM이 실제로 반영하도록 현재 호감도를 매 호출마다 같이 넘긴다.
+        int affinityScore = npcService.getAffinityScore(session, npc);
+
+        // 기획서 확정 스펙: 7일차(고발 가능 시작일)부터는 "간단한 대화만 가능(추리 대화 불가)".
+        // 대화 주제 판별은 서버가 아니라 LLM이 시스템 프롬프트 지시로 직접 수행한다.
+        boolean restrictDetectiveTalk = session.getCurrentDay() >= GameConstants.FIRST_ACCUSATION_DAY;
+        DialogueChatResponse llmResult = llmProxyClient.chat(personaJson, history, userMessage, honestMode,
+                affinityScore, restrictDetectiveTalk);
         String reply = llmResult.reply();
 
         dialogueLogRepository.save(DialogueLog.builder()

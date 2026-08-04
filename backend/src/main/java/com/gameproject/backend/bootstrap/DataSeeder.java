@@ -11,6 +11,7 @@ import com.gameproject.backend.domain.ItemCategory;
 import com.gameproject.backend.domain.LocationSlot;
 import com.gameproject.backend.domain.Npc;
 import com.gameproject.backend.domain.NpcLocationSchedule;
+import com.gameproject.backend.domain.ShopItemCode;
 import com.gameproject.backend.domain.ShopItemMaster;
 import com.gameproject.backend.repository.CropMasterRepository;
 import com.gameproject.backend.repository.FruitMasterRepository;
@@ -199,13 +200,17 @@ public class DataSeeder implements CommandLineRunner {
 
     private void seedShopItems() {
         shopItemMasterRepository.saveAll(List.of(
-                ShopItemMaster.builder().name("운동화").category(ItemCategory.PERMANENT_EQUIPMENT).price(50)
-                        .effectDesc("이동 시 체력 소모량 5→4").usageLimit("1회 구매, 영구").build(),
-                ShopItemMaster.builder().name("거짓말탐지기").category(ItemCategory.CONSUMABLE).price(60)
+                ShopItemMaster.builder().name("운동화").itemCode(ShopItemCode.SNEAKERS)
+                        .category(ItemCategory.PERMANENT_EQUIPMENT).price(50)
+                        .effectDesc("이동 중 체력 소모량 초당 0.15→0.12로 감소 (20% 감소, 정지 시 소모 없음)").usageLimit("1회 구매, 영구").build(),
+                ShopItemMaster.builder().name("거짓말탐지기").itemCode(ShopItemCode.LIE_DETECTOR)
+                        .category(ItemCategory.CONSUMABLE).price(60)
                         .effectDesc("대화 중 사용 시 \"정직 모드\" 1턴 (알리바이 질문에 더 구체적 답변, 범인 여부는 안 알려줌)").usageLimit("1일 1회").build(),
-                ShopItemMaster.builder().name("돋보기").category(ItemCategory.CONSUMABLE).price(30)
+                ShopItemMaster.builder().name("돋보기").itemCode(ShopItemCode.MAGNIFIER)
+                        .category(ItemCategory.CONSUMABLE).price(30)
                         .effectDesc("애매한 단서 카드 1개를 더 명확한 문구로 갱신").usageLimit("1일 1회").build(),
-                ShopItemMaster.builder().name("선물세트").category(ItemCategory.CONSUMABLE).price(40)
+                ShopItemMaster.builder().name("선물세트").itemCode(ShopItemCode.GIFT_SET)
+                        .category(ItemCategory.CONSUMABLE).price(40)
                         .effectDesc("지정 NPC 호감도 즉시 +10~15").usageLimit("1개당 1회").build()
         ));
     }

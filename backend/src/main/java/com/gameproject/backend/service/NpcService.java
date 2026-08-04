@@ -42,9 +42,7 @@ public class NpcService {
         GameSession session = sessionService.findSession(sessionId);
         Npc npc = npcRepository.findById(npcId)
                 .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 NPC입니다: " + npcId));
-        int affinity = affinityRepository.findBySessionAndNpc(session, npc)
-                .map(Affinity::getScore)
-                .orElse(GameConstants.AFFINITY_START);
+        int affinity = getAffinityScore(session, npc);
 
         return new NpcDetailResponse(
                 npc.getNpcId(),
@@ -57,6 +55,14 @@ public class NpcService {
                 affinity,
                 locationResolver.resolveToday(session, npc)
         );
+    }
+
+    /** 현재 호감도 점수 조회 (기록이 없으면 시작값). 대화 LLM 프롬프트에 등급 판단용으로 넘길 때 사용. */
+    @Transactional(readOnly = true)
+    public int getAffinityScore(GameSession session, Npc npc) {
+        return affinityRepository.findBySessionAndNpc(session, npc)
+                .map(Affinity::getScore)
+                .orElse(GameConstants.AFFINITY_START);
     }
 
     /** 대화 진행/선물 등으로 인한 호감도 변화를 적용 (0~100 범위로 clamp) */

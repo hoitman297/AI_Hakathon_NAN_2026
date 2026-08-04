@@ -11,6 +11,7 @@ import com.gameproject.backend.domain.ClueCard;
 import com.gameproject.backend.domain.GameSession;
 import com.gameproject.backend.domain.InventoryItemType;
 import com.gameproject.backend.domain.NpcCaseAssignment;
+import com.gameproject.backend.domain.ShopItemCode;
 import com.gameproject.backend.domain.ShopItemMaster;
 import com.gameproject.backend.dto.ClueCardResponse;
 import com.gameproject.backend.repository.ClueCardRepository;
@@ -68,7 +69,7 @@ public class ClueService {
             throw new IllegalStateException("돋보기는 하루에 한 번만 사용할 수 있습니다.");
         }
 
-        ShopItemMaster magnifier = shopItemMasterRepository.findByName("돋보기")
+        ShopItemMaster magnifier = shopItemMasterRepository.findByItemCode(ShopItemCode.MAGNIFIER)
                 .orElseThrow(() -> new IllegalStateException("돋보기 마스터 데이터가 없습니다."));
         inventoryService.removeItem(session, InventoryItemType.SHOP_ITEM, magnifier.getItemId(), 1);
 

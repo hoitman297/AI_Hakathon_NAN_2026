@@ -111,6 +111,14 @@ public class LlmService {
             systemPrompt.append("지금은 '정직 모드'입니다: 알리바이 관련 질문에 평소보다 더 구체적으로 답하되, ")
                     .append("본인이 범인인지 여부는 절대 직접 밝히지 마세요.\n");
         }
+        if (request.restrictDetectiveTalk()) {
+            systemPrompt.append("지금은 이야기가 막바지에 접어든 시점입니다: 날씨·마을 소식·안부 같은 ")
+                    .append("가벼운 일상 대화에는 평소처럼 응하되, 사건·단서·범인 추리와 직접 관련된 ")
+                    .append("질문에는 '지금은 그 얘기를 할 때가 아니다'는 식으로 캐릭터답게 얼버무리며 ")
+                    .append("구체적인 정보나 단서를 새로 주지 마세요")
+                    .append(request.honestMode() ? " (단, 위 정직 모드가 적용되는 알리바이 질문은 예외입니다).\n" : ".\n");
+        }
+        systemPrompt.append(affinityToneGuidance(request.affinityScore()));
         systemPrompt.append("""
                 또한 이 캐릭터의 성격·가치관·말투에 비추어, 방금 플레이어 발화가 이 캐릭터의
                 호감도에 어떤 영향을 줬는지 판단하세요. 예의 바르거나 이 캐릭터가 흥미로워할
@@ -152,6 +160,28 @@ public class LlmService {
         } catch (RuntimeException e) {
             log.error("대화 LLM 호출 실패", e);
             return new DialogueChatResponse("(연결이 불안정한지 대답을 잇지 못했습니다. 잠시 후 다시 말을 걸어주세요.)", 0);
+        }
+    }
+
+    /**
+     * 기획서 확정 스펙: 호감도 70점 이상은 우호적 태도로 단서·정보를 먼저 제공하려는 태도,
+     * 30~70점은 기본적인 일상 대화만 가능(단서를 스스로 먼저 꺼내지 않음),
+     * 30점 미만은 대화 자체를 회피하며 단답형으로만 답함(완전 차단은 아님).
+     */
+    private String affinityToneGuidance(int affinityScore) {
+        if (affinityScore >= 70) {
+            return "현재 이 캐릭터의 플레이어에 대한 호감도는 %d점(높음)입니다. 플레이어에게 우호적이고 친근한 태도로 답하고, "
+                    .formatted(affinityScore)
+                    + "본인이 알고 있는 단서나 정보가 있다면 먼저 나서서 알려주려는 태도를 보이세요.\n";
+        } else if (affinityScore >= 30) {
+            return "현재 이 캐릭터의 플레이어에 대한 호감도는 %d점(보통)입니다. 예의는 지키되 아직 특별히 친하지는 않은 "
+                    .formatted(affinityScore)
+                    + "사이입니다. 일상적인 대화 정도만 하고, 단서나 민감한 정보를 스스로 먼저 꺼내지는 마세요.\n";
+        } else {
+            return "현재 이 캐릭터의 플레이어에 대한 호감도는 %d점(낮음)입니다. 플레이어를 경계하거나 불편해하며 "
+                    .formatted(affinityScore)
+                    + "대화를 짧고 무뚝뚝하게 회피하려는 태도를 보이세요. 단서나 정보는 절대 스스로 꺼내지 마세요. "
+                    + "다만 대화 자체를 완전히 거부하지는 말고 짧게라도 응답하세요.\n";
         }
     }
 
