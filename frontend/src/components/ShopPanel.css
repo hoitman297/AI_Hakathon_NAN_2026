@@ -1,0 +1,103 @@
+.shop-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  z-index: 25;
+  background: rgba(20, 15, 10, 0.45);
+}
+
+.shop-panel {
+  width: min(520px, 100%);
+  max-height: min(600px, 90%);
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+}
+
+.shop-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.shop-header h2 {
+  margin: 0;
+}
+
+.shop-gold {
+  font-weight: 700;
+  color: var(--accent-dark);
+}
+
+.shop-tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.shop-message {
+  margin: 0 0 8px;
+  color: var(--leaf-dark);
+  font-size: 0.85rem;
+}
+
+.shop-status {
+  color: var(--ink-soft);
+  font-size: 0.85rem;
+}
+
+.shop-list {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.shop-item-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 2px solid var(--ink);
+  border-radius: 8px;
+  background: var(--paper-dim);
+}
+
+.shop-item-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.shop-item-name {
+  font-weight: 700;
+}
+
+.shop-item-price {
+  font-weight: 400;
+  color: var(--accent-dark);
+  margin-left: 6px;
+}
+
+.shop-item-desc {
+  font-size: 0.82rem;
+  color: var(--ink-soft);
+  margin-top: 2px;
+}
+
+.shop-item-limit {
+  font-size: 0.75rem;
+  color: var(--ink-soft);
+  margin-top: 2px;
+  font-style: italic;
+}
+
+.shop-close {
+  align-self: flex-end;
+}

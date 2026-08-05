@@ -12,6 +12,7 @@ import org.springframework.web.bind.annotation.RestController;
 import com.gameproject.backend.domain.Account;
 import com.gameproject.backend.dto.CreateSessionRequest;
 import com.gameproject.backend.dto.MoveRequest;
+import com.gameproject.backend.dto.NightSummaryResponse;
 import com.gameproject.backend.dto.SessionResponse;
 import com.gameproject.backend.service.SessionService;
 
@@ -67,5 +68,13 @@ public class SessionController {
     @PostMapping("/{sessionId}/move")
     public ResponseEntity<SessionResponse> move(@PathVariable Long sessionId, @Valid @RequestBody MoveRequest request) {
         return ResponseEntity.ok(sessionService.move(sessionId, request.seconds()));
+    }
+
+    /** NightTransitionScreen용 — 지정한 일차 밤에 사보타주가 없었으면(6일차 이후 등) 204. */
+    @GetMapping("/{sessionId}/sabotage/{day}")
+    public ResponseEntity<NightSummaryResponse> nightSummary(@PathVariable Long sessionId, @PathVariable int day) {
+        return sessionService.getNightSummary(sessionId, day)
+                .map(ResponseEntity::ok)
+                .orElseGet(() -> ResponseEntity.noContent().build());
     }
 }

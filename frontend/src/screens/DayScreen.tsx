@@ -5,7 +5,10 @@ import { DayScene, type DaySceneInitData } from '../game/DayScene'
 import { StaminaBar } from '../components/StaminaBar'
 import { DialogueBox } from '../components/DialogueBox'
 import { EscMenu } from '../components/EscMenu'
+import { InventoryPanel } from '../components/InventoryPanel'
+import { CluePanel } from '../components/CluePanel'
 import { moveSession, type SessionResponse } from '../api/sessionApi'
+import { listNpcsToday } from '../api/npcApi'
 import './DayScreen.css'
 
 // 백엔드 GameConstants.FIRST_ACCUSATION_DAY / LAST_ACCUSATION_DAY 와 맞춰야 한다.
@@ -33,8 +36,28 @@ export function DayScreen({
   const containerRef = useRef<HTMLDivElement>(null)
   const gameRef = useRef<Phaser.Game | null>(null)
   const [stamina, setStamina] = useState(() => session.staminaCurrent)
-  const [dialogueNpc, setDialogueNpc] = useState<{ name: string; role: string } | null>(null)
+  const [gold] = useState(() => session.gold)
+  const [dialogueNpc, setDialogueNpc] = useState<{ npcId: number; name: string; role: string } | null>(null)
   const [escOpen, setEscOpen] = useState(false)
+  const [inventoryOpen, setInventoryOpen] = useState(false)
+  const [clueOpen, setClueOpen] = useState(false)
+
+  // NPC 이름 -> 실제 백엔드 npcId. Phaser 씬은 로컬 스프라이트 로스터(이름 기준)만 알고 있어서,
+  // 대화 API를 호출하려면 이 매핑을 통해 클릭된 NPC 이름을 npcId로 바꿔줘야 한다.
+  const npcIdByNameRef = useRef<Map<string, number>>(new Map())
+
+  useEffect(() => {
+    let cancelled = false
+    listNpcsToday(session.sessionId)
+      .then((npcs) => {
+        if (cancelled) return
+        npcIdByNameRef.current = new Map(npcs.map((npc) => [npc.name, npc.npcId]))
+      })
+      .catch((err) => console.error('NPC 목록을 불러오지 못했습니다.', err))
+    return () => {
+      cancelled = true
+    }
+  }, [session.sessionId])
 
   useEffect(() => {
     if (!containerRef.current) return
@@ -60,7 +83,14 @@ export function DayScreen({
       sneakersEquipped: session.sneakersEquipped ?? false,
       onStaminaChange: setStamina,
       onMove: handleMove,
-      onNpcClick: (name, role) => setDialogueNpc({ name, role }),
+      onNpcClick: (name, role) => {
+        const npcId = npcIdByNameRef.current.get(name)
+        if (npcId === undefined) {
+          console.error(`"${name}"에 대응하는 npcId를 찾지 못했습니다.`)
+          return
+        }
+        setDialogueNpc({ npcId, name, role })
+      },
     }
     game.scene.start('DayScene', initData)
 
@@ -72,17 +102,30 @@ export function DayScreen({
   }, [session.currentDay])
 
   useEffect(() => {
+    const scene = gameRef.current?.scene.getScene('DayScene') as DayScene | undefined
+    scene?.setInputLocked(!!dialogueNpc || escOpen || inventoryOpen || clueOpen)
+  }, [dialogueNpc, escOpen, inventoryOpen, clueOpen])
+
+  useEffect(() => {
     function handleKeyDown(event: KeyboardEvent) {
       if (event.key !== 'Escape') return
       if (dialogueNpc) {
         setDialogueNpc(null)
         return
       }
+      if (inventoryOpen) {
+        setInventoryOpen(false)
+        return
+      }
+      if (clueOpen) {
+        setClueOpen(false)
+        return
+      }
       setEscOpen((open) => !open)
     }
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [dialogueNpc])
+  }, [dialogueNpc, inventoryOpen, clueOpen])
 
   const canAccuse =
     session.status === 'IN_PROGRESS' &&
@@ -92,8 +135,17 @@ export function DayScreen({
   return (
     <div className="day-screen">
       <div className="day-hud">
-        <StaminaBar value={stamina} max={session.staminaMax} day={session.currentDay} />
+        <div className="day-hud-left">
+          <StaminaBar value={stamina} max={session.staminaMax} day={session.currentDay} />
+          <div className="day-gold">골드: {gold}</div>
+        </div>
         <div className="day-hud-actions">
+          <button className="pixel-button" onClick={() => setInventoryOpen(true)}>
+            인벤토리
+          </button>
+          <button className="pixel-button" onClick={() => setClueOpen(true)}>
+            단서
+          </button>
           {canAccuse && (
             <button className="pixel-button pixel-button--danger" onClick={onOpenAccusation}>
               범인 고발하기
@@ -109,11 +161,29 @@ export function DayScreen({
 
       <div ref={containerRef} className="day-canvas-wrap" />
 
-      <p className="day-hint">방향키 / WASD로 이동, NPC를 클릭해 대화하세요. ESC로 메뉴를 엽니다.</p>
+      <p className="day-hint">방향키 / WASD로 이동, NPC에게 가까이 가서 클릭하면 대화하세요. ESC로 메뉴를 엽니다.</p>
 
       {dialogueNpc && (
-        <DialogueBox npcName={dialogueNpc.name} npcRole={dialogueNpc.role} onClose={() => setDialogueNpc(null)} />
+        <DialogueBox
+          key={dialogueNpc.npcId}
+          sessionId={session.sessionId}
+          npcId={dialogueNpc.npcId}
+          npcName={dialogueNpc.name}
+          npcRole={dialogueNpc.role}
+          onStaminaChange={setStamina}
+          onClose={() => setDialogueNpc(null)}
+        />
       )}
+
+      {inventoryOpen && (
+        <InventoryPanel
+          sessionId={session.sessionId}
+          onStaminaChange={(restored) => setStamina((prev) => Math.min(session.staminaMax, prev + restored))}
+          onClose={() => setInventoryOpen(false)}
+        />
+      )}
+
+      {clueOpen && <CluePanel sessionId={session.sessionId} onClose={() => setClueOpen(false)} />}
 
       {escOpen && <EscMenu onResume={() => setEscOpen(false)} onQuit={onQuitToTitle} />}
     </div>

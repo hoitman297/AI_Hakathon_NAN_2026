@@ -10,18 +10,31 @@
 
 .day-hud {
   width: 100%;
-  max-width: 640px;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  padding: 12px;
+  padding: 12px 24px;
   flex-wrap: wrap;
+}
+
+.day-hud-left {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.day-gold {
+  color: var(--paper);
+  font-weight: 700;
+  font-size: 0.9rem;
+  white-space: nowrap;
 }
 
 .day-hud-actions {
   display: flex;
   gap: 8px;
+  flex-wrap: wrap;
 }
 
 .day-advance-error {
@@ -34,6 +47,14 @@
   border: 3px solid var(--ink);
   border-radius: 8px;
   overflow: hidden;
+  flex: 1;
+  width: 100%;
+  min-height: 0;
+}
+
+.day-canvas-wrap canvas {
+  display: block;
+  margin: 0 auto;
 }
 
 .day-hint {

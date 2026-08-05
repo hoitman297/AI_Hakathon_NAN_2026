@@ -29,3 +29,25 @@
   font-size: 0.8rem;
   margin: 0 0 20px;
 }
+
+.night-summary {
+  margin: 0 0 20px;
+  padding: 12px 14px;
+  border: 2px solid var(--ink);
+  border-radius: 8px;
+  background: var(--paper-dim);
+  text-align: left;
+}
+
+.night-summary-location {
+  font-weight: 700;
+  font-size: 0.85rem;
+  margin-bottom: 6px;
+}
+
+.night-summary-text {
+  margin: 0;
+  font-size: 0.88rem;
+  line-height: 1.5;
+  font-style: italic;
+}

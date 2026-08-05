@@ -21,6 +21,7 @@ import com.gameproject.backend.domain.SabotageEvent;
 import com.gameproject.backend.domain.SabotageType;
 import com.gameproject.backend.domain.SessionStatus;
 import com.gameproject.backend.dto.CreateSessionRequest;
+import com.gameproject.backend.dto.NightSummaryResponse;
 import com.gameproject.backend.dto.SessionResponse;
 import com.gameproject.backend.repository.AffinityRepository;
 import com.gameproject.backend.repository.ClueCardRepository;
@@ -115,6 +116,15 @@ public class SessionService {
         return toResponse(session, stat);
     }
 
+    /** NightTransitionScreen용 — 지정한 일차 밤에 사보타주가 있었다면 장소/연출 문구를 반환. */
+    @Transactional(readOnly = true)
+    public Optional<NightSummaryResponse> getNightSummary(Long sessionId, int day) {
+        GameSession session = findSession(sessionId);
+        return sabotageEventRepository.findBySessionAndDay(session, day).stream()
+                .findFirst()
+                .map(event -> new NightSummaryResponse(event.getLocation(), event.getSummaryText()));
+    }
+
     /**
      * "이어서하기"용 — 이 계정의 진행 중인(IN_PROGRESS) 세션을 찾는다. 프론트가 세션 ID를
      * localStorage에만 들고 있다 보니, 그 값이 사라지면(다른 기기/브라우저 저장소 초기화 등)
@@ -207,6 +217,10 @@ public class SessionService {
         Npc witness = findWitness(session, assignment.getNpc(), tonight.location());
         SabotageType tonightType = pickTonightType(assignment, random);
 
+        // 다음날 아침 화면(NightTransitionScreen)에 노출되는 연출 문구 — 범인 정보는 안 들어간다.
+        String summaryText = llmProxyClient.generateSabotageSummary(
+                tonight.location(), tonightType.name(), tonight.subTarget(), day);
+
         SabotageEvent event = sabotageEventRepository.save(SabotageEvent.builder()
                 .session(session)
                 .day(day)
@@ -215,6 +229,7 @@ public class SessionService {
                 .subTarget(tonight.subTarget())
                 .selfDecoy(selfDecoy)
                 .witnessNpc(witness)
+                .summaryText(summaryText)
                 .createdAt(LocalDateTime.now())
                 .build());
 
@@ -273,6 +288,12 @@ public class SessionService {
     }
 
     private SessionResponse toResponse(GameSession session, PlayerStat stat) {
+        // honestModeNpcId는 실제로 소모되기 전까지 남아있을 수 있어(예: 구매만 하고 그날 안 씀),
+        // DialogueService와 같은 기준(당일 여부)으로 걸러야 "어제 산 정직모드가 오늘도 활성"으로
+        // 잘못 표시되지 않는다.
+        Long activeHonestModeNpcId = session.getCurrentDay().equals(session.getHonestModeDay())
+                ? session.getHonestModeNpcId()
+                : null;
         return new SessionResponse(
                 session.getSessionId(),
                 session.getPlayerId(),
@@ -283,6 +304,7 @@ public class SessionService {
                 stat.getStaminaMax(),
                 stat.getGold(),
                 session.getSneakersEquipped(),
+                activeHonestModeNpcId,
                 session.getStartedAt(),
                 session.getEndedAt()
         );

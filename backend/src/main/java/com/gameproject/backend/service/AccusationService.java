@@ -102,7 +102,10 @@ public class AccusationService {
             } else {
                 sessionRepository.save(session);
             }
-            message = "오답입니다. " + accused.getName() + "가 억울함을 토로합니다.";
+            String reaction = llmProxyClient.generateWrongAccusationReaction(
+                    accused.getName(), accused.getRole(), accused.getAge(),
+                    accused.getPersonalityDesc(), accused.getSpeechStyle(), accused.getSampleLine());
+            message = "오답입니다. " + (reaction != null ? reaction : accused.getName() + "가 억울함을 토로합니다.");
         }
 
         return new AccuseResultResponse(correct, message, session.getStatus().name());

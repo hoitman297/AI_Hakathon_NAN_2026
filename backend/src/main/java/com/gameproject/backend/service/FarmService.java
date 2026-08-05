@@ -1,5 +1,7 @@
 package com.gameproject.backend.service;
 
+import java.util.List;
+
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -7,6 +9,8 @@ import com.gameproject.backend.domain.CropMaster;
 import com.gameproject.backend.domain.FarmPlot;
 import com.gameproject.backend.domain.GameSession;
 import com.gameproject.backend.domain.InventoryItemType;
+import com.gameproject.backend.dto.CropSummaryResponse;
+import com.gameproject.backend.dto.FarmPlotResponse;
 import com.gameproject.backend.repository.CropMasterRepository;
 import com.gameproject.backend.repository.FarmPlotRepository;
 
@@ -21,6 +25,28 @@ public class FarmService {
     private final SessionService sessionService;
     private final StaminaService staminaService;
     private final InventoryService inventoryService;
+
+    /** 파종 가능한 작물 목록 — 씨앗 가격/성장일수 등 심기 전에 프론트가 보여줘야 하는 정보. */
+    @Transactional(readOnly = true)
+    public List<CropSummaryResponse> listCrops() {
+        return cropMasterRepository.findAll().stream()
+                .map(crop -> new CropSummaryResponse(
+                        crop.getCropId(), crop.getName(), crop.getSeedPrice(), crop.getGrowDays(),
+                        crop.getPlantOrHarvestStamina(), crop.getSellPrice(), crop.getRestoreHp()))
+                .toList();
+    }
+
+    /** 이 세션의 밭 상태 — 수확하려면 프론트가 어떤 farmPlotId가 다 자랐는지 알아야 한다. */
+    @Transactional(readOnly = true)
+    public List<FarmPlotResponse> listPlots(Long sessionId) {
+        GameSession session = sessionService.findSession(sessionId);
+        return farmPlotRepository.findBySession(session).stream()
+                .map(plot -> new FarmPlotResponse(
+                        plot.getId(), plot.getCrop().getName(), plot.getPlantedDay(), plot.getReadyDay(),
+                        plot.getHarvested(),
+                        !Boolean.TRUE.equals(plot.getHarvested()) && plot.getReadyDay() <= session.getCurrentDay()))
+                .toList();
+    }
 
     @Transactional
     public void plant(Long sessionId, Long cropId) {

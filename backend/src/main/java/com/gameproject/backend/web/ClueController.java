@@ -10,6 +10,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.gameproject.backend.dto.ClueCardResponse;
+import com.gameproject.backend.dto.UnacquiredClueResponse;
 import com.gameproject.backend.service.ClueService;
 
 import lombok.RequiredArgsConstructor;
@@ -24,6 +25,11 @@ public class ClueController {
     @GetMapping
     public ResponseEntity<List<ClueCardResponse>> list(@PathVariable Long sessionId) {
         return ResponseEntity.ok(clueService.listAcquired(sessionId));
+    }
+
+    @GetMapping("/unacquired")
+    public ResponseEntity<List<UnacquiredClueResponse>> unacquired(@PathVariable Long sessionId) {
+        return ResponseEntity.ok(clueService.listUnacquired(sessionId));
     }
 
     @PostMapping("/{clueId}/acquire")

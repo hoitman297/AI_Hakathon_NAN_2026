@@ -8,7 +8,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
-import org.springframework.web.client.ResourceAccessException;
+import org.springframework.web.client.RestClientException;
 
 import com.gameproject.backend.service.AuthException;
 import com.gameproject.backend.service.ForbiddenException;
@@ -44,9 +44,14 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("error", e.getMessage()));
     }
 
-    /** llm-proxy(대화/페르소나 생성) 호출이 타임아웃되거나 연결 실패한 경우. */
-    @ExceptionHandler(ResourceAccessException.class)
-    public ResponseEntity<Map<String, String>> handleUpstreamTimeout(ResourceAccessException e) {
+    /**
+     * llm-proxy(대화/페르소나 생성) 호출이 타임아웃되거나 연결/응답 처리에 실패한 경우.
+     * 연결 단계 실패는 ResourceAccessException으로 오지만, 응답 바디를 읽는 도중 타임아웃이 나면
+     * (RestClient가 응답 헤더/스트림을 늦게 받는 경우) 상위 타입인 RestClientException으로만 온다 —
+     * 실제로 대화 중 read timeout이 이 경로로 발생해 500으로 새는 걸 확인하고 상위 타입으로 넓혔다.
+     */
+    @ExceptionHandler(RestClientException.class)
+    public ResponseEntity<Map<String, String>> handleUpstreamTimeout(RestClientException e) {
         return ResponseEntity.status(HttpStatus.GATEWAY_TIMEOUT)
                 .body(Map.of("error", "LLM 서버 응답이 지연되고 있습니다. 잠시 후 다시 시도해주세요."));
     }

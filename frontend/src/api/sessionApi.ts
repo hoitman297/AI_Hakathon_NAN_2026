@@ -11,6 +11,7 @@ export interface SessionResponse {
   staminaMax: number
   gold: number
   sneakersEquipped: boolean | null
+  honestModeNpcId: number | null
   startedAt: string | null
   endedAt: string | null
 }

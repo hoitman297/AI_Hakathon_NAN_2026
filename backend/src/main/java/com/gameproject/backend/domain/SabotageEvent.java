@@ -11,6 +11,7 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
+import jakarta.persistence.Lob;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import lombok.AllArgsConstructor;
@@ -64,6 +65,11 @@ public class SabotageEvent {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "witness_npc_id")
     private Npc witnessNpc;
+
+    @Comment("다음날 아침 화면에 노출되는 짧은 연출 문구(LLM 생성) — 범인 정보는 포함하지 않음")
+    @Lob
+    @Column(name = "summary_text", columnDefinition = "TEXT")
+    private String summaryText;
 
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt;

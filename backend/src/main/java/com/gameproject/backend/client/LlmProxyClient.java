@@ -16,8 +16,14 @@ import com.gameproject.backend.dto.llm.EndingContentRequest;
 import com.gameproject.backend.dto.llm.EndingContentResponse;
 import com.gameproject.backend.dto.llm.EventContentRequest;
 import com.gameproject.backend.dto.llm.EventContentResponse;
+import com.gameproject.backend.dto.llm.GiftReactionRequest;
+import com.gameproject.backend.dto.llm.GiftReactionResponse;
 import com.gameproject.backend.dto.llm.PersonaGenerateRequest;
 import com.gameproject.backend.dto.llm.PersonaGenerateResponse;
+import com.gameproject.backend.dto.llm.SabotageSummaryRequest;
+import com.gameproject.backend.dto.llm.SabotageSummaryResponse;
+import com.gameproject.backend.dto.llm.WrongAccusationRequest;
+import com.gameproject.backend.dto.llm.WrongAccusationResponse;
 
 import lombok.RequiredArgsConstructor;
 
@@ -45,9 +51,10 @@ public class LlmProxyClient {
     }
 
     public DialogueChatResponse chat(String personaJson, List<DialogueTurn> history, String userMessage,
-                                      boolean honestMode, int affinityScore, boolean restrictDetectiveTalk) {
+                                      boolean honestMode, int affinityScore, boolean restrictDetectiveTalk,
+                                      String witnessContext, String recentVillageEventContext) {
         DialogueChatRequest request = new DialogueChatRequest(personaJson, history, userMessage, honestMode,
-                affinityScore, restrictDetectiveTalk);
+                affinityScore, restrictDetectiveTalk, witnessContext, recentVillageEventContext);
         DialogueChatResponse response = llmProxyRestClient.post()
                 .uri("/internal/llm/dialogue")
                 .body(request)
@@ -87,6 +94,40 @@ public class LlmProxyClient {
                 .retrieve()
                 .body(ClueContentResponse.class);
         return response != null ? response.text() : null;
+    }
+
+    public String generateSabotageSummary(String location, String type, String subTarget, int day) {
+        SabotageSummaryRequest request = new SabotageSummaryRequest(location, type, subTarget, day);
+        SabotageSummaryResponse response = llmProxyRestClient.post()
+                .uri("/internal/llm/sabotage-summary")
+                .body(request)
+                .retrieve()
+                .body(SabotageSummaryResponse.class);
+        return response != null ? response.summary() : null;
+    }
+
+    public String generateGiftReaction(String name, String role, Integer age, String personalityDesc,
+                                        String speechStyle, String sampleLine) {
+        GiftReactionRequest request = new GiftReactionRequest(
+                name, role, age, personalityDesc, speechStyle, sampleLine);
+        GiftReactionResponse response = llmProxyRestClient.post()
+                .uri("/internal/llm/gift-reaction")
+                .body(request)
+                .retrieve()
+                .body(GiftReactionResponse.class);
+        return response != null ? response.reaction() : null;
+    }
+
+    public String generateWrongAccusationReaction(String name, String role, Integer age, String personalityDesc,
+                                                    String speechStyle, String sampleLine) {
+        WrongAccusationRequest request = new WrongAccusationRequest(
+                name, role, age, personalityDesc, speechStyle, sampleLine);
+        WrongAccusationResponse response = llmProxyRestClient.post()
+                .uri("/internal/llm/wrong-accusation")
+                .body(request)
+                .retrieve()
+                .body(WrongAccusationResponse.class);
+        return response != null ? response.reaction() : null;
     }
 
     public String clarifyClueContent(String topic, String npcAppearanceDesc, String previousText) {

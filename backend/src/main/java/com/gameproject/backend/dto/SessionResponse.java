@@ -12,6 +12,7 @@ public record SessionResponse(
         Integer staminaMax,
         Integer gold,
         Boolean sneakersEquipped,
+        Long honestModeNpcId,
         LocalDateTime startedAt,
         LocalDateTime endedAt
 ) {

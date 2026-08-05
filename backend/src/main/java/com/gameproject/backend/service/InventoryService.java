@@ -7,6 +7,7 @@ import java.util.Random;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.gameproject.backend.client.LlmProxyClient;
 import com.gameproject.backend.domain.CropMaster;
 import com.gameproject.backend.domain.FruitMaster;
 import com.gameproject.backend.domain.GameSession;
@@ -38,6 +39,7 @@ public class InventoryService {
     private final StaminaService staminaService;
     private final NpcService npcService;
     private final SessionService sessionService;
+    private final LlmProxyClient llmProxyClient;
 
     private final Random random = new Random();
 
@@ -175,7 +177,12 @@ public class InventoryService {
                         + random.nextInt(GameConstants.AFFINITY_GIFT_MAX - GameConstants.AFFINITY_GIFT_MIN + 1);
                 int newScore = npcService.adjustAffinity(session, target, gain);
                 consumeOne(session, item);
-                yield target.getName() + "의 호감도가 " + gain + " 상승했습니다 (현재 " + newScore + ")";
+                String reaction = llmProxyClient.generateGiftReaction(target.getName(), target.getRole(),
+                        target.getAge(), target.getPersonalityDesc(), target.getSpeechStyle(), target.getSampleLine());
+                if (reaction == null) {
+                    reaction = target.getName() + "이(가) 선물을 받고 반가워합니다.";
+                }
+                yield reaction + " (호감도 +" + gain + ", 현재 " + newScore + ")";
             }
             case MAGNIFIER ->
                     // 돋보기는 어떤 단서를 명확화할지 지정해야 하므로 실제 소모/적용은

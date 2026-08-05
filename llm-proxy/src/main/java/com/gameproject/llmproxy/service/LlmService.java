@@ -118,7 +118,23 @@ public class LlmService {
                     .append("구체적인 정보나 단서를 새로 주지 마세요")
                     .append(request.honestMode() ? " (단, 위 정직 모드가 적용되는 알리바이 질문은 예외입니다).\n" : ".\n");
         }
-        systemPrompt.append(affinityToneGuidance(request.affinityScore()));
+        // 목격담: 이 NPC가 그날 밤 근처에 있었다는 설정만 주어지고, 실제로 무엇을 봤는지는
+        // 이 프롬프트에도 알려주지 않는다 — 캐릭터가 스스로 애매하게 지어내되 범인을 특정하지
+        // 못하게 하기 위함. 7일차 이후(추리 대화 제한)에는 어차피 새 정보를 주면 안 되므로 생략.
+        if (request.witnessContext() != null && !request.restrictDetectiveTalk()) {
+            systemPrompt.append("이 캐릭터는 %s 무렵 근처에 있었습니다. 대화 주제가 그날 밤이나 그 장소, ".formatted(request.witnessContext()))
+                    .append("혹은 마을에서 벌어진 사건과 관련되면, 그림자·발소리·인기척 정도의 애매한 목격담을 ")
+                    .append("캐릭터의 성격과 말투에 맞게 자연스럽게 흘리세요 — 구체적으로 누구를 봤는지는 ")
+                    .append("당신도 모른다는 태도를 유지하세요. 관련 없는 화제라면 이 이야기를 먼저 꺼내지 마세요.\n");
+        }
+        // 최근 마을 전체에 퍼진 사건(랜덤 이벤트) — 마을 사람이면 누구나 알 법한 공개 사건이라
+        // 자연스러운 잡담 소재로 씀. 플레이어 개인 대상 이벤트는 여기 포함되지 않는다.
+        if (request.recentVillageEventContext() != null) {
+            systemPrompt.append("최근 마을에 이런 소문이 돌고 있습니다: %s ".formatted(request.recentVillageEventContext()))
+                    .append("자연스러운 흐름이면 이 이야기를 언급하거나 반응해도 좋지만, 캐릭터가 관심 없어할 ")
+                    .append("만한 주제라면 굳이 먼저 꺼내지 않아도 됩니다.\n");
+        }
+        systemPrompt.append(affinityToneGuidance(request.affinityScore(), request.honestMode()));
         systemPrompt.append("""
                 또한 이 캐릭터의 성격·가치관·말투에 비추어, 방금 플레이어 발화가 이 캐릭터의
                 호감도에 어떤 영향을 줬는지 판단하세요. 예의 바르거나 이 캐릭터가 흥미로워할
@@ -167,8 +183,11 @@ public class LlmService {
      * 기획서 확정 스펙: 호감도 70점 이상은 우호적 태도로 단서·정보를 먼저 제공하려는 태도,
      * 30~70점은 기본적인 일상 대화만 가능(단서를 스스로 먼저 꺼내지 않음),
      * 30점 미만은 대화 자체를 회피하며 단답형으로만 답함(완전 차단은 아님).
+     * 30점 미만 구간은 여기서 더 나아가 비협조적으로 얼버무리거나 살짝 말을 지어내는 등
+     * 완전히 솔직하지 않은 태도까지 취하도록 지시한다(사용자 요청 확장) — 다만 정직 모드가
+     * 적용되는 알리바이 질문에 대해서만큼은 예외로 둔다.
      */
-    private String affinityToneGuidance(int affinityScore) {
+    private String affinityToneGuidance(int affinityScore, boolean honestMode) {
         if (affinityScore >= 70) {
             return "현재 이 캐릭터의 플레이어에 대한 호감도는 %d점(높음)입니다. 플레이어에게 우호적이고 친근한 태도로 답하고, "
                     .formatted(affinityScore)
@@ -178,10 +197,15 @@ public class LlmService {
                     .formatted(affinityScore)
                     + "사이입니다. 일상적인 대화 정도만 하고, 단서나 민감한 정보를 스스로 먼저 꺼내지는 마세요.\n";
         } else {
-            return "현재 이 캐릭터의 플레이어에 대한 호감도는 %d점(낮음)입니다. 플레이어를 경계하거나 불편해하며 "
+            String guidance = "현재 이 캐릭터의 플레이어에 대한 호감도는 %d점(낮음)입니다. 플레이어를 경계하거나 불편해하며 "
                     .formatted(affinityScore)
                     + "대화를 짧고 무뚝뚝하게 회피하려는 태도를 보이세요. 단서나 정보는 절대 스스로 꺼내지 마세요. "
-                    + "다만 대화 자체를 완전히 거부하지는 말고 짧게라도 응답하세요.\n";
+                    + "질문에 비협조적으로 얼버무리거나, 사실을 살짝 다르게 말하거나 둘러대는 등 완전히 솔직하지 "
+                    + "않은 태도를 보여도 됩니다.";
+            if (honestMode) {
+                guidance += " 다만 위에서 정직 모드가 적용된다고 한 알리바이 관련 질문에 한해서는 그 지시를 우선하세요.";
+            }
+            return guidance + " 대화 자체를 완전히 거부하지는 말고 짧게라도 응답하세요.\n";
         }
     }
 
@@ -231,6 +255,135 @@ public class LlmService {
         } catch (RuntimeException e) {
             log.error("랜덤 이벤트 연출 LLM 호출 실패 (eventType={}), 대체 문구로 진행", eventType, e);
             return fallbackEventDescription(eventType);
+        }
+    }
+
+    /**
+     * 밤 사보타주 다음날 아침, 마을에 퍼지는 소문 수준의 짧은 연출 텍스트.
+     * 단서 카드(포렌식 톤, 애매하게 설계)와 달리 이건 "다음날 아침 알림" 화면에 쓰이는
+     * 분위기용 텍스트라 범인을 특정할 정보(외형 등)는 아예 주지 않는다 — 장소/유형/대상만으로 서술.
+     */
+    public String generateSabotageSummary(String location, String type, String subTarget, int day) {
+        String systemPrompt = """
+                당신은 마을 사보타주 추리 게임의 아침 뉴스 연출 작가입니다.
+                간밤에 벌어진 사보타주 사건이 다음날 아침 마을에 알려지는 순간을 1~2문장으로
+                분위기 있게 묘사하세요. 범인이 누구인지 암시할 정보(외형, 이름 등)는 전혀 없이,
+                오직 장소와 무슨 일이 있었는지만으로 서술하세요.
+                """;
+        String userPrompt = """
+                일차: %d
+                장소: %s
+                사보타주 유형: %s
+                구체적 피해 대상: %s
+                """.formatted(day, location, type, subTarget);
+
+        try {
+            MessageCreateParams params = MessageCreateParams.builder()
+                    .model(model)
+                    .maxTokens(300L)
+                    .system(systemPrompt)
+                    .thinking(ThinkingConfigDisabled.builder().build())
+                    .addUserMessage(userPrompt)
+                    .build();
+
+            Message response = anthropicClient.messages().create(params);
+            checkRefusal(response.stopReason(), "밤 사보타주 아침 알림 생성");
+
+            return response.content().stream()
+                    .flatMap(block -> block.text().stream())
+                    .findFirst()
+                    .map(text -> text.text())
+                    .orElseGet(() -> fallbackSabotageSummary(location));
+        } catch (RuntimeException e) {
+            log.error("밤 사보타주 아침 알림 LLM 호출 실패 (location={}), 대체 문구로 진행", location, e);
+            return fallbackSabotageSummary(location);
+        }
+    }
+
+    /** 선물세트를 받은 NPC의 짧은 감사/반응 대사. */
+    public String generateGiftReaction(String name, String role, Integer age, String personalityDesc,
+                                        String speechStyle, String sampleLine) {
+        String systemPrompt = """
+                당신은 마을 사보타주 추리 게임의 이벤트 연출 작가입니다.
+                플레이어에게 선물을 받은 NPC가 그 자리에서 보이는 짧은 반응을 씁니다.
+                이 캐릭터의 성격·말투·말버릇에 맞춰 1인칭으로 1~2문장만 쓰세요.
+                """;
+        String userPrompt = """
+                이름: %s
+                역할: %s
+                나이: %s
+                성격: %s
+                말투: %s
+                평소 말버릇 예시: %s
+                """.formatted(name, role, age, personalityDesc, speechStyle, sampleLine);
+
+        try {
+            MessageCreateParams params = MessageCreateParams.builder()
+                    .model(model)
+                    .maxTokens(200L)
+                    .system(systemPrompt)
+                    .thinking(ThinkingConfigDisabled.builder().build())
+                    .addUserMessage(userPrompt)
+                    .build();
+
+            Message response = anthropicClient.messages().create(params);
+            checkRefusal(response.stopReason(), "선물 반응 생성");
+
+            return response.content().stream()
+                    .flatMap(block -> block.text().stream())
+                    .findFirst()
+                    .map(text -> text.text())
+                    .orElseGet(() -> fallbackGiftReaction(name));
+        } catch (RuntimeException e) {
+            log.error("선물 반응 LLM 호출 실패 (name={}), 대체 문구로 진행", name, e);
+            return fallbackGiftReaction(name);
+        }
+    }
+
+    /**
+     * 오답 고발로 지목된 NPC의 억울함 토로 연출. 이 메서드가 호출되는 시점엔 이미 오답으로
+     * 판정됐다는 뜻이라(accused != 실제 범인) 이 NPC는 항상 무고하다 — 실제 범인이 누구인지는
+     * 이 NPC도 알 길이 없으므로 그런 내용은 아예 전달하지 않는다.
+     */
+    public String generateWrongAccusationReaction(String name, String role, Integer age,
+                                                    String personalityDesc, String speechStyle, String sampleLine) {
+        String systemPrompt = """
+                당신은 마을 사보타주 추리 게임의 이벤트 연출 작가입니다.
+                플레이어에게 범인으로 잘못 지목된(실제로는 무고한) NPC가 그 자리에서 억울함을
+                토로하는 장면을 씁니다. 이 캐릭터의 성격·말투·말버릇에 맞춰 1인칭으로,
+                황당하거나 억울하거나 화나거나 하는 감정을 자연스럽게 드러내며 2~3문장으로 쓰세요.
+                실제 범인이 누구인지는 이 캐릭터도 전혀 모르므로 다른 인물을 언급하거나
+                추측하지 마세요.
+                """;
+        String userPrompt = """
+                이름: %s
+                역할: %s
+                나이: %s
+                성격: %s
+                말투: %s
+                평소 말버릇 예시: %s
+                """.formatted(name, role, age, personalityDesc, speechStyle, sampleLine);
+
+        try {
+            MessageCreateParams params = MessageCreateParams.builder()
+                    .model(model)
+                    .maxTokens(300L)
+                    .system(systemPrompt)
+                    .thinking(ThinkingConfigDisabled.builder().build())
+                    .addUserMessage(userPrompt)
+                    .build();
+
+            Message response = anthropicClient.messages().create(params);
+            checkRefusal(response.stopReason(), "오답 고발 반응 생성");
+
+            return response.content().stream()
+                    .flatMap(block -> block.text().stream())
+                    .findFirst()
+                    .map(text -> text.text())
+                    .orElseGet(() -> fallbackWrongAccusationReaction(name));
+        } catch (RuntimeException e) {
+            log.error("오답 고발 반응 LLM 호출 실패 (name={}), 대체 문구로 진행", name, e);
+            return fallbackWrongAccusationReaction(name);
         }
     }
 
@@ -373,6 +526,18 @@ public class LlmService {
 
     private String fallbackClarifiedText(String previousText) {
         return previousText + " (돋보기로 확인: 좀 더 구체적인 정황이 드러났다)";
+    }
+
+    private String fallbackSabotageSummary(String location) {
+        return "간밤에 " + location + " 근처에서 무슨 일이 있었다는 소문이 마을에 퍼졌다.";
+    }
+
+    private String fallbackGiftReaction(String name) {
+        return name + "이(가) 선물을 받고 반가운 표정을 짓습니다.";
+    }
+
+    private String fallbackWrongAccusationReaction(String name) {
+        return name + "이(가) 억울하다는 표정으로 강하게 부인합니다. \"저는 절대 그런 적 없어요!\"";
     }
 
     private String fallbackEventDescription(String eventType) {

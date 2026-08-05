@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react'
 import { listNpcsToday, type NpcSummary } from '../api/npcApi'
 import { accuseNpc, type AccuseResult } from '../api/accusationApi'
 import { findRosterEntry } from '../types/npc'
-import { villageAssets } from '../assets/asset-manifest'
 import './AccusationScreen.css'
 
 interface AccusationScreenProps {
@@ -59,7 +58,7 @@ export function AccusationScreen({ sessionId, day, onResolved, onCancel }: Accus
     <div className="accusation-screen">
       <div className="accusation-header">
         <h2>범인 지목</h2>
-        <p>{day}일차 · 진범이라 생각되는 마을 사람을 골라 고발 카드를 제출하세요.</p>
+        <p>{day}일차 · 진범이라 생각되는 마을 사람을 지목해 고발하세요.</p>
       </div>
 
       {loadError && <p className="pixel-error">{loadError}</p>}
@@ -81,28 +80,21 @@ export function AccusationScreen({ sessionId, day, onResolved, onCancel }: Accus
       )}
 
       {selected && (
-        <div className="accusation-card-wrap">
-          <div className="mission-card">
-            <img className="mission-card-frame pixel-art" src={villageAssets.ui.missionCards.active} alt="" />
-            {findRosterEntry(selected.name) && (
-              <img
-                className="mission-card-portrait pixel-art"
-                src={findRosterEntry(selected.name)?.portrait}
-                alt=""
-              />
-            )}
-            <p className="mission-card-caption">
-              {selected.name} ({selected.role})을(를)
-              <br />
-              범인으로 고발하시겠습니까?
-            </p>
-          </div>
+        <div className="accusation-confirm pixel-panel">
+          {findRosterEntry(selected.name) && (
+            <img className="accusation-confirm-portrait pixel-art" src={findRosterEntry(selected.name)?.portrait} alt="" />
+          )}
+          <p className="accusation-confirm-caption">
+            {selected.name} ({selected.role})을(를)
+            <br />
+            범인으로 지목해 고발하시겠습니까?
+          </p>
 
           {submitError && <p className="pixel-error">{submitError}</p>}
 
-          <div className="accusation-card-actions">
+          <div className="accusation-confirm-actions">
             <button className="pixel-button pixel-button--danger" onClick={handleConfirm} disabled={submitting}>
-              {submitting ? '제출 중...' : '고발하기'}
+              {submitting ? '고발하는 중...' : '고발하기'}
             </button>
             <button className="pixel-button" onClick={() => setSelected(null)} disabled={submitting}>
               다시 선택

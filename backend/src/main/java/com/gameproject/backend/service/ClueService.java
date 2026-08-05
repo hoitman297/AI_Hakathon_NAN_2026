@@ -14,6 +14,7 @@ import com.gameproject.backend.domain.NpcCaseAssignment;
 import com.gameproject.backend.domain.ShopItemCode;
 import com.gameproject.backend.domain.ShopItemMaster;
 import com.gameproject.backend.dto.ClueCardResponse;
+import com.gameproject.backend.dto.UnacquiredClueResponse;
 import com.gameproject.backend.repository.ClueCardRepository;
 import com.gameproject.backend.repository.GameSessionRepository;
 import com.gameproject.backend.repository.NpcCaseAssignmentRepository;
@@ -38,6 +39,23 @@ public class ClueService {
         GameSession session = sessionService.findSession(sessionId);
         return clueCardRepository.findBySessionAndAcquiredTrue(session).stream()
                 .map(this::toResponse)
+                .toList();
+    }
+
+    /**
+     * 아직 습득하지 않은 단서의 발생 장소 목록 — 지도 위 어디로 가서 습득(acquire)해야 하는지
+     * 프론트가 알 방법이 없어서 신설. 범인 정보(NpcCaseAssignment)는 전혀 조회하지 않는다.
+     */
+    @Transactional(readOnly = true)
+    public List<UnacquiredClueResponse> listUnacquired(Long sessionId) {
+        GameSession session = sessionService.findSession(sessionId);
+        return clueCardRepository.findBySession(session).stream()
+                .filter(clue -> !Boolean.TRUE.equals(clue.getAcquired()))
+                .map(clue -> new UnacquiredClueResponse(
+                        clue.getClueId(),
+                        clue.getSabotageEvent().getLocation(),
+                        clue.getSabotageEvent().getDay(),
+                        clue.getTopic().name()))
                 .toList();
     }
 

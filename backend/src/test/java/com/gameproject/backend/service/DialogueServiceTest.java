@@ -34,6 +34,8 @@ import com.gameproject.backend.repository.GameSessionRepository;
 import com.gameproject.backend.repository.NpcCaseAssignmentRepository;
 import com.gameproject.backend.repository.NpcPersonaStateRepository;
 import com.gameproject.backend.repository.NpcRepository;
+import com.gameproject.backend.repository.RandomEventLogRepository;
+import com.gameproject.backend.repository.SabotageEventRepository;
 
 /** LlmRateLimiter 연동에 초점을 맞춘 테스트 — DialogueService 전체 커버리지는 아님. */
 @ExtendWith(MockitoExtension.class)
@@ -59,6 +61,10 @@ class DialogueServiceTest {
     private LlmProxyClient llmProxyClient;
     @Mock
     private LlmRateLimiter llmRateLimiter;
+    @Mock
+    private SabotageEventRepository sabotageEventRepository;
+    @Mock
+    private RandomEventLogRepository randomEventLogRepository;
 
     private DialogueService dialogueService;
 
@@ -70,7 +76,7 @@ class DialogueServiceTest {
     void setUp() {
         dialogueService = new DialogueService(npcRepository, personaStateRepository, caseAssignmentRepository,
                 dialogueLogRepository, sessionRepository, sessionService, staminaService, npcService,
-                llmProxyClient, llmRateLimiter);
+                llmProxyClient, llmRateLimiter, sabotageEventRepository, randomEventLogRepository);
 
         account = Account.builder().accountId(1L).username("u").passwordHash("h").nickname("n")
                 .createdAt(LocalDateTime.now()).build();
@@ -95,7 +101,7 @@ class DialogueServiceTest {
                 .isInstanceOf(LlmRateLimitExceededException.class);
 
         verify(staminaService, never()).consume(any(), anyInt());
-        verify(llmProxyClient, never()).chat(any(), any(), any(), anyBoolean(), anyInt(), anyBoolean());
+        verify(llmProxyClient, never()).chat(any(), any(), any(), anyBoolean(), anyInt(), anyBoolean(), any(), any());
         verify(dialogueLogRepository, never()).save(any());
     }
 
@@ -109,7 +115,9 @@ class DialogueServiceTest {
                 .staminaCurrent(92.0).staminaMax(100).gold(0).fainted(false).build();
         when(staminaService.consume(session, GameConstants.DIALOGUE_STAMINA)).thenReturn(stat);
         when(npcService.getAffinityScore(session, npc)).thenReturn(50);
-        when(llmProxyClient.chat("{}", List.of(), "안녕하세요", false, 50, false))
+        when(sabotageEventRepository.findBySession(session)).thenReturn(List.of());
+        when(randomEventLogRepository.findBySession(session)).thenReturn(List.of());
+        when(llmProxyClient.chat("{}", List.of(), "안녕하세요", false, 50, false, null, null))
                 .thenReturn(new DialogueChatResponse("반갑습니다.", 3));
         when(npcService.adjustAffinity(any(), any(), anyInt())).thenReturn(55);
 
@@ -139,12 +147,14 @@ class DialogueServiceTest {
                 .staminaCurrent(92.0).staminaMax(100).gold(0).fainted(false).build();
         when(staminaService.consume(session, GameConstants.DIALOGUE_STAMINA)).thenReturn(stat);
         when(npcService.getAffinityScore(session, npc)).thenReturn(50);
-        when(llmProxyClient.chat("{}", List.of(), "범인이 누구예요?", false, 50, true))
+        when(sabotageEventRepository.findBySession(session)).thenReturn(List.of());
+        when(randomEventLogRepository.findBySession(session)).thenReturn(List.of());
+        when(llmProxyClient.chat("{}", List.of(), "범인이 누구예요?", false, 50, true, null, null))
                 .thenReturn(new DialogueChatResponse("글쎄, 그건 나도 모르겠구먼.", 0));
         when(npcService.adjustAffinity(any(), any(), anyInt())).thenReturn(50);
 
         dialogueService.send(100L, 1L, "범인이 누구예요?");
 
-        verify(llmProxyClient).chat("{}", List.of(), "범인이 누구예요?", false, 50, true);
+        verify(llmProxyClient).chat("{}", List.of(), "범인이 누구예요?", false, 50, true, null, null);
     }
 }

@@ -16,8 +16,14 @@ import com.gameproject.llmproxy.dto.EndingContentRequest;
 import com.gameproject.llmproxy.dto.EndingContentResponse;
 import com.gameproject.llmproxy.dto.EventContentRequest;
 import com.gameproject.llmproxy.dto.EventContentResponse;
+import com.gameproject.llmproxy.dto.GiftReactionRequest;
+import com.gameproject.llmproxy.dto.GiftReactionResponse;
 import com.gameproject.llmproxy.dto.PersonaGenerateRequest;
 import com.gameproject.llmproxy.dto.PersonaGenerateResponse;
+import com.gameproject.llmproxy.dto.SabotageSummaryRequest;
+import com.gameproject.llmproxy.dto.SabotageSummaryResponse;
+import com.gameproject.llmproxy.dto.WrongAccusationRequest;
+import com.gameproject.llmproxy.dto.WrongAccusationResponse;
 import com.gameproject.llmproxy.service.LlmService;
 
 import lombok.RequiredArgsConstructor;
@@ -63,6 +69,29 @@ public class InternalLlmController {
         String text = llmService.generateClueContent(request.topic(), request.npcAppearanceDesc(),
                 request.npcPersonalityDesc(), request.location(), request.subTarget());
         return ResponseEntity.ok(new ClueContentResponse(text));
+    }
+
+    @PostMapping("/sabotage-summary")
+    public ResponseEntity<SabotageSummaryResponse> sabotageSummary(@RequestBody SabotageSummaryRequest request) {
+        String summary = llmService.generateSabotageSummary(
+                request.location(), request.type(), request.subTarget(), request.day());
+        return ResponseEntity.ok(new SabotageSummaryResponse(summary));
+    }
+
+    @PostMapping("/gift-reaction")
+    public ResponseEntity<GiftReactionResponse> giftReaction(@RequestBody GiftReactionRequest request) {
+        String reaction = llmService.generateGiftReaction(
+                request.name(), request.role(), request.age(),
+                request.personalityDesc(), request.speechStyle(), request.sampleLine());
+        return ResponseEntity.ok(new GiftReactionResponse(reaction));
+    }
+
+    @PostMapping("/wrong-accusation")
+    public ResponseEntity<WrongAccusationResponse> wrongAccusation(@RequestBody WrongAccusationRequest request) {
+        String reaction = llmService.generateWrongAccusationReaction(
+                request.name(), request.role(), request.age(),
+                request.personalityDesc(), request.speechStyle(), request.sampleLine());
+        return ResponseEntity.ok(new WrongAccusationResponse(reaction));
     }
 
     @PostMapping("/clue/clarify")

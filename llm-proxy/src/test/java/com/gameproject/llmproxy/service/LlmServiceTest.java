@@ -122,7 +122,7 @@ class LlmServiceTest {
                         new ObjectMapper().writeValueAsString(llmOutput), DialogueChatResponse.class));
 
         DialogueChatResponse result = llmService.chat(new DialogueChatRequest(personaJson(),
-                List.of(new DialogueTurn("USER", "안녕하세요")), "요즘 별일 없나요?", false, 50, false));
+                List.of(new DialogueTurn("USER", "안녕하세요")), "요즘 별일 없나요?", false, 50, false, null, null));
 
         assertThat(result.reply()).isEqualTo("마을 일은 제가 챙깁니다.");
         assertThat(result.affinityDelta()).isEqualTo(3);
@@ -135,7 +135,7 @@ class LlmServiceTest {
                 .thenReturn(structuredMessage(StopReason.END_TURN,
                         new ObjectMapper().writeValueAsString(llmOutput), DialogueChatResponse.class));
 
-        DialogueChatResponse result = llmService.chat(new DialogueChatRequest(personaJson(), List.of(), "욕설", false, 50, false));
+        DialogueChatResponse result = llmService.chat(new DialogueChatRequest(personaJson(), List.of(), "욕설", false, 50, false, null, null));
 
         assertThat(result.affinityDelta()).isEqualTo(5);
     }
@@ -149,7 +149,7 @@ class LlmServiceTest {
         ArgumentCaptor<StructuredMessageCreateParams<DialogueChatResponse>> captor =
                 ArgumentCaptor.forClass(StructuredMessageCreateParams.class);
 
-        llmService.chat(new DialogueChatRequest(personaJson(), List.of(), "범인이 누구예요?", false, 50, true));
+        llmService.chat(new DialogueChatRequest(personaJson(), List.of(), "범인이 누구예요?", false, 50, true, null, null));
 
         verify(messageService).create(captor.capture());
         String systemPrompt = captor.getValue().rawParams().system().orElseThrow().asString();
@@ -165,7 +165,7 @@ class LlmServiceTest {
         ArgumentCaptor<StructuredMessageCreateParams<DialogueChatResponse>> captor =
                 ArgumentCaptor.forClass(StructuredMessageCreateParams.class);
 
-        llmService.chat(new DialogueChatRequest(personaJson(), List.of(), "안녕하세요", false, 50, false));
+        llmService.chat(new DialogueChatRequest(personaJson(), List.of(), "안녕하세요", false, 50, false, null, null));
 
         verify(messageService).create(captor.capture());
         String systemPrompt = captor.getValue().rawParams().system().orElseThrow().asString();
@@ -173,11 +173,62 @@ class LlmServiceTest {
     }
 
     @Test
+    void chat_witnessContextPresent_includesWitnessGuidanceInSystemPrompt() throws Exception {
+        DialogueChatResponse llmOutput = new DialogueChatResponse("글쎄, 그날 밤에 뭔가 소리가 나긴 했지.", 0);
+        when(messageService.create(any(StructuredMessageCreateParams.class)))
+                .thenReturn(structuredMessage(StopReason.END_TURN,
+                        new ObjectMapper().writeValueAsString(llmOutput), DialogueChatResponse.class));
+        ArgumentCaptor<StructuredMessageCreateParams<DialogueChatResponse>> captor =
+                ArgumentCaptor.forClass(StructuredMessageCreateParams.class);
+
+        llmService.chat(new DialogueChatRequest(personaJson(), List.of(), "그날 밤 뭐 봤어요?",
+                false, 50, false, "3일차 밤 수박밭", null));
+
+        verify(messageService).create(captor.capture());
+        String systemPrompt = captor.getValue().rawParams().system().orElseThrow().asString();
+        assertThat(systemPrompt).contains("3일차 밤 수박밭").contains("목격담");
+    }
+
+    @Test
+    void chat_witnessContextPresentButRestrictDetectiveTalkTrue_omitsWitnessGuidance() throws Exception {
+        DialogueChatResponse llmOutput = new DialogueChatResponse("그건 지금 말할 때가 아닐세.", 0);
+        when(messageService.create(any(StructuredMessageCreateParams.class)))
+                .thenReturn(structuredMessage(StopReason.END_TURN,
+                        new ObjectMapper().writeValueAsString(llmOutput), DialogueChatResponse.class));
+        ArgumentCaptor<StructuredMessageCreateParams<DialogueChatResponse>> captor =
+                ArgumentCaptor.forClass(StructuredMessageCreateParams.class);
+
+        llmService.chat(new DialogueChatRequest(personaJson(), List.of(), "그날 밤 뭐 봤어요?",
+                false, 50, true, "3일차 밤 수박밭", null));
+
+        verify(messageService).create(captor.capture());
+        String systemPrompt = captor.getValue().rawParams().system().orElseThrow().asString();
+        assertThat(systemPrompt).doesNotContain("목격담");
+    }
+
+    @Test
+    void chat_recentVillageEventContextPresent_includesGossipGuidanceInSystemPrompt() throws Exception {
+        DialogueChatResponse llmOutput = new DialogueChatResponse("아 그거요, 저도 들었어요.", 0);
+        when(messageService.create(any(StructuredMessageCreateParams.class)))
+                .thenReturn(structuredMessage(StopReason.END_TURN,
+                        new ObjectMapper().writeValueAsString(llmOutput), DialogueChatResponse.class));
+        ArgumentCaptor<StructuredMessageCreateParams<DialogueChatResponse>> captor =
+                ArgumentCaptor.forClass(StructuredMessageCreateParams.class);
+
+        llmService.chat(new DialogueChatRequest(personaJson(), List.of(), "요즘 마을 어때요?",
+                false, 50, false, null, "게시판에 도발적인 쪽지가 붙었다."));
+
+        verify(messageService).create(captor.capture());
+        String systemPrompt = captor.getValue().rawParams().system().orElseThrow().asString();
+        assertThat(systemPrompt).contains("게시판에 도발적인 쪽지가 붙었다.");
+    }
+
+    @Test
     void chat_llmRefuses_returnsFallbackMessageWithZeroDelta() {
         when(messageService.create(any(StructuredMessageCreateParams.class)))
                 .thenReturn(structuredMessage(StopReason.REFUSAL, null, DialogueChatResponse.class));
 
-        DialogueChatResponse result = llmService.chat(new DialogueChatRequest(personaJson(), List.of(), "질문", false, 50, false));
+        DialogueChatResponse result = llmService.chat(new DialogueChatRequest(personaJson(), List.of(), "질문", false, 50, false, null, null));
 
         assertThat(result.reply()).contains("잠시 후 다시 말을 걸어주세요");
         assertThat(result.affinityDelta()).isZero();
@@ -188,7 +239,7 @@ class LlmServiceTest {
         when(messageService.create(any(StructuredMessageCreateParams.class)))
                 .thenReturn(structuredMessage(StopReason.END_TURN, null, DialogueChatResponse.class));
 
-        DialogueChatResponse result = llmService.chat(new DialogueChatRequest(personaJson(), List.of(), "질문", false, 50, false));
+        DialogueChatResponse result = llmService.chat(new DialogueChatRequest(personaJson(), List.of(), "질문", false, 50, false, null, null));
 
         assertThat(result.reply()).contains("잠시 후 다시 말을 걸어주세요");
         assertThat(result.affinityDelta()).isZero();
@@ -199,7 +250,7 @@ class LlmServiceTest {
         when(messageService.create(any(StructuredMessageCreateParams.class)))
                 .thenThrow(new RuntimeException("timeout"));
 
-        DialogueChatResponse result = llmService.chat(new DialogueChatRequest(personaJson(), List.of(), "질문", false, 50, false));
+        DialogueChatResponse result = llmService.chat(new DialogueChatRequest(personaJson(), List.of(), "질문", false, 50, false, null, null));
 
         assertThat(result.reply()).contains("잠시 후 다시 말을 걸어주세요");
         assertThat(result.affinityDelta()).isZero();
@@ -301,6 +352,78 @@ class LlmServiceTest {
         String text = llmService.clarifyClueContent("HAIR", "long black hair", "기존 문구");
 
         assertThat(text).startsWith("기존 문구").contains("돋보기로 확인");
+    }
+
+    // ------------------------------------------------------------------
+    // generateSabotageSummary
+    // ------------------------------------------------------------------
+
+    @Test
+    void generateSabotageSummary_success_returnsLlmText() {
+        when(messageService.create(any(MessageCreateParams.class)))
+                .thenReturn(message(StopReason.END_TURN, "간밤에 수박밭에서 소란이 있었다는 소문이 돌았다."));
+
+        String text = llmService.generateSabotageSummary("수박밭", "DAMAGE", "화분", 3);
+
+        assertThat(text).isEqualTo("간밤에 수박밭에서 소란이 있었다는 소문이 돌았다.");
+    }
+
+    @Test
+    void generateSabotageSummary_llmThrows_returnsFallbackWithLocation() {
+        when(messageService.create(any(MessageCreateParams.class)))
+                .thenThrow(new RuntimeException("network error"));
+
+        String text = llmService.generateSabotageSummary("수박밭", "DAMAGE", "화분", 3);
+
+        assertThat(text).contains("수박밭");
+    }
+
+    // ------------------------------------------------------------------
+    // generateGiftReaction
+    // ------------------------------------------------------------------
+
+    @Test
+    void generateGiftReaction_success_returnsLlmText() {
+        when(messageService.create(any(MessageCreateParams.class)))
+                .thenReturn(message(StopReason.END_TURN, "어머, 이런 것까지... 고마워요!"));
+
+        String text = llmService.generateGiftReaction("나주부", "아내", 32, "상냥함", "존댓말", "어머");
+
+        assertThat(text).isEqualTo("어머, 이런 것까지... 고마워요!");
+    }
+
+    @Test
+    void generateGiftReaction_llmThrows_returnsFallbackWithName() {
+        when(messageService.create(any(MessageCreateParams.class)))
+                .thenThrow(new RuntimeException("network error"));
+
+        String text = llmService.generateGiftReaction("나주부", "아내", 32, "상냥함", "존댓말", "어머");
+
+        assertThat(text).contains("나주부");
+    }
+
+    // ------------------------------------------------------------------
+    // generateWrongAccusationReaction
+    // ------------------------------------------------------------------
+
+    @Test
+    void generateWrongAccusationReaction_success_returnsLlmText() {
+        when(messageService.create(any(MessageCreateParams.class)))
+                .thenReturn(message(StopReason.END_TURN, "억울합니다, 저는 정말 아니에요!"));
+
+        String text = llmService.generateWrongAccusationReaction("나박수", "수박밭 주인", 32, "다혈질", "사투리", "아이고");
+
+        assertThat(text).isEqualTo("억울합니다, 저는 정말 아니에요!");
+    }
+
+    @Test
+    void generateWrongAccusationReaction_llmThrows_returnsFallbackWithName() {
+        when(messageService.create(any(MessageCreateParams.class)))
+                .thenThrow(new RuntimeException("network error"));
+
+        String text = llmService.generateWrongAccusationReaction("나박수", "수박밭 주인", 32, "다혈질", "사투리", "아이고");
+
+        assertThat(text).contains("나박수");
     }
 
     // ------------------------------------------------------------------

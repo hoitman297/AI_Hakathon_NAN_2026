@@ -1,23 +1,67 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { findRosterEntry } from '../types/npc'
+import { fetchDialogueHistory, sendDialogueMessage, type DialogueMessage } from '../api/dialogueApi'
+import { getSession } from '../api/sessionApi'
 import './DialogueBox.css'
 
-const DUMMY_LINES = [
-  '(더미 대사) 오늘 날씨가 참 좋구먼.',
-  '(더미 대사) 요즘 마을에 이상한 일이 자꾸 생긴다지?',
-  '(더미 대사) 별일 없으면 다음에 또 이야기하자고.',
-]
-
 interface DialogueBoxProps {
+  sessionId: number
+  npcId: number
   npcName: string
   npcRole: string
+  onStaminaChange: (value: number) => void
   onClose: () => void
 }
 
-export function DialogueBox({ npcName, npcRole, onClose }: DialogueBoxProps) {
-  const [lineIndex, setLineIndex] = useState(0)
+export function DialogueBox({ sessionId, npcId, npcName, npcRole, onStaminaChange, onClose }: DialogueBoxProps) {
   const roster = findRosterEntry(npcName)
-  const isLastLine = lineIndex === DUMMY_LINES.length - 1
+  const [messages, setMessages] = useState<DialogueMessage[]>([])
+  const [loadingHistory, setLoadingHistory] = useState(true)
+  const [input, setInput] = useState('')
+  const [sending, setSending] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [honestModeActive, setHonestModeActive] = useState(false)
+  const listRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    fetchDialogueHistory(sessionId, npcId)
+      .then(setMessages)
+      .catch((err) => setError(err instanceof Error ? err.message : '대화 기록을 불러오지 못했습니다.'))
+      .finally(() => setLoadingHistory(false))
+
+    getSession(sessionId)
+      .then((session) => setHonestModeActive(session.honestModeNpcId === npcId))
+      .catch(() => undefined)
+  }, [sessionId, npcId])
+
+  useEffect(() => {
+    listRef.current?.scrollTo({ top: listRef.current.scrollHeight })
+  }, [messages, sending])
+
+  async function handleSend() {
+    const message = input.trim()
+    if (!message || sending) return
+
+    setError(null)
+    setSending(true)
+    setMessages((prev) => [...prev, { sender: 'USER', message, createdAt: new Date().toISOString() }])
+    setInput('')
+
+    try {
+      const result = await sendDialogueMessage(sessionId, npcId, message)
+      setMessages((prev) => [
+        ...prev,
+        { sender: 'NPC', message: result.npcReply, createdAt: new Date().toISOString() },
+      ])
+      onStaminaChange(result.staminaCurrent)
+      // 서버는 정직 모드가 걸려있던 경우 이번 한 턴에 소모하고 해제한다.
+      setHonestModeActive(false)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'NPC가 응답하지 못했습니다.')
+    } finally {
+      setSending(false)
+    }
+  }
 
   return (
     <div className="dialogue-overlay">
@@ -26,17 +70,52 @@ export function DialogueBox({ npcName, npcRole, onClose }: DialogueBoxProps) {
         <div className="dialogue-content">
           <div className="dialogue-name">
             {npcName} <span className="dialogue-role">· {npcRole}</span>
+            {honestModeActive && <span className="dialogue-honest-badge">정직 모드 (이번 대화만 적용)</span>}
           </div>
-          <p className="dialogue-text">{DUMMY_LINES[lineIndex]}</p>
+
+          <div className="dialogue-history" ref={listRef}>
+            {loadingHistory && <p className="dialogue-status">대화 기록을 불러오는 중...</p>}
+            {!loadingHistory && messages.length === 0 && (
+              <p className="dialogue-status">아직 나눈 대화가 없습니다. 말을 걸어보세요.</p>
+            )}
+            {messages.map((msg, index) => (
+              <p
+                key={index}
+                className={`dialogue-line ${msg.sender === 'USER' ? 'dialogue-line--user' : 'dialogue-line--npc'}`}
+              >
+                {msg.message}
+              </p>
+            ))}
+            {sending && <p className="dialogue-status dialogue-status--thinking">{npcName}이(가) 생각하는 중...</p>}
+          </div>
+
+          {error && <p className="dialogue-error pixel-error">{error}</p>}
+
+          <form
+            className="dialogue-input-row"
+            onSubmit={(event) => {
+              event.preventDefault()
+              handleSend()
+            }}
+          >
+            <input
+              className="dialogue-input pixel-input"
+              type="text"
+              value={input}
+              maxLength={1000}
+              placeholder="할 말을 입력하세요..."
+              disabled={sending || loadingHistory}
+              onChange={(event) => setInput(event.target.value)}
+              autoFocus
+            />
+            <button className="pixel-button pixel-button--accent" type="submit" disabled={sending || !input.trim()}>
+              {sending ? '...' : '말하기'}
+            </button>
+          </form>
+
           <div className="dialogue-actions">
             <button className="pixel-button" onClick={onClose}>
-              닫기
-            </button>
-            <button
-              className="pixel-button pixel-button--accent"
-              onClick={() => (isLastLine ? onClose() : setLineIndex((i) => i + 1))}
-            >
-              {isLastLine ? '대화 종료' : '다음'}
+              대화 종료
             </button>
           </div>
         </div>

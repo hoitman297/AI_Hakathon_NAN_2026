@@ -1,0 +1,80 @@
+.inventory-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  z-index: 25;
+  background: rgba(20, 15, 10, 0.45);
+}
+
+.inventory-panel {
+  width: min(560px, 100%);
+  max-height: min(600px, 90%);
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+}
+
+.inventory-panel h2 {
+  margin: 0 0 12px;
+}
+
+.inventory-message {
+  margin: 0 0 8px;
+  color: var(--leaf-dark);
+  font-size: 0.85rem;
+}
+
+.inventory-status {
+  color: var(--ink-soft);
+  font-size: 0.85rem;
+}
+
+.inventory-grid {
+  flex: 1;
+  overflow-y: auto;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.inventory-slot {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 12px 8px;
+  border: 2px solid var(--ink);
+  border-radius: 8px;
+  background: var(--paper-dim);
+  text-align: center;
+}
+
+.inventory-slot-name {
+  font-weight: 700;
+  font-size: 0.9rem;
+}
+
+.inventory-slot-qty {
+  font-size: 0.8rem;
+  color: var(--ink-soft);
+}
+
+.inventory-target-picker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  justify-content: center;
+}
+
+.inventory-target-btn {
+  padding: 6px 10px;
+  font-size: 0.8rem;
+}
+
+.inventory-close {
+  align-self: flex-end;
+}

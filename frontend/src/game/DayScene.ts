@@ -25,6 +25,16 @@ const WORLD_TILES_H = 20
 const WORLD_W = WORLD_TILES_W * TILE
 const WORLD_H = WORLD_TILES_H * TILE
 
+// 대화를 걸 수 있는 최대 거리(플레이어 중심 ~ NPC 중심). 타일 2칸 정도 — 바로 옆이 아니어도
+// 조금 여유 있게 붙으면 클릭할 수 있는 정도로 잡았다.
+const NPC_INTERACT_RANGE = TILE * 2
+
+// 넓은 화면(RESIZE 스케일 모드)에서는 카메라 뷰포트가 마을(WORLD_W x WORLD_H)보다 커질 수 있다.
+// 카메라는 월드 경계 밖으로 스크롤하지 않으므로, 잔디만 이 범위까지 더 깔아서 배경색 여백이
+// 그대로 드러나지 않게 한다 — 이동 가능 범위(WORLD_W/H)나 건물/NPC 배치는 그대로 둔다.
+const BG_TILES_W = 90
+const BG_TILES_H = 60
+
 interface BuildingSpot {
   key: string
   tileX: number
@@ -61,6 +71,7 @@ export class DayScene extends Phaser.Scene {
   private keyS?: Phaser.Input.Keyboard.Key
   private keyD?: Phaser.Input.Keyboard.Key
   private pendingMovedSeconds = 0
+  private inputLocked = false
 
   constructor() {
     super('DayScene')
@@ -84,11 +95,7 @@ export class DayScene extends Phaser.Scene {
   }
 
   create() {
-    for (let x = 0; x < WORLD_TILES_W; x++) {
-      for (let y = 0; y < WORLD_TILES_H; y++) {
-        this.add.image(x * TILE, y * TILE, 'grass').setOrigin(0).setDisplaySize(TILE, TILE)
-      }
-    }
+    this.add.tileSprite(0, 0, BG_TILES_W * TILE, BG_TILES_H * TILE, 'grass').setOrigin(0)
 
     BUILDING_SPOTS.forEach((spot) => {
       const displayWidth = spot.tilesWide * TILE
@@ -121,7 +128,14 @@ export class DayScene extends Phaser.Scene {
       const sprite = this.add.image(pos.x * TILE, pos.y * TILE, `npc-${npc.slug}`)
       sprite.setDisplaySize(TILE, TILE)
       sprite.setInteractive({ useHandCursor: true })
-      sprite.on('pointerdown', () => this.initData.onNpcClick(npc.name, npc.role))
+      sprite.on('pointerdown', () => {
+        const distance = Phaser.Math.Distance.Between(this.player.x, this.player.y, sprite.x, sprite.y)
+        if (distance <= NPC_INTERACT_RANGE) {
+          this.initData.onNpcClick(npc.name, npc.role)
+        } else {
+          this.showTooFarHint(sprite.x, sprite.y)
+        }
+      })
       this.add
         .text(pos.x * TILE, pos.y * TILE + TILE / 2 + 2, npc.name, {
           fontSize: '10px',
@@ -139,6 +153,12 @@ export class DayScene extends Phaser.Scene {
     this.cameras.main.setBounds(0, 0, WORLD_W, WORLD_H)
     this.cameras.main.startFollow(this.player, true, 0.15, 0.15)
 
+    // RESIZE 스케일 모드에서는 캔버스가 브라우저 창 크기에 맞춰 계속 바뀌는데,
+    // 카메라 뷰포트는 자동으로 따라오지 않으므로 직접 맞춰줘야 한다.
+    this.cameras.main.setSize(this.scale.width, this.scale.height)
+    this.scale.on(Phaser.Scale.Events.RESIZE, this.handleResize, this)
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.scale.off(Phaser.Scale.Events.RESIZE, this.handleResize, this))
+
     if (this.input.keyboard) {
       this.cursors = this.input.keyboard.createCursorKeys()
       this.keyW = this.input.keyboard.addKey('W')
@@ -151,7 +171,26 @@ export class DayScene extends Phaser.Scene {
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.flushPendingMove())
   }
 
+  /**
+   * 대화창/ESC 메뉴가 열려 있는 동안 호출된다. Phaser는 기본적으로 WASD/방향키를
+   * 캔버스에서 전역으로 캡처(preventDefault)해서, 잠그지 않으면 채팅 입력창에 같은
+   * 글자를 입력할 수 없고(예: "a") 배경에서 캐릭터도 계속 움직인다.
+   */
+  private handleResize(gameSize: Phaser.Structs.Size) {
+    this.cameras.main.setSize(gameSize.width, gameSize.height)
+  }
+
+  setInputLocked(locked: boolean) {
+    this.inputLocked = locked
+    if (locked) {
+      this.input.keyboard?.disableGlobalCapture()
+    } else {
+      this.input.keyboard?.enableGlobalCapture()
+    }
+  }
+
   update(_time: number, delta: number) {
+    if (this.inputLocked) return
     if (this.stamina <= 0) return
 
     let dx = 0
@@ -180,6 +219,27 @@ export class DayScene extends Phaser.Scene {
     if (this.pendingMovedSeconds >= MOVE_REPORT_INTERVAL_SECONDS) {
       this.flushPendingMove()
     }
+  }
+
+  /** NPC와 너무 멀리 떨어진 채로 클릭했을 때, 그 위치 위에 잠깐 안내 문구를 띄웠다가 지운다. */
+  private showTooFarHint(x: number, y: number) {
+    const hint = this.add
+      .text(x, y - TILE, '너무 멀어요! 가까이 가주세요', {
+        fontSize: '11px',
+        color: '#fff8ec',
+        backgroundColor: '#b23a2fcc',
+        padding: { x: 4, y: 2 },
+      })
+      .setOrigin(0.5, 1)
+      .setDepth(20)
+
+    this.tweens.add({
+      targets: hint,
+      alpha: 0,
+      delay: 700,
+      duration: 400,
+      onComplete: () => hint.destroy(),
+    })
   }
 
   private flushPendingMove() {

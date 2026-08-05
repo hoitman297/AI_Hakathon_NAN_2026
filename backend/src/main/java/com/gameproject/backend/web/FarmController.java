@@ -11,6 +11,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.gameproject.backend.dto.AvailableFruitResponse;
+import com.gameproject.backend.dto.CropSummaryResponse;
+import com.gameproject.backend.dto.FarmPlotResponse;
 import com.gameproject.backend.dto.ForageRequest;
 import com.gameproject.backend.dto.ForageResponse;
 import com.gameproject.backend.dto.HarvestRequest;
@@ -31,6 +33,16 @@ public class FarmController {
     private final FarmService farmService;
     private final ForageService forageService;
     private final SessionService sessionService;
+
+    @GetMapping("/farm/crops")
+    public ResponseEntity<List<CropSummaryResponse>> crops(@PathVariable Long sessionId) {
+        return ResponseEntity.ok(farmService.listCrops());
+    }
+
+    @GetMapping("/farm/plots")
+    public ResponseEntity<List<FarmPlotResponse>> plots(@PathVariable Long sessionId) {
+        return ResponseEntity.ok(farmService.listPlots(sessionId));
+    }
 
     @PostMapping("/farm/plant")
     public ResponseEntity<SessionResponse> plant(@PathVariable Long sessionId, @Valid @RequestBody PlantRequest request) {

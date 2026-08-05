@@ -15,11 +15,13 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import com.gameproject.backend.client.LlmProxyClient;
 import com.gameproject.backend.domain.Account;
 import com.gameproject.backend.domain.GameSession;
 import com.gameproject.backend.domain.InventoryItem;
 import com.gameproject.backend.domain.InventoryItemType;
 import com.gameproject.backend.domain.ItemCategory;
+import com.gameproject.backend.domain.Npc;
 import com.gameproject.backend.domain.SessionStatus;
 import com.gameproject.backend.domain.ShopItemCode;
 import com.gameproject.backend.domain.ShopItemMaster;
@@ -52,6 +54,8 @@ class InventoryServiceTest {
     private NpcService npcService;
     @Mock
     private SessionService sessionService;
+    @Mock
+    private LlmProxyClient llmProxyClient;
 
     private InventoryService inventoryService;
 
@@ -60,7 +64,8 @@ class InventoryServiceTest {
     @BeforeEach
     void setUp() {
         inventoryService = new InventoryService(inventoryItemRepository, cropMasterRepository, fruitMasterRepository,
-                shopItemMasterRepository, npcRepository, sessionRepository, staminaService, npcService, sessionService);
+                shopItemMasterRepository, npcRepository, sessionRepository, staminaService, npcService, sessionService,
+                llmProxyClient);
 
         Account account = Account.builder().accountId(1L).username("u").passwordHash("h").nickname("n")
                 .createdAt(LocalDateTime.now()).build();
@@ -118,5 +123,26 @@ class InventoryServiceTest {
         assertThat(result).contains("단서 카드 화면");
         verify(inventoryItemRepository, org.mockito.Mockito.never()).delete(any());
         verify(inventoryItemRepository, org.mockito.Mockito.never()).save(any());
+    }
+
+    @Test
+    void useItem_giftSet_includesLlmGeneratedReactionInResult() {
+        InventoryItem giftSlot = InventoryItem.builder().session(session).slotIndex(3)
+                .itemType(InventoryItemType.SHOP_ITEM).itemRefId(4L).quantity(1).build();
+        ShopItemMaster giftSet = ShopItemMaster.builder()
+                .itemId(4L).name("선물세트").itemCode(ShopItemCode.GIFT_SET).category(ItemCategory.CONSUMABLE)
+                .price(40).build();
+        Npc target = Npc.builder().npcId(2L).name("나주부").role("아내").age(32)
+                .personalityDesc("상냥함").speechStyle("존댓말").sampleLine("어머").build();
+        when(inventoryItemRepository.findBySessionAndSlotIndex(session, 3)).thenReturn(Optional.of(giftSlot));
+        when(shopItemMasterRepository.findById(4L)).thenReturn(Optional.of(giftSet));
+        when(npcRepository.findById(2L)).thenReturn(Optional.of(target));
+        when(npcService.adjustAffinity(any(), any(), org.mockito.ArgumentMatchers.anyInt())).thenReturn(60);
+        when(llmProxyClient.generateGiftReaction("나주부", "아내", 32, "상냥함", "존댓말", "어머"))
+                .thenReturn("어머, 이런 것까지... 고마워요!");
+
+        String result = inventoryService.useItem(100L, 3, 2L);
+
+        assertThat(result).contains("어머, 이런 것까지... 고마워요!").contains("호감도 +");
     }
 }

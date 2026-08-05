@@ -1,0 +1,78 @@
+.farm-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  z-index: 25;
+  background: rgba(20, 15, 10, 0.45);
+}
+
+.farm-panel {
+  width: min(520px, 100%);
+  max-height: min(600px, 90%);
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+}
+
+.farm-panel h2 {
+  margin: 0 0 12px;
+}
+
+.farm-tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.farm-message {
+  margin: 0 0 8px;
+  color: var(--leaf-dark);
+  font-size: 0.85rem;
+}
+
+.farm-status {
+  color: var(--ink-soft);
+  font-size: 0.85rem;
+}
+
+.farm-list {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.farm-item-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 2px solid var(--ink);
+  border-radius: 8px;
+  background: var(--paper-dim);
+}
+
+.farm-item-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.farm-item-name {
+  font-weight: 700;
+}
+
+.farm-item-desc {
+  font-size: 0.82rem;
+  color: var(--ink-soft);
+  margin-top: 2px;
+}
+
+.farm-close {
+  align-self: flex-end;
+}

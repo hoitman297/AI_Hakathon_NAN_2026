@@ -42,10 +42,76 @@
   font-size: 0.85rem;
 }
 
-.dialogue-text {
-  min-height: 42px;
-  margin: 0 0 12px;
+.dialogue-honest-badge {
+  margin-left: 8px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--leaf);
+  color: var(--paper);
+  font-size: 0.72rem;
+  font-weight: 700;
+  vertical-align: middle;
+}
+
+.dialogue-history {
+  max-height: 160px;
+  min-height: 60px;
+  overflow-y: auto;
+  margin: 0 0 10px;
+  padding-right: 4px;
+}
+
+.dialogue-status {
+  margin: 0 0 8px;
+  color: var(--ink-soft);
+  font-size: 0.85rem;
+  font-style: italic;
+}
+
+.dialogue-status--thinking {
+  animation: dialogue-pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes dialogue-pulse {
+  0%,
+  100% {
+    opacity: 0.5;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+.dialogue-line {
+  margin: 0 0 8px;
   line-height: 1.5;
+  max-width: 90%;
+}
+
+.dialogue-line--user {
+  margin-left: auto;
+  text-align: right;
+  color: var(--accent-dark);
+}
+
+.dialogue-line--npc {
+  margin-right: auto;
+  color: var(--ink);
+}
+
+.dialogue-error {
+  margin: 0 0 8px;
+}
+
+.dialogue-input-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.dialogue-input-row .dialogue-input {
+  margin-top: 0;
 }
 
 .dialogue-actions {

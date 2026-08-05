@@ -186,8 +186,9 @@ function App() {
         />
       )}
 
-      {screen === 'night' && nightInfo && (
+      {screen === 'night' && nightInfo && session && (
         <NightTransitionScreen
+          sessionId={session.sessionId}
           day={nightInfo.day}
           nextDay={nightInfo.nextDay}
           onContinue={() => setScreen('day')}
