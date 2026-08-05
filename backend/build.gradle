@@ -50,3 +50,11 @@ dependencies {
 tasks.named('test') {
 	useJUnitPlatform()
 }
+
+// Spring이 @PathVariable/@RequestParam의 이름을 리플렉션으로 알아내려면 이 플래그가 필요하다.
+// 없으면 파라미터명 해석이 바이트코드의 로컬 변수 테이블(디버그 심볼)에 의존하게 되는데,
+// 이건 컴파일 상황(증분 빌드 여부, 캐시 재사용 등)에 따라 안정적으로 보존되지 않아서
+// "가끔 되고 가끔 안 되는" 400 에러(Name for argument of type [...] not specified)로 이어진다.
+tasks.withType(JavaCompile).configureEach {
+	options.compilerArgs << '-parameters'
+}

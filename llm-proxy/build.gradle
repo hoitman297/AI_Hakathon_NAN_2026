@@ -47,3 +47,9 @@ tasks.named('test') {
 	useJUnitPlatform()
 	jvmArgs "-javaagent:${configurations.mockitoAgent.asPath}"
 }
+
+// backend와 동일한 이유(@PathVariable/@RequestParam 이름 해석 안정성) — 현재는 이 모듈에
+// @PathVariable을 쓰는 컨트롤러가 없지만, 앞으로 추가될 때를 대비해 미리 맞춰둔다.
+tasks.withType(JavaCompile).configureEach {
+	options.compilerArgs << '-parameters'
+}

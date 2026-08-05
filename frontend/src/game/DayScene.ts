@@ -159,6 +159,14 @@ export class DayScene extends Phaser.Scene {
     this.scale.on(Phaser.Scale.Events.RESIZE, this.handleResize, this)
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.scale.off(Phaser.Scale.Events.RESIZE, this.handleResize, this))
 
+    // Phaser는 포인터 좌표를 캔버스의 DOM 위치(getBoundingClientRect)로 변환할 때 그 결과를
+    // 캐싱해두고, window resize 이벤트가 있을 때만 다시 계산한다. 그런데 이 캔버스는 위쪽 HUD의
+    // 실제 렌더링 높이에 따라 flex 레이아웃으로 세로 위치가 정해지는데, HUD 안 이미지 로딩 등으로
+    // "크기"는 안 바뀌고 "위치"만 나중에 바뀌면 resize 이벤트가 안 뜨고 캔버스 위치 캐시가 안
+    // 갱신돼서, 클릭 좌표(특히 y)가 실제 스프라이트 위치와 어긋나 NPC를 클릭해도 대화가 전혀
+    // 안 열리는 문제가 있었다 — 레이아웃이 안정된 다음 프레임에 강제로 다시 계산해서 맞춘다.
+    requestAnimationFrame(() => this.scale.refresh())
+
     if (this.input.keyboard) {
       this.cursors = this.input.keyboard.createCursorKeys()
       this.keyW = this.input.keyboard.addKey('W')
