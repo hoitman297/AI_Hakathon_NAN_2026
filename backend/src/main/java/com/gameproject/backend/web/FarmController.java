@@ -35,34 +35,34 @@ public class FarmController {
     private final SessionService sessionService;
 
     @GetMapping("/farm/crops")
-    public ResponseEntity<List<CropSummaryResponse>> crops(@PathVariable Long sessionId) {
+    public ResponseEntity<List<CropSummaryResponse>> crops(@PathVariable("sessionId") Long sessionId) {
         return ResponseEntity.ok(farmService.listCrops());
     }
 
     @GetMapping("/farm/plots")
-    public ResponseEntity<List<FarmPlotResponse>> plots(@PathVariable Long sessionId) {
+    public ResponseEntity<List<FarmPlotResponse>> plots(@PathVariable("sessionId") Long sessionId) {
         return ResponseEntity.ok(farmService.listPlots(sessionId));
     }
 
     @PostMapping("/farm/plant")
-    public ResponseEntity<SessionResponse> plant(@PathVariable Long sessionId, @Valid @RequestBody PlantRequest request) {
+    public ResponseEntity<SessionResponse> plant(@PathVariable("sessionId") Long sessionId, @Valid @RequestBody PlantRequest request) {
         farmService.plant(sessionId, request.cropId());
         return ResponseEntity.ok(sessionService.getSession(sessionId));
     }
 
     @PostMapping("/farm/harvest")
-    public ResponseEntity<SessionResponse> harvest(@PathVariable Long sessionId, @Valid @RequestBody HarvestRequest request) {
+    public ResponseEntity<SessionResponse> harvest(@PathVariable("sessionId") Long sessionId, @Valid @RequestBody HarvestRequest request) {
         farmService.harvest(sessionId, request.farmPlotId());
         return ResponseEntity.ok(sessionService.getSession(sessionId));
     }
 
     @GetMapping("/forage/today")
-    public ResponseEntity<List<AvailableFruitResponse>> availableToday(@PathVariable Long sessionId) {
+    public ResponseEntity<List<AvailableFruitResponse>> availableToday(@PathVariable("sessionId") Long sessionId) {
         return ResponseEntity.ok(forageService.listAvailableToday(sessionId));
     }
 
     @PostMapping("/forage")
-    public ResponseEntity<ForageResponse> forage(@PathVariable Long sessionId, @Valid @RequestBody ForageRequest request) {
+    public ResponseEntity<ForageResponse> forage(@PathVariable("sessionId") Long sessionId, @Valid @RequestBody ForageRequest request) {
         return ResponseEntity.ok(forageService.forage(sessionId, request.fruitId()));
     }
 }

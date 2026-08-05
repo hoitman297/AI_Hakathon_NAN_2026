@@ -26,12 +26,12 @@ public class DialogueController {
     private final DialogueService dialogueService;
 
     @GetMapping
-    public ResponseEntity<List<DialogueMessageResponse>> history(@PathVariable Long sessionId, @PathVariable Long npcId) {
+    public ResponseEntity<List<DialogueMessageResponse>> history(@PathVariable("sessionId") Long sessionId, @PathVariable("npcId") Long npcId) {
         return ResponseEntity.ok(dialogueService.history(sessionId, npcId));
     }
 
     @PostMapping
-    public ResponseEntity<DialogueReplyResponse> send(@PathVariable Long sessionId, @PathVariable Long npcId,
+    public ResponseEntity<DialogueReplyResponse> send(@PathVariable("sessionId") Long sessionId, @PathVariable("npcId") Long npcId,
                                                         @Valid @RequestBody DialogueRequest request) {
         return ResponseEntity.ok(dialogueService.send(sessionId, npcId, request.message()));
     }

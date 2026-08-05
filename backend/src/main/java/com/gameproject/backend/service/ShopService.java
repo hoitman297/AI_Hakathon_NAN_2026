@@ -38,7 +38,7 @@ public class ShopService {
     public List<ShopItemResponse> listItems() {
         return shopItemMasterRepository.findAll().stream()
                 .map(item -> new ShopItemResponse(
-                        item.getItemId(), item.getName(), item.getCategory().name(),
+                        item.getItemId(), item.getItemCode().name(), item.getName(), item.getCategory().name(),
                         item.getPrice(), item.getEffectDesc(), item.getUsageLimit()))
                 .toList();
     }

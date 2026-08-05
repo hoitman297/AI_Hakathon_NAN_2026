@@ -24,12 +24,12 @@ public class AccusationController {
     private final AccusationService accusationService;
 
     @PostMapping("/accuse")
-    public ResponseEntity<AccuseResultResponse> accuse(@PathVariable Long sessionId, @Valid @RequestBody AccuseRequest request) {
+    public ResponseEntity<AccuseResultResponse> accuse(@PathVariable("sessionId") Long sessionId, @Valid @RequestBody AccuseRequest request) {
         return ResponseEntity.ok(accusationService.accuse(sessionId, request.accusedNpcId()));
     }
 
     @GetMapping("/ending")
-    public ResponseEntity<EndingResponse> ending(@PathVariable Long sessionId) {
+    public ResponseEntity<EndingResponse> ending(@PathVariable("sessionId") Long sessionId) {
         return ResponseEntity.ok(accusationService.getEnding(sessionId));
     }
 }

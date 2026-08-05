@@ -98,6 +98,19 @@
 - 테스트: `DialogueServiceTest`에 7일차 이상일 때 `restrictDetectiveTalk=true`가 실제로 전달되는지 검증하는 케이스 추가. `LlmServiceTest`에 `ArgumentCaptor`로 실제 전송되는 시스템 프롬프트 문자열을 캡처해 `restrictDetectiveTalk=true`일 때만 제한 지시문이 포함되고 `false`일 때는 포함되지 않는 것을 직접 검증하는 케이스 2개 추가(기존 14번 항목의 호감도 등급 테스트는 프롬프트 내용까지는 검증하지 않았던 것보다 한 단계 더 엄격한 검증).
 - `backend`/`llm-proxy` 양쪽 `./gradlew test` 전체 통과. 라이브 검증에 쓴 테스트 계정(`dtt855566`)·세션(29) 및 연관 레코드 전부 Aiven DB에서 삭제 완료.
 
+### 16. Eclipse로 실행 시 모든 `@PathVariable` 엔드포인트가 400 에러 — ✅ 해결(2026-08-05)
+- 증상: 프론트에서 NPC 대화 시도 시 "LLM 서버 응답이 지연되고 있습니다" 오류가 뜬다는 제보를 받고 재현하던 중, 실제로는 그보다 앞단에서 `{"error":"Name for argument of type [java.lang.Long] not specified, and parameter name information not available via reflection..."}` 400 에러가 나는 걸 발견 — 대화뿐 아니라 세션/상점/농장/인벤토리/단서/고발/NPC 등 `@PathVariable`을 쓰는 컨트롤러 8개, 총 25곳 전부가 같은 이유로 깨져 있었음.
+- 원인: 이 프로젝트는 `@PathVariable Long sessionId`처럼 이름을 명시하지 않고 자바 리플렉션으로 파라미터 이름을 읽어오는 방식에 의존하고 있었는데, `./gradlew bootRun`(Spring Boot Gradle 플러그인이 `-parameters`를 자동으로 넣어줌)으로 실행할 때는 문제가 없었지만, **Eclipse에서 직접 실행**(classpath가 `backend\bin\main`으로 잡히는 것으로 확인)하면 Eclipse 기본 컴파일러 설정상 파라미터 이름 정보를 바이트코드에 안 넣어서 런타임에 깨짐.
+- 수정 1(즉효): `.settings/org.eclipse.jdt.core.prefs`에 `org.eclipse.jdt.core.compiler.codegen.methodParameters=generate` 추가 — Eclipse Project → Clean 한 번 해주면 적용됨.
+- 수정 2(근본): 컴파일러/IDE 설정에 의존하지 않도록 8개 컨트롤러(`SessionController`/`DialogueController`/`NpcController`/`ShopController`/`AccusationController`/`ClueController`/`FarmController`/`InventoryController`) 전체 `@PathVariable`에 `@PathVariable("sessionId")`처럼 명시적 이름을 붙임 — 이제 Eclipse 설정이 원래대로 돌아가도(또는 팀원 각자 IDE 설정이 달라도) 안 깨짐.
+- `./gradlew compileJava`/`./gradlew test` 전체 통과 확인. **주의**: 이 수정은 소스 코드/`.settings` 파일만 바꾼 것이라, 지금 Eclipse에서 이미 띄워둔 서버는 재빌드하기 전까진 여전히 예전 깨진 바이트코드로 돌아간다 — Eclipse에서 Project → Clean(또는 재시작)한 뒤 서버를 다시 띄워야 실제로 반영됨.
+
+### 17. 상점/인벤토리 응답에 `itemCode` 미노출 — ✅ 해결(2026-08-05)
+- 계기: 백엔드/DB 개발 필요 항목 전수 점검 중 프론트 `InventoryPanel.tsx`에서 발견 — "ShopItemResponse에 itemCode가 안 내려오므로 표시 이름으로 판별한다"는 주석과 함께 `NEEDS_TARGET_NPC = new Set(['거짓말탐지기', '선물세트'])`처럼 한글 표시 이름 문자열로 "대상 NPC 지정이 필요한 아이템인지" 판별하고 있었음 — 표시 이름이 바뀌면(오타 수정, 다국어 등) 조용히 깨지는 구조라, 이번 세션 초반에 백엔드 로직에서 걷어냈던 것과 같은 종류의 취약점.
+- `ShopItemResponse`/`InventorySlotResponse`에 `itemCode`(`ShopItemCode` enum 이름, 예: `LIE_DETECTOR`/`GIFT_SET`) 필드 추가 — `InventorySlotResponse`는 `CROP`/`FRUIT` 슬롯에서는 `null`(해당 없음), `SHOP_ITEM` 슬롯에서만 값이 채워짐.
+- 순수 추가 필드라 기존 프론트 호출과 하위 호환됨(당장 프론트를 고칠 필요는 없고, 팀원이 원할 때 이름 매칭 대신 `itemCode` 매칭으로 바꾸면 됨).
+- `./gradlew compileJava`/`./gradlew test` 전체 통과 확인.
+
 ---
 
 ### 참고

@@ -25,12 +25,12 @@ public class InventoryController {
     private final InventoryService inventoryService;
 
     @GetMapping
-    public ResponseEntity<List<InventorySlotResponse>> list(@PathVariable Long sessionId) {
+    public ResponseEntity<List<InventorySlotResponse>> list(@PathVariable("sessionId") Long sessionId) {
         return ResponseEntity.ok(inventoryService.list(sessionId));
     }
 
     @PostMapping("/use")
-    public ResponseEntity<String> use(@PathVariable Long sessionId, @Valid @RequestBody UseItemRequest request) {
+    public ResponseEntity<String> use(@PathVariable("sessionId") Long sessionId, @Valid @RequestBody UseItemRequest request) {
         String result = inventoryService.useItem(sessionId, request.slotIndex(), request.targetNpcId());
         return ResponseEntity.ok(result);
     }

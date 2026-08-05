@@ -7,6 +7,7 @@ import { DialogueBox } from '../components/DialogueBox'
 import { EscMenu } from '../components/EscMenu'
 import { InventoryPanel } from '../components/InventoryPanel'
 import { CluePanel } from '../components/CluePanel'
+import { NightLoadingOverlay } from '../components/NightLoadingOverlay'
 import { moveSession, type SessionResponse } from '../api/sessionApi'
 import { listNpcsToday } from '../api/npcApi'
 import './DayScreen.css'
@@ -186,6 +187,8 @@ export function DayScreen({
       {clueOpen && <CluePanel sessionId={session.sessionId} onClose={() => setClueOpen(false)} />}
 
       {escOpen && <EscMenu onResume={() => setEscOpen(false)} onQuit={onQuitToTitle} />}
+
+      {advancing && <NightLoadingOverlay />}
     </div>
   )
 }

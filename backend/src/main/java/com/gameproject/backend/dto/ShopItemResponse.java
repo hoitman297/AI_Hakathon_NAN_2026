@@ -2,6 +2,7 @@ package com.gameproject.backend.dto;
 
 public record ShopItemResponse(
         Long itemId,
+        String itemCode,
         String name,
         String category,
         Integer price,

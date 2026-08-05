@@ -4,6 +4,10 @@ import { fetchDialogueHistory, sendDialogueMessage, type DialogueMessage } from 
 import { getSession } from '../api/sessionApi'
 import './DialogueBox.css'
 
+// 한 번 대화창을 열 때마다 주고받을 수 있는 질의응답 횟수 제한 — 이 횟수를 채우면
+// NPC가 대화를 마무리하고, 다시 말을 걸려면 대화창을 닫았다 새로 열어야 한다.
+const MAX_EXCHANGES_PER_VISIT = 3
+
 interface DialogueBoxProps {
   sessionId: number
   npcId: number
@@ -21,7 +25,9 @@ export function DialogueBox({ sessionId, npcId, npcName, npcRole, onStaminaChang
   const [sending, setSending] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [honestModeActive, setHonestModeActive] = useState(false)
+  const [exchangeCount, setExchangeCount] = useState(0)
   const listRef = useRef<HTMLDivElement>(null)
+  const conversationEnded = exchangeCount >= MAX_EXCHANGES_PER_VISIT
 
   useEffect(() => {
     fetchDialogueHistory(sessionId, npcId)
@@ -40,7 +46,7 @@ export function DialogueBox({ sessionId, npcId, npcName, npcRole, onStaminaChang
 
   async function handleSend() {
     const message = input.trim()
-    if (!message || sending) return
+    if (!message || sending || conversationEnded) return
 
     setError(null)
     setSending(true)
@@ -56,6 +62,7 @@ export function DialogueBox({ sessionId, npcId, npcName, npcRole, onStaminaChang
       onStaminaChange(result.staminaCurrent)
       // 서버는 정직 모드가 걸려있던 경우 이번 한 턴에 소모하고 해제한다.
       setHonestModeActive(false)
+      setExchangeCount((prev) => prev + 1)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'NPC가 응답하지 못했습니다.')
     } finally {
@@ -69,8 +76,15 @@ export function DialogueBox({ sessionId, npcId, npcName, npcRole, onStaminaChang
         {roster && <img className="dialogue-portrait pixel-art" src={roster.portrait} alt="" />}
         <div className="dialogue-content">
           <div className="dialogue-name">
-            {npcName} <span className="dialogue-role">· {npcRole}</span>
-            {honestModeActive && <span className="dialogue-honest-badge">정직 모드 (이번 대화만 적용)</span>}
+            <span>
+              {npcName} <span className="dialogue-role">· {npcRole}</span>
+              {honestModeActive && <span className="dialogue-honest-badge">정직 모드 (이번 대화만 적용)</span>}
+            </span>
+            {!conversationEnded && (
+              <span className="dialogue-turns-left">
+                남은 질문 {MAX_EXCHANGES_PER_VISIT - exchangeCount}/{MAX_EXCHANGES_PER_VISIT}
+              </span>
+            )}
           </div>
 
           <div className="dialogue-history" ref={listRef}>
@@ -87,31 +101,36 @@ export function DialogueBox({ sessionId, npcId, npcName, npcRole, onStaminaChang
               </p>
             ))}
             {sending && <p className="dialogue-status dialogue-status--thinking">{npcName}이(가) 생각하는 중...</p>}
+            {conversationEnded && (
+              <p className="dialogue-status">{npcName}이(가) 대화를 마무리했습니다. 다음에 다시 말을 걸어보세요.</p>
+            )}
           </div>
 
           {error && <p className="dialogue-error pixel-error">{error}</p>}
 
-          <form
-            className="dialogue-input-row"
-            onSubmit={(event) => {
-              event.preventDefault()
-              handleSend()
-            }}
-          >
-            <input
-              className="dialogue-input pixel-input"
-              type="text"
-              value={input}
-              maxLength={1000}
-              placeholder="할 말을 입력하세요..."
-              disabled={sending || loadingHistory}
-              onChange={(event) => setInput(event.target.value)}
-              autoFocus
-            />
-            <button className="pixel-button pixel-button--accent" type="submit" disabled={sending || !input.trim()}>
-              {sending ? '...' : '말하기'}
-            </button>
-          </form>
+          {!conversationEnded && (
+            <form
+              className="dialogue-input-row"
+              onSubmit={(event) => {
+                event.preventDefault()
+                handleSend()
+              }}
+            >
+              <input
+                className="dialogue-input pixel-input"
+                type="text"
+                value={input}
+                maxLength={1000}
+                placeholder="할 말을 입력하세요..."
+                disabled={sending || loadingHistory}
+                onChange={(event) => setInput(event.target.value)}
+                autoFocus
+              />
+              <button className="pixel-button pixel-button--accent" type="submit" disabled={sending || !input.trim()}>
+                {sending ? '...' : '말하기'}
+              </button>
+            </form>
+          )}
 
           <div className="dialogue-actions">
             <button className="pixel-button" onClick={onClose}>

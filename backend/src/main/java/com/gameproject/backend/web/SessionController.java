@@ -52,12 +52,12 @@ public class SessionController {
     }
 
     @GetMapping("/{sessionId}")
-    public ResponseEntity<SessionResponse> get(@PathVariable Long sessionId) {
+    public ResponseEntity<SessionResponse> get(@PathVariable("sessionId") Long sessionId) {
         return ResponseEntity.ok(sessionService.getSession(sessionId));
     }
 
     @PostMapping("/{sessionId}/day/advance")
-    public ResponseEntity<SessionResponse> advanceDay(@PathVariable Long sessionId) {
+    public ResponseEntity<SessionResponse> advanceDay(@PathVariable("sessionId") Long sessionId) {
         return ResponseEntity.ok(sessionService.advanceDay(sessionId));
     }
 
@@ -66,13 +66,13 @@ public class SessionController {
      * 프론트가 캐릭터가 실제로 움직인 시간을 누적해서 주기적으로 호출한다.
      */
     @PostMapping("/{sessionId}/move")
-    public ResponseEntity<SessionResponse> move(@PathVariable Long sessionId, @Valid @RequestBody MoveRequest request) {
+    public ResponseEntity<SessionResponse> move(@PathVariable("sessionId") Long sessionId, @Valid @RequestBody MoveRequest request) {
         return ResponseEntity.ok(sessionService.move(sessionId, request.seconds()));
     }
 
     /** NightTransitionScreen용 — 지정한 일차 밤에 사보타주가 없었으면(6일차 이후 등) 204. */
     @GetMapping("/{sessionId}/sabotage/{day}")
-    public ResponseEntity<NightSummaryResponse> nightSummary(@PathVariable Long sessionId, @PathVariable int day) {
+    public ResponseEntity<NightSummaryResponse> nightSummary(@PathVariable("sessionId") Long sessionId, @PathVariable("day") int day) {
         return sessionService.getNightSummary(sessionId, day)
                 .map(ResponseEntity::ok)
                 .orElseGet(() -> ResponseEntity.noContent().build());

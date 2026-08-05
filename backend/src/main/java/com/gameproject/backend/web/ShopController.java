@@ -29,18 +29,18 @@ public class ShopController {
     private final SessionService sessionService;
 
     @GetMapping("/items")
-    public ResponseEntity<List<ShopItemResponse>> items(@PathVariable Long sessionId) {
+    public ResponseEntity<List<ShopItemResponse>> items(@PathVariable("sessionId") Long sessionId) {
         return ResponseEntity.ok(shopService.listItems());
     }
 
     @PostMapping("/purchase")
-    public ResponseEntity<SessionResponse> purchase(@PathVariable Long sessionId, @Valid @RequestBody PurchaseRequest request) {
+    public ResponseEntity<SessionResponse> purchase(@PathVariable("sessionId") Long sessionId, @Valid @RequestBody PurchaseRequest request) {
         shopService.purchase(sessionId, request.itemId());
         return ResponseEntity.ok(sessionService.getSession(sessionId));
     }
 
     @PostMapping("/sell")
-    public ResponseEntity<SessionResponse> sell(@PathVariable Long sessionId, @Valid @RequestBody SellRequest request) {
+    public ResponseEntity<SessionResponse> sell(@PathVariable("sessionId") Long sessionId, @Valid @RequestBody SellRequest request) {
         shopService.sell(sessionId, request);
         return ResponseEntity.ok(sessionService.getSession(sessionId));
     }

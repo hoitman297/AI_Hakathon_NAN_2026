@@ -22,12 +22,12 @@ public class NpcController {
     private final NpcService npcService;
 
     @GetMapping
-    public ResponseEntity<List<NpcSummaryResponse>> listToday(@PathVariable Long sessionId) {
+    public ResponseEntity<List<NpcSummaryResponse>> listToday(@PathVariable("sessionId") Long sessionId) {
         return ResponseEntity.ok(npcService.listToday(sessionId));
     }
 
     @GetMapping("/{npcId}")
-    public ResponseEntity<NpcDetailResponse> detail(@PathVariable Long sessionId, @PathVariable Long npcId) {
+    public ResponseEntity<NpcDetailResponse> detail(@PathVariable("sessionId") Long sessionId, @PathVariable("npcId") Long npcId) {
         return ResponseEntity.ok(npcService.getDetail(sessionId, npcId));
     }
 }

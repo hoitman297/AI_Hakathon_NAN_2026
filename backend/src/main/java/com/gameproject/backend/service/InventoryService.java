@@ -57,6 +57,7 @@ public class InventoryService {
                         item.getItemType().name(),
                         item.getItemRefId(),
                         resolveName(item.getItemType(), item.getItemRefId()),
+                        resolveItemCode(item.getItemType(), item.getItemRefId()),
                         item.getQuantity()))
                 .toList();
     }
@@ -211,5 +212,12 @@ public class InventoryService {
             case FRUIT -> fruitMasterRepository.findById(refId).map(FruitMaster::getName).orElse("알 수 없는 과일");
             case SHOP_ITEM -> shopItemMasterRepository.findById(refId).map(ShopItemMaster::getName).orElse("알 수 없는 아이템");
         };
+    }
+
+    private String resolveItemCode(InventoryItemType type, Long refId) {
+        if (type != InventoryItemType.SHOP_ITEM) {
+            return null;
+        }
+        return shopItemMasterRepository.findById(refId).map(item -> item.getItemCode().name()).orElse(null);
     }
 }

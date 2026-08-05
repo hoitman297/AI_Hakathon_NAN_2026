@@ -20,6 +20,9 @@ const MOVE_STAMINA_PER_SECOND_WITH_SNEAKERS = 0.12
 const MOVE_REPORT_INTERVAL_SECONDS = 1
 
 const TILE = 32
+// NPC 스프라이트는 타일 하나에 딱 맞추면 너무 작아 보여서, 타일 그리드(이동/거리 판정)는
+// 그대로 두고 시각적 크기만 이만큼 키운다.
+const NPC_DISPLAY_SIZE = TILE * 1.6
 const WORLD_TILES_W = 30
 const WORLD_TILES_H = 20
 const WORLD_W = WORLD_TILES_W * TILE
@@ -126,7 +129,7 @@ export class DayScene extends Phaser.Scene {
     NPC_ROSTER.forEach((npc, index) => {
       const pos = NPC_TILE_POSITIONS[index]
       const sprite = this.add.image(pos.x * TILE, pos.y * TILE, `npc-${npc.slug}`)
-      sprite.setDisplaySize(TILE, TILE)
+      sprite.setDisplaySize(NPC_DISPLAY_SIZE, NPC_DISPLAY_SIZE)
       sprite.setInteractive({ useHandCursor: true })
       sprite.on('pointerdown', () => {
         const distance = Phaser.Math.Distance.Between(this.player.x, this.player.y, sprite.x, sprite.y)
@@ -137,7 +140,7 @@ export class DayScene extends Phaser.Scene {
         }
       })
       this.add
-        .text(pos.x * TILE, pos.y * TILE + TILE / 2 + 2, npc.name, {
+        .text(pos.x * TILE, pos.y * TILE + NPC_DISPLAY_SIZE / 2 + 2, npc.name, {
           fontSize: '10px',
           color: '#fff8ec',
           backgroundColor: '#3b2b20cc',
@@ -152,6 +155,7 @@ export class DayScene extends Phaser.Scene {
 
     this.cameras.main.setBounds(0, 0, WORLD_W, WORLD_H)
     this.cameras.main.startFollow(this.player, true, 0.15, 0.15)
+    this.cameras.main.setZoom(1.4)
 
     // RESIZE 스케일 모드에서는 캔버스가 브라우저 창 크기에 맞춰 계속 바뀌는데,
     // 카메라 뷰포트는 자동으로 따라오지 않으므로 직접 맞춰줘야 한다.

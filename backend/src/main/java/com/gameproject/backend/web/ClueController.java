@@ -23,22 +23,22 @@ public class ClueController {
     private final ClueService clueService;
 
     @GetMapping
-    public ResponseEntity<List<ClueCardResponse>> list(@PathVariable Long sessionId) {
+    public ResponseEntity<List<ClueCardResponse>> list(@PathVariable("sessionId") Long sessionId) {
         return ResponseEntity.ok(clueService.listAcquired(sessionId));
     }
 
     @GetMapping("/unacquired")
-    public ResponseEntity<List<UnacquiredClueResponse>> unacquired(@PathVariable Long sessionId) {
+    public ResponseEntity<List<UnacquiredClueResponse>> unacquired(@PathVariable("sessionId") Long sessionId) {
         return ResponseEntity.ok(clueService.listUnacquired(sessionId));
     }
 
     @PostMapping("/{clueId}/acquire")
-    public ResponseEntity<ClueCardResponse> acquire(@PathVariable Long sessionId, @PathVariable Long clueId) {
+    public ResponseEntity<ClueCardResponse> acquire(@PathVariable("sessionId") Long sessionId, @PathVariable("clueId") Long clueId) {
         return ResponseEntity.ok(clueService.acquire(sessionId, clueId));
     }
 
     @PostMapping("/{clueId}/clarify")
-    public ResponseEntity<ClueCardResponse> clarify(@PathVariable Long sessionId, @PathVariable Long clueId) {
+    public ResponseEntity<ClueCardResponse> clarify(@PathVariable("sessionId") Long sessionId, @PathVariable("clueId") Long clueId) {
         return ResponseEntity.ok(clueService.clarify(sessionId, clueId));
     }
 }
