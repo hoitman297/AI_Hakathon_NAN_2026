@@ -8,6 +8,7 @@ interface TitleScreenProps {
   onLogoutClick: () => void
   onStartNewGame: () => void
   onContinue: () => void
+  onVillagePreview: () => void
 }
 
 export function TitleScreen({
@@ -17,6 +18,7 @@ export function TitleScreen({
   onLogoutClick,
   onStartNewGame,
   onContinue,
+  onVillagePreview,
 }: TitleScreenProps) {
   return (
     <div className="title-screen" style={{ backgroundImage: `url(${villageAssets.concept})` }}>
@@ -46,6 +48,10 @@ export function TitleScreen({
             </>
           )}
         </div>
+
+        <button className="pixel-button title-preview-button" type="button" onClick={onVillagePreview}>
+          로그인 없이 마을 화면 보기
+        </button>
 
         {isLoggedIn && (
           <div className="title-account">
