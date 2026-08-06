@@ -1,0 +1,352 @@
+{
+  "image": "wildflowers-overlay-atlas-24-v1.png",
+  "tileWidth": 32,
+  "tileHeight": 32,
+  "columns": 6,
+  "rows": 4,
+  "tileCount": 24,
+  "uniqueTileCount": 24,
+  "transparent": true,
+  "transparentPerimeterPixels": 2,
+  "allTileEdgesTransparent": true,
+  "margin": 0,
+  "spacing": 0,
+  "tiles": [
+    {
+      "id": 0,
+      "x": 0,
+      "y": 0,
+      "width": 32,
+      "height": 32,
+      "empty": false,
+      "contentBounds": [
+        13,
+        16,
+        26,
+        27
+      ]
+    },
+    {
+      "id": 1,
+      "x": 32,
+      "y": 0,
+      "width": 32,
+      "height": 32,
+      "empty": false,
+      "contentBounds": [
+        2,
+        11,
+        5,
+        18
+      ]
+    },
+    {
+      "id": 2,
+      "x": 64,
+      "y": 0,
+      "width": 32,
+      "height": 32,
+      "empty": false,
+      "contentBounds": [
+        2,
+        12,
+        18,
+        22
+      ]
+    },
+    {
+      "id": 3,
+      "x": 96,
+      "y": 0,
+      "width": 32,
+      "height": 32,
+      "empty": false,
+      "contentBounds": [
+        21,
+        13,
+        30,
+        24
+      ]
+    },
+    {
+      "id": 4,
+      "x": 128,
+      "y": 0,
+      "width": 32,
+      "height": 32,
+      "empty": false,
+      "contentBounds": [
+        2,
+        11,
+        6,
+        19
+      ]
+    },
+    {
+      "id": 5,
+      "x": 160,
+      "y": 0,
+      "width": 32,
+      "height": 32,
+      "empty": false,
+      "contentBounds": [
+        2,
+        11,
+        22,
+        30
+      ]
+    },
+    {
+      "id": 6,
+      "x": 0,
+      "y": 32,
+      "width": 32,
+      "height": 32,
+      "empty": false,
+      "contentBounds": [
+        13,
+        11,
+        21,
+        21
+      ]
+    },
+    {
+      "id": 7,
+      "x": 32,
+      "y": 32,
+      "width": 32,
+      "height": 32,
+      "empty": false,
+      "contentBounds": [
+        25,
+        12,
+        30,
+        23
+      ]
+    },
+    {
+      "id": 8,
+      "x": 64,
+      "y": 32,
+      "width": 32,
+      "height": 32,
+      "empty": false,
+      "contentBounds": [
+        3,
+        16,
+        4,
+        18
+      ]
+    },
+    {
+      "id": 9,
+      "x": 96,
+      "y": 32,
+      "width": 32,
+      "height": 32,
+      "empty": false,
+      "contentBounds": [
+        2,
+        14,
+        9,
+        23
+      ]
+    },
+    {
+      "id": 10,
+      "x": 128,
+      "y": 32,
+      "width": 32,
+      "height": 32,
+      "empty": false,
+      "contentBounds": [
+        2,
+        11,
+        9,
+        25
+      ]
+    },
+    {
+      "id": 11,
+      "x": 160,
+      "y": 32,
+      "width": 32,
+      "height": 32,
+      "empty": false,
+      "contentBounds": [
+        4,
+        12,
+        20,
+        23
+      ]
+    },
+    {
+      "id": 12,
+      "x": 0,
+      "y": 64,
+      "width": 32,
+      "height": 32,
+      "empty": false,
+      "contentBounds": [
+        16,
+        8,
+        27,
+        19
+      ]
+    },
+    {
+      "id": 13,
+      "x": 32,
+      "y": 64,
+      "width": 32,
+      "height": 32,
+      "empty": false,
+      "contentBounds": [
+        24,
+        10,
+        30,
+        19
+      ]
+    },
+    {
+      "id": 14,
+      "x": 64,
+      "y": 64,
+      "width": 32,
+      "height": 32,
+      "empty": false,
+      "contentBounds": [
+        27,
+        12,
+        30,
+        17
+      ]
+    },
+    {
+      "id": 15,
+      "x": 96,
+      "y": 64,
+      "width": 32,
+      "height": 32,
+      "empty": false,
+      "contentBounds": [
+        2,
+        11,
+        7,
+        20
+      ]
+    },
+    {
+      "id": 16,
+      "x": 128,
+      "y": 64,
+      "width": 32,
+      "height": 32,
+      "empty": false,
+      "contentBounds": [
+        2,
+        13,
+        9,
+        22
+      ]
+    },
+    {
+      "id": 17,
+      "x": 160,
+      "y": 64,
+      "width": 32,
+      "height": 32,
+      "empty": false,
+      "contentBounds": [
+        4,
+        10,
+        12,
+        20
+      ]
+    },
+    {
+      "id": 18,
+      "x": 0,
+      "y": 96,
+      "width": 32,
+      "height": 32,
+      "empty": false,
+      "contentBounds": [
+        17,
+        8,
+        25,
+        17
+      ]
+    },
+    {
+      "id": 19,
+      "x": 32,
+      "y": 96,
+      "width": 32,
+      "height": 32,
+      "empty": false,
+      "contentBounds": [
+        20,
+        8,
+        30,
+        18
+      ]
+    },
+    {
+      "id": 20,
+      "x": 64,
+      "y": 96,
+      "width": 32,
+      "height": 32,
+      "empty": false,
+      "contentBounds": [
+        2,
+        8,
+        5,
+        14
+      ]
+    },
+    {
+      "id": 21,
+      "x": 96,
+      "y": 96,
+      "width": 32,
+      "height": 32,
+      "empty": false,
+      "contentBounds": [
+        2,
+        9,
+        5,
+        15
+      ]
+    },
+    {
+      "id": 22,
+      "x": 128,
+      "y": 96,
+      "width": 32,
+      "height": 32,
+      "empty": false,
+      "contentBounds": [
+        2,
+        8,
+        10,
+        18
+      ]
+    },
+    {
+      "id": 23,
+      "x": 160,
+      "y": 96,
+      "width": 32,
+      "height": 32,
+      "empty": false,
+      "contentBounds": [
+        3,
+        8,
+        16,
+        18
+      ]
+    }
+  ]
+}

@@ -1,0 +1,39 @@
+{
+  "version": 1,
+  "tileSize": 128,
+  "recommendedDisplaySizes": [64, 128],
+  "perspective": "low-top-down-oblique",
+  "totalTiles": 80,
+  "sets": [
+    {
+      "id": "ground",
+      "count": 16,
+      "pathPattern": "ground/ground-tile-{01..16}.png",
+      "contents": ["grass", "compacted-dirt", "tilled-soil", "mud", "dry-grass"]
+    },
+    {
+      "id": "roads",
+      "count": 16,
+      "pathPattern": "roads/roads-tile-{01..16}.png",
+      "contents": ["straight", "corner", "inner-corner", "t-junction", "crossroad", "diagonal"]
+    },
+    {
+      "id": "rivers",
+      "count": 16,
+      "pathPattern": "rivers/rivers-tile-{01..16}.png",
+      "contents": ["open-water", "straight-stream", "curve", "riverbank", "wide-bend", "junction", "shallows"]
+    },
+    {
+      "id": "boundaries",
+      "count": 16,
+      "pathPattern": "boundaries/boundaries-tile-{01..16}.png",
+      "contents": ["stone-bank", "stone-corner", "broken-stone-bank", "rice-bank", "soil-edge", "mud-edge"]
+    },
+    {
+      "id": "transitions",
+      "count": 16,
+      "pathPattern": "transitions/transitions-tile-{01..16}.png",
+      "contents": ["grass-dirt", "grass-soil", "rice-paddy", "trampled-grass", "pebbly-dirt", "mossy-ground"]
+    }
+  ]
+}
