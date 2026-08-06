@@ -4,7 +4,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: radial-gradient(circle at top, #4c7a3d 0%, #2f4b26 100%);
+  background: #b9905f;
 }
 
 .character-create-panel {

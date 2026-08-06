@@ -23,7 +23,7 @@ export function TitleScreen({
       <div className="title-overlay" />
       <div className="title-content">
         <h1 className="title-logo">마을 사보타주 추리 게임</h1>
-        <p className="title-tagline">누군가 마을을 망치고 있다. 낮엔 이야기를 듣고, 밤엔 사건이 벌어진다.</p>
+        <p className="title-tagline">누군가 마을을 망치고 있다. 찾아내지 않으면 내가 마을에서 쫒겨난다!</p>
 
         <div className="title-buttons">
           {isLoggedIn ? (

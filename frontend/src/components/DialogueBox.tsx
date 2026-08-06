@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from 'react'
 import { findRosterEntry } from '../types/npc'
 import { fetchDialogueHistory, sendDialogueMessage, type DialogueMessage } from '../api/dialogueApi'
 import { getSession } from '../api/sessionApi'
+import { getNpcDetail } from '../api/npcApi'
+import { HeartMeter } from './HeartMeter'
 import './DialogueBox.css'
 
 // 한 번 대화창을 열 때마다 주고받을 수 있는 질의응답 횟수 제한 — 이 횟수를 채우면
@@ -26,6 +28,7 @@ export function DialogueBox({ sessionId, npcId, npcName, npcRole, onStaminaChang
   const [error, setError] = useState<string | null>(null)
   const [honestModeActive, setHonestModeActive] = useState(false)
   const [exchangeCount, setExchangeCount] = useState(0)
+  const [affinity, setAffinity] = useState<number | null>(null)
   const listRef = useRef<HTMLDivElement>(null)
   const conversationEnded = exchangeCount >= MAX_EXCHANGES_PER_VISIT
 
@@ -37,6 +40,10 @@ export function DialogueBox({ sessionId, npcId, npcName, npcRole, onStaminaChang
 
     getSession(sessionId)
       .then((session) => setHonestModeActive(session.honestModeNpcId === npcId))
+      .catch(() => undefined)
+
+    getNpcDetail(sessionId, npcId)
+      .then((detail) => setAffinity(detail.affinityScore))
       .catch(() => undefined)
   }, [sessionId, npcId])
 
@@ -60,6 +67,7 @@ export function DialogueBox({ sessionId, npcId, npcName, npcRole, onStaminaChang
         { sender: 'NPC', message: result.npcReply, createdAt: new Date().toISOString() },
       ])
       onStaminaChange(result.staminaCurrent)
+      setAffinity(result.affinityScore)
       // 서버는 정직 모드가 걸려있던 경우 이번 한 턴에 소모하고 해제한다.
       setHonestModeActive(false)
       setExchangeCount((prev) => prev + 1)
@@ -86,6 +94,13 @@ export function DialogueBox({ sessionId, npcId, npcName, npcRole, onStaminaChang
               </span>
             )}
           </div>
+
+          {affinity !== null && (
+            <div className="dialogue-affinity">
+              <HeartMeter score={affinity} />
+              <span className="dialogue-affinity-score">호감도 {affinity}/100</span>
+            </div>
+          )}
 
           <div className="dialogue-history" ref={listRef}>
             {loadingHistory && <p className="dialogue-status">대화 기록을 불러오는 중...</p>}

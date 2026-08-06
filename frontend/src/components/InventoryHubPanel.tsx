@@ -1,0 +1,327 @@
+import { useEffect, useState } from 'react'
+import { listInventory, applyInventoryItem, type InventorySlot } from '../api/inventoryApi'
+import { listNpcsToday, getNpcDetail, type NpcSummary } from '../api/npcApi'
+import {
+  listAcquiredClues,
+  listUnacquiredClues,
+  acquireClue,
+  clarifyClue,
+  topicLabel,
+  type ClueCard,
+  type UnacquiredClue,
+} from '../api/clueApi'
+import { HeartMeter } from './HeartMeter'
+import './InventoryHubPanel.css'
+
+// 이 두 아이템은 사용 시 대상 NPC를 지정해야 한다(백엔드 UseItemRequest.targetNpcId).
+// ShopItemResponse에 itemCode가 안 내려오므로 표시 이름으로 판별한다.
+const NEEDS_TARGET_NPC = new Set(['거짓말탐지기', '선물세트'])
+
+// 백엔드 GameConstants상 한 게임당 총 단서 카드 수. 조회 API가 없어 프론트에 하드코딩했다.
+const TOTAL_CLUES = 5
+
+type MainTab = 'items' | 'clues' | 'affinity'
+
+interface AffinityEntry {
+  npcId: number
+  name: string
+  role: string
+  score: number
+}
+
+interface InventoryHubPanelProps {
+  sessionId: number
+  onStaminaChange: (value: number) => void
+  onClose: () => void
+}
+
+export function InventoryHubPanel({ sessionId, onStaminaChange, onClose }: InventoryHubPanelProps) {
+  const [mainTab, setMainTab] = useState<MainTab>('items')
+
+  const [slots, setSlots] = useState<InventorySlot[] | null>(null)
+  const [npcs, setNpcs] = useState<NpcSummary[] | null>(null)
+  const [pickingTargetFor, setPickingTargetFor] = useState<number | null>(null)
+  const [invError, setInvError] = useState<string | null>(null)
+  const [busySlot, setBusySlot] = useState<number | null>(null)
+  const [invMessage, setInvMessage] = useState<string | null>(null)
+
+  const [unacquired, setUnacquired] = useState<UnacquiredClue[] | null>(null)
+  const [acquired, setAcquired] = useState<ClueCard[] | null>(null)
+  const [clueError, setClueError] = useState<string | null>(null)
+  const [busyClueKey, setBusyClueKey] = useState<string | null>(null)
+  const [clueMessage, setClueMessage] = useState<string | null>(null)
+
+  const [affinityList, setAffinityList] = useState<AffinityEntry[] | null>(null)
+  const [affinityError, setAffinityError] = useState<string | null>(null)
+
+  function reloadInventory() {
+    listInventory(sessionId)
+      .then(setSlots)
+      .catch((err: unknown) => setInvError(err instanceof Error ? err.message : '인벤토리를 불러오지 못했습니다.'))
+  }
+
+  function loadUnacquired() {
+    listUnacquiredClues(sessionId)
+      .then(setUnacquired)
+      .catch((err: unknown) => setClueError(err instanceof Error ? err.message : '미습득 단서를 불러오지 못했습니다.'))
+  }
+
+  function loadAcquired() {
+    listAcquiredClues(sessionId)
+      .then(setAcquired)
+      .catch((err: unknown) => setClueError(err instanceof Error ? err.message : '습득한 단서를 불러오지 못했습니다.'))
+  }
+
+  async function loadAffinity() {
+    setAffinityError(null)
+    try {
+      const npcs = await listNpcsToday(sessionId)
+      const details = await Promise.all(npcs.map((npc) => getNpcDetail(sessionId, npc.npcId)))
+      setAffinityList(details.map((d) => ({ npcId: d.npcId, name: d.name, role: d.role, score: d.affinityScore })))
+    } catch (err) {
+      setAffinityError(err instanceof Error ? err.message : '호감도 정보를 불러오지 못했습니다.')
+    }
+  }
+
+  useEffect(reloadInventory, [sessionId])
+  useEffect(loadUnacquired, [sessionId])
+  // 상단 탭에 습득 개수(n/5)를 보여줘야 해서, 단서 탭을 열기 전에도 미리 불러온다.
+  useEffect(loadAcquired, [sessionId])
+
+  useEffect(() => {
+    if (mainTab === 'affinity' && affinityList === null) loadAffinity()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mainTab])
+
+  async function handleUse(slot: InventorySlot, targetNpcId?: number) {
+    setInvMessage(null)
+    setInvError(null)
+    setBusySlot(slot.slotIndex)
+    setPickingTargetFor(null)
+    try {
+      const result = await applyInventoryItem(sessionId, slot.slotIndex, targetNpcId)
+      setInvMessage(result)
+      if (slot.itemType === 'CROP' || slot.itemType === 'FRUIT') {
+        // 서버가 회복량을 텍스트로만 알려줘서, 별도 조회 없이 결과 문구에서 숫자만 뽑아 반영한다.
+        const restored = Number(result.match(/체력 (\d+) 회복/)?.[1])
+        if (!Number.isNaN(restored)) onStaminaChange(restored)
+      }
+      reloadInventory()
+    } catch (err) {
+      setInvError(err instanceof Error ? err.message : '아이템을 사용하지 못했습니다.')
+    } finally {
+      setBusySlot(null)
+    }
+  }
+
+  function handleUseClick(slot: InventorySlot) {
+    if (NEEDS_TARGET_NPC.has(slot.itemName)) {
+      setInvMessage(null)
+      setInvError(null)
+      setPickingTargetFor(slot.slotIndex)
+      if (npcs === null) {
+        listNpcsToday(sessionId)
+          .then(setNpcs)
+          .catch((err: unknown) => setInvError(err instanceof Error ? err.message : 'NPC 목록을 불러오지 못했습니다.'))
+      }
+      return
+    }
+    handleUse(slot)
+  }
+
+  async function handleAcquire(clue: UnacquiredClue) {
+    setClueMessage(null)
+    setClueError(null)
+    setBusyClueKey(`acquire-${clue.clueId}`)
+    try {
+      await acquireClue(sessionId, clue.clueId)
+      setClueMessage(`${clue.location}에서 단서(${topicLabel(clue.topic)})를 습득했습니다.`)
+      loadUnacquired()
+      loadAcquired()
+    } catch (err) {
+      setClueError(err instanceof Error ? err.message : '단서를 습득하지 못했습니다.')
+    } finally {
+      setBusyClueKey(null)
+    }
+  }
+
+  async function handleClarify(clue: ClueCard) {
+    setClueMessage(null)
+    setClueError(null)
+    setBusyClueKey(`clarify-${clue.clueId}`)
+    try {
+      await clarifyClue(sessionId, clue.clueId)
+      setClueMessage('돋보기로 단서를 더 명확하게 밝혀냈습니다.')
+      loadAcquired()
+    } catch (err) {
+      setClueError(err instanceof Error ? err.message : '단서를 명확화하지 못했습니다.')
+    } finally {
+      setBusyClueKey(null)
+    }
+  }
+
+  const acquiredCount = acquired?.length ?? 0
+
+  return (
+    <div className="inventory-hub-overlay">
+      <div className="inventory-hub-panel pixel-panel">
+        <div className="inventory-hub-tabs">
+          <button
+            className={`pixel-button ${mainTab === 'items' ? 'pixel-button--accent' : ''}`}
+            onClick={() => setMainTab('items')}
+          >
+            아이템
+          </button>
+          <button
+            className={`pixel-button ${mainTab === 'clues' ? 'pixel-button--accent' : ''}`}
+            onClick={() => setMainTab('clues')}
+          >
+            단서 카드
+          </button>
+          <button
+            className={`pixel-button ${mainTab === 'affinity' ? 'pixel-button--accent' : ''}`}
+            onClick={() => setMainTab('affinity')}
+          >
+            호감도
+          </button>
+        </div>
+
+        {mainTab === 'items' && (
+          <div className="inventory-hub-section">
+            {invError && <p className="pixel-error">{invError}</p>}
+            {invMessage && <p className="inventory-message">{invMessage}</p>}
+
+            <div className="inventory-grid">
+              {slots === null ? (
+                <p className="inventory-status">불러오는 중...</p>
+              ) : slots.length === 0 ? (
+                <p className="inventory-status">가진 아이템이 없습니다.</p>
+              ) : (
+                slots.map((slot) => (
+                  <div key={slot.slotIndex} className="inventory-slot">
+                    <div className="inventory-slot-name">{slot.itemName}</div>
+                    <div className="inventory-slot-qty">x{slot.quantity}</div>
+
+                    {pickingTargetFor === slot.slotIndex ? (
+                      <div className="inventory-target-picker">
+                        {npcs === null ? (
+                          <p className="inventory-status">NPC 목록 불러오는 중...</p>
+                        ) : (
+                          npcs.map((npc) => (
+                            <button
+                              key={npc.npcId}
+                              className="pixel-button inventory-target-btn"
+                              disabled={busySlot === slot.slotIndex}
+                              onClick={() => handleUse(slot, npc.npcId)}
+                            >
+                              {npc.name}
+                            </button>
+                          ))
+                        )}
+                        <button className="pixel-button" onClick={() => setPickingTargetFor(null)}>
+                          취소
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        className="pixel-button pixel-button--accent"
+                        disabled={busySlot === slot.slotIndex}
+                        onClick={() => handleUseClick(slot)}
+                      >
+                        사용
+                      </button>
+                    )}
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        )}
+
+        {mainTab === 'clues' && (
+          <div className="inventory-hub-section">
+            <div className="clue-progress">
+              단서 카드 {acquiredCount}/{TOTAL_CLUES}
+            </div>
+
+            {clueError && <p className="pixel-error">{clueError}</p>}
+            {clueMessage && <p className="clue-message">{clueMessage}</p>}
+
+            <div className="clue-list">
+              {unacquired === null || acquired === null ? (
+                <p className="clue-status">불러오는 중...</p>
+              ) : unacquired.length === 0 && acquired.length === 0 ? (
+                <p className="clue-status">아직 발견한 단서가 없습니다.</p>
+              ) : (
+                <>
+                  {acquired.map((clue) => (
+                    <div key={`acquired-${clue.clueId}`} className="clue-card-item">
+                      <div className="clue-item-name">{topicLabel(clue.topic)}</div>
+                      <p className="clue-card-text">{clue.text}</p>
+                      <button
+                        className="pixel-button"
+                        disabled={clue.clarified || busyClueKey === `clarify-${clue.clueId}`}
+                        onClick={() => handleClarify(clue)}
+                      >
+                        {clue.clarified ? '명확화됨' : '돋보기로 명확화'}
+                      </button>
+                    </div>
+                  ))}
+
+                  {unacquired.map((clue) => (
+                    <div key={`unacquired-${clue.clueId}`} className="clue-item-row">
+                      <div className="clue-item-info">
+                        <div className="clue-item-name">
+                          {clue.location} <span className="clue-item-topic">· {topicLabel(clue.topic)}</span>
+                        </div>
+                        <div className="clue-item-desc">{clue.day}일차 밤 발생</div>
+                      </div>
+                      <button
+                        className="pixel-button pixel-button--accent"
+                        disabled={busyClueKey === `acquire-${clue.clueId}`}
+                        onClick={() => handleAcquire(clue)}
+                      >
+                        습득
+                      </button>
+                    </div>
+                  ))}
+                </>
+              )}
+            </div>
+          </div>
+        )}
+
+        {mainTab === 'affinity' && (
+          <div className="inventory-hub-section">
+            {affinityError && <p className="pixel-error">{affinityError}</p>}
+
+            <div className="affinity-list">
+              {affinityList === null ? (
+                <p className="inventory-status">불러오는 중...</p>
+              ) : affinityList.length === 0 ? (
+                <p className="inventory-status">마을 주민이 없습니다.</p>
+              ) : (
+                affinityList.map((npc) => (
+                  <div key={npc.npcId} className="affinity-row">
+                    <div className="affinity-info">
+                      <div className="affinity-name">{npc.name}</div>
+                      <div className="affinity-role">{npc.role}</div>
+                    </div>
+                    <div className="affinity-meter">
+                      <HeartMeter score={npc.score} />
+                      <span className="affinity-score">{npc.score}/100</span>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        )}
+
+        <button className="pixel-button inventory-hub-close" onClick={onClose}>
+          닫기
+        </button>
+      </div>
+    </div>
+  )
+}

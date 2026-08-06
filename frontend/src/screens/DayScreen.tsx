@@ -5,11 +5,11 @@ import { DayScene, type DaySceneInitData } from '../game/DayScene'
 import { StaminaBar } from '../components/StaminaBar'
 import { DialogueBox } from '../components/DialogueBox'
 import { EscMenu } from '../components/EscMenu'
-import { InventoryPanel } from '../components/InventoryPanel'
-import { CluePanel } from '../components/CluePanel'
+import { InventoryHubPanel } from '../components/InventoryHubPanel'
 import { NightLoadingOverlay } from '../components/NightLoadingOverlay'
 import { moveSession, type SessionResponse } from '../api/sessionApi'
 import { listNpcsToday } from '../api/npcApi'
+import { villageAssets } from '../assets/asset-manifest'
 import './DayScreen.css'
 
 // 백엔드 GameConstants.FIRST_ACCUSATION_DAY / LAST_ACCUSATION_DAY 와 맞춰야 한다.
@@ -41,7 +41,7 @@ export function DayScreen({
   const [dialogueNpc, setDialogueNpc] = useState<{ npcId: number; name: string; role: string } | null>(null)
   const [escOpen, setEscOpen] = useState(false)
   const [inventoryOpen, setInventoryOpen] = useState(false)
-  const [clueOpen, setClueOpen] = useState(false)
+  const sneakersEquipped = session.sneakersEquipped ?? false
 
   // NPC 이름 -> 실제 백엔드 npcId. Phaser 씬은 로컬 스프라이트 로스터(이름 기준)만 알고 있어서,
   // 대화 API를 호출하려면 이 매핑을 통해 클릭된 NPC 이름을 npcId로 바꿔줘야 한다.
@@ -104,8 +104,8 @@ export function DayScreen({
 
   useEffect(() => {
     const scene = gameRef.current?.scene.getScene('DayScene') as DayScene | undefined
-    scene?.setInputLocked(!!dialogueNpc || escOpen || inventoryOpen || clueOpen)
-  }, [dialogueNpc, escOpen, inventoryOpen, clueOpen])
+    scene?.setInputLocked(!!dialogueNpc || escOpen || inventoryOpen || advancing)
+  }, [dialogueNpc, escOpen, inventoryOpen, advancing])
 
   useEffect(() => {
     function handleKeyDown(event: KeyboardEvent) {
@@ -118,15 +118,19 @@ export function DayScreen({
         setInventoryOpen(false)
         return
       }
-      if (clueOpen) {
-        setClueOpen(false)
-        return
-      }
       setEscOpen((open) => !open)
     }
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [dialogueNpc, inventoryOpen, clueOpen])
+  }, [dialogueNpc, inventoryOpen])
+
+  // 체력(낮 시간)이 다 떨어지면 버튼 없이 자동으로 밤으로 넘어간다.
+  const nightTriggeredRef = useRef(false)
+  useEffect(() => {
+    if (stamina > 0 || advancing || nightTriggeredRef.current) return
+    nightTriggeredRef.current = true
+    onAdvanceDay()
+  }, [stamina, advancing, onAdvanceDay])
 
   const canAccuse =
     session.status === 'IN_PROGRESS' &&
@@ -137,30 +141,30 @@ export function DayScreen({
     <div className="day-screen">
       <div className="day-hud">
         <div className="day-hud-left">
-          <StaminaBar value={stamina} max={session.staminaMax} day={session.currentDay} />
+          <div className="day-day">{session.currentDay}일차</div>
           <div className="day-gold">골드: {gold}</div>
+          {sneakersEquipped && (
+            <img className="day-sneaker-icon pixel-art" src={villageAssets.items.sneakers} alt="운동화 착용 중" />
+          )}
         </div>
         <div className="day-hud-actions">
           <button className="pixel-button" onClick={() => setInventoryOpen(true)}>
             인벤토리
-          </button>
-          <button className="pixel-button" onClick={() => setClueOpen(true)}>
-            단서
           </button>
           {canAccuse && (
             <button className="pixel-button pixel-button--danger" onClick={onOpenAccusation}>
               범인 고발하기
             </button>
           )}
-          <button className="pixel-button pixel-button--accent" onClick={onAdvanceDay} disabled={advancing}>
-            {advancing ? '밤이 오는 중...' : '밤으로 넘어가기'}
-          </button>
         </div>
       </div>
 
       {advanceError && <p className="day-advance-error pixel-error">{advanceError}</p>}
 
-      <div ref={containerRef} className="day-canvas-wrap" />
+      <div className="day-canvas-wrap">
+        <StaminaBar value={stamina} max={session.staminaMax} />
+        <div ref={containerRef} className="day-canvas-inner" />
+      </div>
 
       <p className="day-hint">방향키 / WASD로 이동, NPC에게 가까이 가서 클릭하면 대화하세요. ESC로 메뉴를 엽니다.</p>
 
@@ -177,14 +181,12 @@ export function DayScreen({
       )}
 
       {inventoryOpen && (
-        <InventoryPanel
+        <InventoryHubPanel
           sessionId={session.sessionId}
           onStaminaChange={(restored) => setStamina((prev) => Math.min(session.staminaMax, prev + restored))}
           onClose={() => setInventoryOpen(false)}
         />
       )}
-
-      {clueOpen && <CluePanel sessionId={session.sessionId} onClose={() => setClueOpen(false)} />}
 
       {escOpen && <EscMenu onResume={() => setEscOpen(false)} onQuit={onQuitToTitle} />}
 

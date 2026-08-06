@@ -65,6 +65,18 @@
   white-space: nowrap;
 }
 
+.dialogue-affinity {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.dialogue-affinity-score {
+  color: var(--ink-soft);
+  font-size: 0.78rem;
+}
+
 .dialogue-history {
   max-height: 160px;
   min-height: 60px;

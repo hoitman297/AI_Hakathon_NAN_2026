@@ -1,0 +1,18 @@
+.heart-meter {
+  display: inline-flex;
+  gap: 1px;
+  line-height: 1;
+}
+
+.heart {
+  font-size: 1rem;
+}
+
+.heart--filled {
+  color: #e0456b;
+}
+
+.heart--empty {
+  color: var(--ink-soft);
+  opacity: 0.5;
+}

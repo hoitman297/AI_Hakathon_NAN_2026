@@ -24,11 +24,36 @@
   gap: 14px;
 }
 
+.day-day,
 .day-gold {
-  color: var(--paper);
+  display: flex;
+  align-items: center;
+  color: var(--ink);
   font-weight: 700;
-  font-size: 0.9rem;
+  font-size: 0.95rem;
   white-space: nowrap;
+  background: var(--paper-dim);
+  border: 2px solid var(--ink);
+  border-radius: 999px;
+  padding: 6px 16px;
+  box-shadow: 0 3px 0 var(--ink);
+}
+
+.day-day {
+  background: var(--accent);
+  color: var(--paper);
+  border-color: var(--accent-dark);
+  box-shadow: 0 3px 0 var(--accent-dark);
+}
+
+.day-sneaker-icon {
+  width: 30px;
+  height: 30px;
+  padding: 3px;
+  background: var(--paper-dim);
+  border: 2px solid var(--ink);
+  border-radius: 50%;
+  box-shadow: 0 3px 0 var(--ink);
 }
 
 .day-hud-actions {
@@ -55,6 +80,11 @@
 .day-canvas-wrap canvas {
   display: block;
   margin: 0 auto;
+}
+
+.day-canvas-inner {
+  position: absolute;
+  inset: 0;
 }
 
 .day-hint {
