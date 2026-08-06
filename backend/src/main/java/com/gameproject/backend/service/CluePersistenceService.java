@@ -9,6 +9,7 @@ import com.gameproject.backend.domain.InventoryItemType;
 import com.gameproject.backend.domain.NpcCaseAssignment;
 import com.gameproject.backend.domain.ShopItemCode;
 import com.gameproject.backend.domain.ShopItemMaster;
+import com.gameproject.backend.domain.SessionStatus;
 import com.gameproject.backend.dto.ClueCardResponse;
 import com.gameproject.backend.repository.ClueCardRepository;
 import com.gameproject.backend.repository.GameSessionRepository;
@@ -36,6 +37,9 @@ class CluePersistenceService {
     @Transactional
     ClarifyContext prepareClarify(Long sessionId, Long clueId) {
         GameSession session = sessionService.findSession(sessionId);
+        if (session.getStatus() != SessionStatus.IN_PROGRESS) {
+            throw new IllegalStateException("이미 종료된 세션입니다.");
+        }
         ClueCard clue = getOwnedClue(session, clueId);
         if (!Boolean.TRUE.equals(clue.getAcquired())) {
             throw new IllegalStateException("아직 습득하지 않은 단서입니다.");

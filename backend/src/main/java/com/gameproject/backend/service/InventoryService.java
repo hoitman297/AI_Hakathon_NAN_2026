@@ -47,14 +47,26 @@ public class InventoryService {
     public List<InventorySlotResponse> list(Long sessionId) {
         GameSession session = sessionService.findSession(sessionId);
         return inventoryItemRepository.findBySession(session).stream()
-                .map(item -> new InventorySlotResponse(
-                        item.getSlotIndex(),
-                        item.getItemType().name(),
-                        item.getItemRefId(),
-                        resolveName(item.getItemType(), item.getItemRefId()),
-                        resolveItemCode(item.getItemType(), item.getItemRefId()),
-                        item.getQuantity()))
+                .map(this::toSlotResponse)
                 .toList();
+    }
+
+    private InventorySlotResponse toSlotResponse(InventoryItem item) {
+        InventoryItemType type = item.getItemType();
+        Long refId = item.getItemRefId();
+        // SHOP_ITEM은 이름/코드가 둘 다 같은 ShopItemMaster 행에서 나오므로 한 번만 조회한다.
+        ShopItemMaster shopItem = type == InventoryItemType.SHOP_ITEM
+                ? shopItemMasterRepository.findById(refId).orElse(null)
+                : null;
+        String name = switch (type) {
+            case CROP -> cropMasterRepository.findById(refId).map(CropMaster::getName).orElse("알 수 없는 작물");
+            case FRUIT -> fruitMasterRepository.findById(refId).map(FruitMaster::getName).orElse("알 수 없는 과일");
+            case SHOP_ITEM -> shopItem != null ? shopItem.getName() : "알 수 없는 아이템";
+        };
+        String itemCode = shopItem != null ? shopItem.getItemCode().name() : null;
+
+        return new InventorySlotResponse(
+                item.getSlotIndex(), type.name(), refId, name, itemCode, item.getQuantity());
     }
 
     /** 같은 아이템이 이미 있으면 수량만 증가, 없으면 빈 슬롯(1~7)에 새로 넣음. 슬롯이 꽉 차면 예외. */
@@ -124,18 +136,4 @@ public class InventoryService {
         return reaction + " (호감도 +" + outcome.gain() + ", 현재 " + outcome.newAffinityScore() + ")";
     }
 
-    private String resolveName(InventoryItemType type, Long refId) {
-        return switch (type) {
-            case CROP -> cropMasterRepository.findById(refId).map(CropMaster::getName).orElse("알 수 없는 작물");
-            case FRUIT -> fruitMasterRepository.findById(refId).map(FruitMaster::getName).orElse("알 수 없는 과일");
-            case SHOP_ITEM -> shopItemMasterRepository.findById(refId).map(ShopItemMaster::getName).orElse("알 수 없는 아이템");
-        };
-    }
-
-    private String resolveItemCode(InventoryItemType type, Long refId) {
-        if (type != InventoryItemType.SHOP_ITEM) {
-            return null;
-        }
-        return shopItemMasterRepository.findById(refId).map(item -> item.getItemCode().name()).orElse(null);
-    }
 }

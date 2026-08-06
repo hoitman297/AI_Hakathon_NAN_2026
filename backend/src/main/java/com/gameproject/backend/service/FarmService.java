@@ -9,6 +9,7 @@ import com.gameproject.backend.domain.CropMaster;
 import com.gameproject.backend.domain.FarmPlot;
 import com.gameproject.backend.domain.GameSession;
 import com.gameproject.backend.domain.InventoryItemType;
+import com.gameproject.backend.domain.SessionStatus;
 import com.gameproject.backend.dto.CropSummaryResponse;
 import com.gameproject.backend.dto.FarmPlotResponse;
 import com.gameproject.backend.repository.CropMasterRepository;
@@ -51,6 +52,9 @@ public class FarmService {
     @Transactional
     public void plant(Long sessionId, Long cropId) {
         GameSession session = sessionService.findSession(sessionId);
+        if (session.getStatus() != SessionStatus.IN_PROGRESS) {
+            throw new IllegalStateException("이미 종료된 세션입니다.");
+        }
         CropMaster crop = cropMasterRepository.findById(cropId)
                 .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 작물입니다: " + cropId));
 
@@ -68,6 +72,9 @@ public class FarmService {
     @Transactional
     public void harvest(Long sessionId, Long farmPlotId) {
         GameSession session = sessionService.findSession(sessionId);
+        if (session.getStatus() != SessionStatus.IN_PROGRESS) {
+            throw new IllegalStateException("이미 종료된 세션입니다.");
+        }
         FarmPlot plot = farmPlotRepository.findById(farmPlotId)
                 .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 밭입니다: " + farmPlotId));
 

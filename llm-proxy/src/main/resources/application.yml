@@ -10,6 +10,9 @@ server:
 anthropic:
   api-key: ${LLM_API_KEY}
   model: ${LLM_MODEL:claude-opus-5}
+  # 대화(chat)만 실시간성이 중요해 더 빠른 모델을 따로 쓴다 — 페르소나/엔딩/단서 등
+  # 품질이 더 중요한 나머지 생성은 여전히 위 model(Opus)을 쓴다.
+  chat-model: ${LLM_CHAT_MODEL:claude-sonnet-5}
 
 internal:
   api-key: ${INTERNAL_API_KEY}

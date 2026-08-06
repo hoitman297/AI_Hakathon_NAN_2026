@@ -1,0 +1,126 @@
+.save-picker-screen {
+  position: relative;
+  width: 100vw;
+  height: 100vh;
+  background-size: cover;
+  background-position: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.save-picker-overlay {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(20, 15, 10, 0.55) 0%, rgba(20, 15, 10, 0.82) 100%);
+}
+
+.save-picker-content {
+  position: relative;
+  z-index: 1;
+  width: min(820px, 92vw);
+  text-align: center;
+  color: var(--paper);
+  padding: 32px;
+}
+
+.save-picker-title {
+  font-size: clamp(1.4rem, 3.4vw, 2.1rem);
+  margin: 0 0 8px;
+  text-shadow: 0 3px 0 var(--ink), 0 6px 10px rgba(0, 0, 0, 0.5);
+}
+
+.save-picker-subtitle {
+  margin: 0 0 24px;
+  color: var(--paper-dim);
+  font-size: 0.9rem;
+}
+
+.save-picker-status {
+  color: var(--paper-dim);
+  font-size: 0.9rem;
+}
+
+.save-picker-status--error {
+  color: var(--danger);
+  font-weight: 700;
+}
+
+.save-slot-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+  margin-bottom: 28px;
+}
+
+.save-slot {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 20px 16px;
+  min-height: 190px;
+}
+
+.save-slot--empty {
+  justify-content: center;
+  opacity: 0.85;
+  border-style: dashed;
+}
+
+.save-slot-empty-label {
+  color: var(--ink-soft);
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+
+.save-slot-badge {
+  padding: 3px 12px;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--paper);
+  background: var(--ink-soft);
+}
+
+.save-slot-badge--in_progress {
+  background: var(--accent);
+}
+
+.save-slot-badge--success {
+  background: var(--leaf);
+}
+
+.save-slot-badge--bad_ending {
+  background: var(--danger);
+}
+
+.save-slot-day {
+  font-size: 1.6rem;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.save-slot-time {
+  color: var(--ink-soft);
+  font-size: 0.78rem;
+  margin-bottom: 4px;
+}
+
+.save-slot-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+  margin-top: auto;
+}
+
+.save-slot-delete {
+  font-size: 0.8rem;
+  padding: 6px 10px;
+}
+
+.save-picker-back {
+  margin-top: 4px;
+}

@@ -3,8 +3,6 @@ package com.gameproject.backend.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyInt;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -23,24 +21,28 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import com.gameproject.backend.client.LlmProxyClient;
 import com.gameproject.backend.domain.Account;
-import com.gameproject.backend.domain.ClueCard;
+import com.gameproject.backend.domain.ClueTopic;
 import com.gameproject.backend.domain.GameSession;
 import com.gameproject.backend.domain.Npc;
 import com.gameproject.backend.domain.NpcCaseAssignment;
 import com.gameproject.backend.domain.PlayerStat;
-import com.gameproject.backend.domain.SabotageEvent;
 import com.gameproject.backend.domain.SabotageType;
 import com.gameproject.backend.domain.SessionStatus;
 import com.gameproject.backend.dto.CreateSessionRequest;
 import com.gameproject.backend.dto.SessionResponse;
 import com.gameproject.backend.repository.AffinityRepository;
-import com.gameproject.backend.repository.ClueCardRepository;
 import com.gameproject.backend.repository.GameSessionRepository;
 import com.gameproject.backend.repository.NpcCaseAssignmentRepository;
 import com.gameproject.backend.repository.NpcRepository;
 import com.gameproject.backend.repository.PlayerStatRepository;
 import com.gameproject.backend.repository.SabotageEventRepository;
 
+/**
+ * advanceDay()의 DB 읽기/쓰기는 SessionPersistenceService(짧은 트랜잭션들)로 옮겨졌으므로,
+ * 이 테스트는 "LLM 호출은 항상 그 트랜잭션 바깥에서 일어난다"는 오케스트레이션만 검증한다.
+ * SessionPersistenceService 자체 로직(사보타주 생성, 다음날 전환, 배드엔딩 등)은
+ * SessionPersistenceServiceTest에서 검증한다.
+ */
 @ExtendWith(MockitoExtension.class)
 class SessionServiceTest {
 
@@ -57,15 +59,13 @@ class SessionServiceTest {
     @Mock
     private SabotageEventRepository sabotageEventRepository;
     @Mock
-    private ClueCardRepository clueCardRepository;
-    @Mock
-    private NpcLocationResolver locationResolver;
-    @Mock
     private StaminaService staminaService;
     @Mock
     private GameSaveService gameSaveService;
     @Mock
     private LlmProxyClient llmProxyClient;
+    @Mock
+    private SessionPersistenceService persistence;
 
     /** 순수 정적 룩업이라 실제 인스턴스를 그대로 사용 — 목킹할 이유가 없음. */
     private final CulpritProfileRegistry culpritProfileRegistry = new CulpritProfileRegistry();
@@ -79,12 +79,13 @@ class SessionServiceTest {
     @BeforeEach
     void setUp() {
         sessionService = new SessionService(sessionRepository, npcRepository, caseAssignmentRepository,
-                affinityRepository, playerStatRepository, sabotageEventRepository, clueCardRepository,
-                culpritProfileRegistry, locationResolver, staminaService, gameSaveService, llmProxyClient);
+                affinityRepository, playerStatRepository, sabotageEventRepository,
+                culpritProfileRegistry, staminaService, gameSaveService, llmProxyClient, persistence);
 
         account = Account.builder().accountId(1L).username("u").passwordHash("h").nickname("n")
                 .createdAt(LocalDateTime.now()).build();
-        culprit = Npc.builder().npcId(1L).name("나박수").role("수박밭 주인").build();
+        culprit = Npc.builder().npcId(1L).name("나박수").role("수박밭 주인")
+                .appearanceDesc("검고 긴 머리카락").personalityDesc("다혈질").build();
         session = GameSession.builder()
                 .sessionId(100L).account(account).culprit(culprit)
                 .currentDay(2).status(SessionStatus.IN_PROGRESS)
@@ -125,6 +126,52 @@ class SessionServiceTest {
     }
 
     @Test
+    void createSession_saveSlotsFull_throwsIllegalStateWithoutCreatingAnything() {
+        when(sessionRepository.countByAccountAndStatusNot(account, SessionStatus.DELETED))
+                .thenReturn((long) GameConstants.MAX_SAVES_PER_ACCOUNT);
+
+        assertThatThrownBy(() -> sessionService.createSession(new CreateSessionRequest(null), account))
+                .isInstanceOf(IllegalStateException.class);
+
+        verify(npcRepository, never()).findAll();
+        verify(sessionRepository, never()).save(any(GameSession.class));
+    }
+
+    @Test
+    void createSession_belowSlotCap_proceedsNormally() {
+        when(sessionRepository.countByAccountAndStatusNot(account, SessionStatus.DELETED))
+                .thenReturn((long) (GameConstants.MAX_SAVES_PER_ACCOUNT - 1));
+        when(npcRepository.findAll()).thenReturn(List.of(culprit));
+        when(playerStatRepository.save(any(PlayerStat.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        SessionResponse response = sessionService.createSession(new CreateSessionRequest(null), account);
+
+        assertThat(response.status()).isEqualTo("IN_PROGRESS");
+    }
+
+    @Test
+    void listSessions_excludesDeletedAndMapsAllStatuses() {
+        PlayerStat stat = PlayerStat.builder().session(session).day(2)
+                .staminaCurrent(77.0).staminaMax(100).gold(3).fainted(false).build();
+        when(sessionRepository.findByAccountAndStatusNotOrderByStartedAtDesc(account, SessionStatus.DELETED))
+                .thenReturn(List.of(session));
+        when(playerStatRepository.findBySessionAndDay(session, 2)).thenReturn(Optional.of(stat));
+
+        List<SessionResponse> result = sessionService.listSessions(account);
+
+        assertThat(result).hasSize(1);
+        assertThat(result.get(0).sessionId()).isEqualTo(100L);
+    }
+
+    @Test
+    void deleteSession_setsStatusToDeleted() {
+        sessionService.deleteSession(100L);
+
+        assertThat(session.getStatus()).isEqualTo(SessionStatus.DELETED);
+        verify(sessionRepository).save(session);
+    }
+
+    @Test
     void getCurrentSession_hasInProgressSession_returnsIt() {
         PlayerStat stat = PlayerStat.builder().session(session).day(2)
                 .staminaCurrent(77.0).staminaMax(100).gold(3).fainted(false).build();
@@ -152,69 +199,43 @@ class SessionServiceTest {
     }
 
     @Test
-    void advanceDay_normalTransition_incrementsDayAndResetsStamina() {
+    void advanceDay_sabotageNight_callsLlmWithPreparedContextThenFinalizes() {
         PlayerStat today = PlayerStat.builder().session(session).day(2)
                 .staminaCurrent(40.0).staminaMax(100).gold(10).fainted(false).build();
-        when(playerStatRepository.findBySessionAndDay(session, 2)).thenReturn(Optional.of(today));
-        when(playerStatRepository.save(any(PlayerStat.class))).thenAnswer(inv -> inv.getArgument(0));
-        stubNightSabotageCollaborators();
+        AdvanceDayContext ctx = new AdvanceDayContext(session, today, 2, new SabotagePrepContext(
+                "수박밭", SabotageType.DAMAGE, "화분", false, null, "", ClueTopic.HAIR,
+                "검고 긴 머리카락", "다혈질"));
+        when(persistence.prepareAdvanceDay(100L)).thenReturn(ctx);
+        when(llmProxyClient.generateSabotageSummary("수박밭", "DAMAGE", "화분", 2))
+                .thenReturn("간밤에 수박밭에서 소란이 있었다.");
+        when(llmProxyClient.generateClueContent("HAIR", "검고 긴 머리카락", "다혈질", "수박밭", "화분"))
+                .thenReturn("검고 긴 머리카락 한 올이 발견됐다.");
+        SessionResponse expected = new SessionResponse(100L, null, 1L, 3, "IN_PROGRESS",
+                100.0, 100, 10, false, null, session.getStartedAt(), null);
+        when(persistence.finalizeAdvanceDay(ctx, "간밤에 수박밭에서 소란이 있었다.", "검고 긴 머리카락 한 올이 발견됐다."))
+                .thenReturn(expected);
 
         SessionResponse response = sessionService.advanceDay(100L);
 
-        assertThat(response.currentDay()).isEqualTo(3);
-        assertThat(response.status()).isEqualTo("IN_PROGRESS");
-        assertThat(response.staminaCurrent()).isEqualTo(GameConstants.DEFAULT_STAMINA_MAX);
-        verify(sabotageEventRepository).save(any(SabotageEvent.class));
-        verify(clueCardRepository).save(any(ClueCard.class));
-        verify(gameSaveService, never()).syncEndingState(any(), any());
+        assertThat(response).isEqualTo(expected);
+        verify(persistence).finalizeAdvanceDay(ctx, "간밤에 수박밭에서 소란이 있었다.", "검고 긴 머리카락 한 올이 발견됐다.");
     }
 
     @Test
-    void advanceDay_faintedToday_nextDayStartsAtFaintRestartStamina() {
-        PlayerStat today = PlayerStat.builder().session(session).day(2)
-                .staminaCurrent(0.0).staminaMax(100).gold(5).fainted(true).build();
-        when(playerStatRepository.findBySessionAndDay(session, 2)).thenReturn(Optional.of(today));
-        when(playerStatRepository.save(any(PlayerStat.class))).thenAnswer(inv -> inv.getArgument(0));
-        stubNightSabotageCollaborators();
-
-        SessionResponse response = sessionService.advanceDay(100L);
-
-        assertThat(response.staminaCurrent()).isEqualTo(GameConstants.FAINT_RESTART_STAMINA);
-    }
-
-    @Test
-    void advanceDay_lastAccusationDayWithoutAccusation_setsBadEndingAndSyncsSave() {
-        session.setCurrentDay(GameConstants.LAST_ACCUSATION_DAY); // 9일차, 사보타주 발생일(1~5) 아님
+    void advanceDay_noSabotageTonight_skipsLlmCallsEntirely() {
         PlayerStat today = PlayerStat.builder().session(session).day(9)
                 .staminaCurrent(50.0).staminaMax(100).gold(0).fainted(false).build();
-        when(playerStatRepository.findBySessionAndDay(session, 9)).thenReturn(Optional.of(today));
+        AdvanceDayContext ctx = new AdvanceDayContext(session, today, 9, null);
+        when(persistence.prepareAdvanceDay(100L)).thenReturn(ctx);
+        SessionResponse expected = new SessionResponse(100L, null, 1L, 9, "BAD_ENDING",
+                50.0, 100, 0, false, null, session.getStartedAt(), LocalDateTime.now());
+        when(persistence.finalizeAdvanceDay(ctx, null, null)).thenReturn(expected);
 
         SessionResponse response = sessionService.advanceDay(100L);
 
-        assertThat(response.status()).isEqualTo(SessionStatus.BAD_ENDING.name());
-        assertThat(session.getEndedAt()).isNotNull();
-        verify(gameSaveService).syncEndingState(account, GameSaveService.ENDING_STATE_BAD_ENDING);
-        verify(playerStatRepository, never()).save(any(PlayerStat.class));
-        verify(sabotageEventRepository, never()).save(any());
-    }
-
-    @Test
-    void advanceDay_alreadyEndedSession_throwsIllegalState() {
-        session.setStatus(SessionStatus.BAD_ENDING);
-
-        assertThatThrownBy(() -> sessionService.advanceDay(100L))
-                .isInstanceOf(IllegalStateException.class);
-    }
-
-    /** 1~5일차 밤 사보타주 생성 경로(generateNightSabotage)가 필요로 하는 협력자들을 스텁한다. */
-    private void stubNightSabotageCollaborators() {
-        NpcCaseAssignment assignment = NpcCaseAssignment.builder()
-                .session(session).npc(culprit)
-                .primaryType(SabotageType.DAMAGE).secondaryType(SabotageType.THEFT)
-                .build();
-        when(caseAssignmentRepository.findBySession(session)).thenReturn(Optional.of(assignment));
-        when(sabotageEventRepository.findBySessionAndDay(eq(session), anyInt())).thenReturn(List.of());
-        when(npcRepository.findAll()).thenReturn(List.of(culprit));
-        when(llmProxyClient.generateClueContent(any(), any(), any(), any(), any())).thenReturn("단서 문구");
+        assertThat(response).isEqualTo(expected);
+        verify(llmProxyClient, never()).generateSabotageSummary(any(), any(), any(), any(Integer.class));
+        verify(llmProxyClient, never()).generateClueContent(any(), any(), any(), any(), any());
+        verify(persistence).finalizeAdvanceDay(ctx, null, null);
     }
 }

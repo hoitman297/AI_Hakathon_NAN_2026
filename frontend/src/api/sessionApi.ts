@@ -65,6 +65,26 @@ export async function getCurrentSession(): Promise<SessionResponse | null> {
   return parseOrThrow<SessionResponse>(response, '진행 중인 게임을 확인하지 못했습니다.')
 }
 
+/** 세이브 슬롯 선택 화면용 — 이 계정의 세이브(삭제된 것 제외) 전체를 최신순으로 반환한다. */
+export async function listSessions(): Promise<SessionResponse[]> {
+  const response = await fetch(`${API_BASE_URL}/api/sessions`, {
+    headers: authHeaders(),
+  })
+  return parseOrThrow<SessionResponse[]>(response, '세이브 목록을 불러오지 못했습니다.')
+}
+
+/** 세이브 슬롯 삭제 — 계정당 최대 3개 제한 안에서 자리를 비운다. */
+export async function deleteSession(sessionId: number): Promise<void> {
+  const response = await fetch(`${API_BASE_URL}/api/sessions/${sessionId}`, {
+    method: 'DELETE',
+    headers: authHeaders(),
+  })
+  if (!response.ok) {
+    const body = (await response.json().catch(() => null)) as { error?: string } | null
+    throw new Error(body?.error ?? '세이브를 삭제하지 못했습니다.')
+  }
+}
+
 /** 낮 -> 밤(사보타주 발생) -> 다음날. 9일차에 고발 없이 호출하면 서버가 배드엔딩으로 종료한다. */
 export async function advanceDay(sessionId: number): Promise<SessionResponse> {
   const response = await fetch(`${API_BASE_URL}/api/sessions/${sessionId}/day/advance`, {

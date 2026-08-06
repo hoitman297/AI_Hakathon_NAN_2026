@@ -88,7 +88,8 @@ class DialogueServiceTest {
 
         verify(llmProxyClient, never()).chat(any(), any(), any(), anyBoolean(), anyInt(), anyBoolean(), any(), any());
         verify(llmProxyClient, never()).generatePersona(any(), any(), any(), any(), any(), any(), any(), any());
-        verify(persistence, never()).finalizeChat(any(), any(), any(), any(), anyBoolean(), anyInt());
+        verify(persistence, never()).saveDialogueExchange(any(), any(), any(), any(), anyBoolean());
+        verify(persistence, never()).applyAffinityDelta(any(), any(), anyInt());
     }
 
     @Test
@@ -96,7 +97,7 @@ class DialogueServiceTest {
         when(persistence.prepareChatContext(100L, 1L)).thenReturn(contextWithExistingPersona(false));
         when(llmProxyClient.chat("{}", List.of(), "안녕하세요", false, 50, false, null, null))
                 .thenReturn(new DialogueChatResponse("반갑습니다.", 3));
-        when(persistence.finalizeChat(session, npc, "안녕하세요", "반갑습니다.", false, 3)).thenReturn(55);
+        when(persistence.applyAffinityDelta(session, npc, 3)).thenReturn(55);
 
         DialogueReplyResponse response = dialogueService.send(100L, 1L, "안녕하세요");
 
@@ -117,7 +118,7 @@ class DialogueServiceTest {
                 .thenReturn("{\"generated\":true}");
         when(llmProxyClient.chat("{\"generated\":true}", List.of(), "안녕하세요", false, 50, false, null, null))
                 .thenReturn(new DialogueChatResponse("반갑습니다.", 0));
-        when(persistence.finalizeChat(session, npc, "안녕하세요", "반갑습니다.", false, 0)).thenReturn(50);
+        when(persistence.applyAffinityDelta(session, npc, 0)).thenReturn(50);
 
         dialogueService.send(100L, 1L, "안녕하세요");
 
@@ -131,7 +132,7 @@ class DialogueServiceTest {
         when(persistence.prepareChatContext(100L, 1L)).thenReturn(contextWithExistingPersona(true));
         when(llmProxyClient.chat("{}", List.of(), "범인이 누구예요?", false, 50, true, null, null))
                 .thenReturn(new DialogueChatResponse("글쎄, 그건 나도 모르겠구먼.", 0));
-        when(persistence.finalizeChat(any(), any(), any(), any(), anyBoolean(), anyInt())).thenReturn(50);
+        when(persistence.applyAffinityDelta(any(), any(), anyInt())).thenReturn(50);
 
         dialogueService.send(100L, 1L, "범인이 누구예요?");
 
@@ -143,10 +144,28 @@ class DialogueServiceTest {
         when(persistence.prepareChatContext(100L, 1L)).thenReturn(contextWithExistingPersona(false));
         when(llmProxyClient.chat("{}", List.of(), "...", false, 50, false, null, null))
                 .thenReturn(new DialogueChatResponse("...", null));
-        when(persistence.finalizeChat(session, npc, "...", "...", false, 0)).thenReturn(50);
+        when(persistence.applyAffinityDelta(session, npc, 0)).thenReturn(50);
 
         dialogueService.send(100L, 1L, "...");
 
-        verify(persistence).finalizeChat(session, npc, "...", "...", false, 0);
+        verify(persistence).applyAffinityDelta(session, npc, 0);
+    }
+
+    @Test
+    void send_affinityUpdateOptimisticLockConflict_stillReturnsSuccessfullyWithPreExistingAffinity() {
+        when(persistence.prepareChatContext(100L, 1L)).thenReturn(contextWithExistingPersona(false));
+        when(llmProxyClient.chat("{}", List.of(), "안녕하세요", false, 50, false, null, null))
+                .thenReturn(new DialogueChatResponse("반갑습니다.", 3));
+        when(persistence.applyAffinityDelta(session, npc, 3))
+                .thenThrow(new org.springframework.orm.ObjectOptimisticLockingFailureException(
+                        "affinity", (Object) null));
+
+        DialogueReplyResponse response = dialogueService.send(100L, 1L, "안녕하세요");
+
+        // 호감도 반영이 동시성 충돌로 실패해도 대화 저장은 이미 끝난 뒤라 요청 자체는 성공해야 하고,
+        // 호감도는 대화 시작 시점 값(반영 실패)으로 대체된다.
+        verify(persistence).saveDialogueExchange(session, npc, "안녕하세요", "반갑습니다.", false);
+        assertThat(response.npcReply()).isEqualTo("반갑습니다.");
+        assertThat(response.affinityScore()).isEqualTo(50);
     }
 }

@@ -10,6 +10,7 @@ import com.gameproject.backend.domain.FruitForageState;
 import com.gameproject.backend.domain.FruitMaster;
 import com.gameproject.backend.domain.GameSession;
 import com.gameproject.backend.domain.InventoryItemType;
+import com.gameproject.backend.domain.SessionStatus;
 import com.gameproject.backend.dto.AvailableFruitResponse;
 import com.gameproject.backend.dto.ForageResponse;
 import com.gameproject.backend.repository.FruitForageStateRepository;
@@ -54,6 +55,9 @@ public class ForageService {
     @Transactional
     public ForageResponse forage(Long sessionId, Long fruitId) {
         GameSession session = sessionService.findSession(sessionId);
+        if (session.getStatus() != SessionStatus.IN_PROGRESS) {
+            throw new IllegalStateException("이미 종료된 세션입니다.");
+        }
         FruitMaster fruit = fruitMasterRepository.findById(fruitId)
                 .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 과일입니다: " + fruitId));
 

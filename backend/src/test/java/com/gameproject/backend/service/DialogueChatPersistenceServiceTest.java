@@ -236,27 +236,32 @@ class DialogueChatPersistenceServiceTest {
     }
 
     @Test
-    void finalizeChat_savesTwoLogsAndAdjustsAffinity() {
-        when(npcService.adjustAffinity(session, npc, 3)).thenReturn(55);
-
-        int result = service.finalizeChat(session, npc, "안녕하세요", "반갑습니다.", false, 3);
+    void saveDialogueExchange_savesTwoLogs() {
+        service.saveDialogueExchange(session, npc, "안녕하세요", "반갑습니다.", false);
 
         verify(dialogueLogRepository, times(2)).save(any(DialogueLog.class));
         verify(sessionRepository, never()).save(any());
-        assertThat(result).isEqualTo(55);
     }
 
     @Test
-    void finalizeChat_honestMode_clearsFlagsAndSavesSession() {
+    void saveDialogueExchange_honestMode_clearsFlagsAndSavesSession() {
         session.setHonestModeNpcId(1L);
         session.setHonestModeDay(2);
-        when(npcService.adjustAffinity(any(), any(), eq(0))).thenReturn(50);
 
-        service.finalizeChat(session, npc, "알리바이가 뭐예요?", "그날은 집에 있었소.", true, 0);
+        service.saveDialogueExchange(session, npc, "알리바이가 뭐예요?", "그날은 집에 있었소.", true);
 
         assertThat(session.getHonestModeNpcId()).isNull();
         assertThat(session.getHonestModeDay()).isNull();
         verify(sessionRepository).save(session);
+    }
+
+    @Test
+    void applyAffinityDelta_delegatesToNpcService() {
+        when(npcService.adjustAffinity(session, npc, 3)).thenReturn(55);
+
+        int result = service.applyAffinityDelta(session, npc, 3);
+
+        assertThat(result).isEqualTo(55);
     }
 
     @Test

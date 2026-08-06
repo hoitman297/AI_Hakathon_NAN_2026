@@ -10,6 +10,7 @@ import com.gameproject.backend.domain.FruitMaster;
 import com.gameproject.backend.domain.GameSession;
 import com.gameproject.backend.domain.InventoryItem;
 import com.gameproject.backend.domain.Npc;
+import com.gameproject.backend.domain.SessionStatus;
 import com.gameproject.backend.domain.ShopItemMaster;
 import com.gameproject.backend.repository.CropMasterRepository;
 import com.gameproject.backend.repository.FruitMasterRepository;
@@ -48,6 +49,9 @@ class InventoryPersistenceService {
     @Transactional
     UseItemOutcome prepareUseItem(Long sessionId, Integer slotIndex, Long targetNpcId) {
         GameSession session = sessionService.findSession(sessionId);
+        if (session.getStatus() != SessionStatus.IN_PROGRESS) {
+            throw new IllegalStateException("이미 종료된 세션입니다.");
+        }
         InventoryItem item = inventoryItemRepository.findBySessionAndSlotIndex(session, slotIndex)
                 .orElseThrow(() -> new IllegalArgumentException("해당 슬롯에 아이템이 없습니다: " + slotIndex));
 

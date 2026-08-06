@@ -11,27 +11,22 @@ import org.springframework.transaction.annotation.Transactional;
 import com.gameproject.backend.client.LlmProxyClient;
 import com.gameproject.backend.domain.Account;
 import com.gameproject.backend.domain.Affinity;
-import com.gameproject.backend.domain.ClueCard;
-import com.gameproject.backend.domain.ClueTopic;
 import com.gameproject.backend.domain.GameSession;
 import com.gameproject.backend.domain.Npc;
 import com.gameproject.backend.domain.NpcCaseAssignment;
 import com.gameproject.backend.domain.PlayerStat;
-import com.gameproject.backend.domain.SabotageEvent;
 import com.gameproject.backend.domain.SabotageType;
 import com.gameproject.backend.domain.SessionStatus;
 import com.gameproject.backend.dto.CreateSessionRequest;
 import com.gameproject.backend.dto.NightSummaryResponse;
 import com.gameproject.backend.dto.SessionResponse;
 import com.gameproject.backend.repository.AffinityRepository;
-import com.gameproject.backend.repository.ClueCardRepository;
 import com.gameproject.backend.repository.GameSessionRepository;
 import com.gameproject.backend.repository.NpcCaseAssignmentRepository;
 import com.gameproject.backend.repository.NpcRepository;
 import com.gameproject.backend.repository.PlayerStatRepository;
 import com.gameproject.backend.repository.SabotageEventRepository;
 import com.gameproject.backend.service.CulpritProfileRegistry.CulpritProfile;
-import com.gameproject.backend.service.CulpritProfileRegistry.Target;
 
 import lombok.RequiredArgsConstructor;
 
@@ -45,17 +40,22 @@ public class SessionService {
     private final AffinityRepository affinityRepository;
     private final PlayerStatRepository playerStatRepository;
     private final SabotageEventRepository sabotageEventRepository;
-    private final ClueCardRepository clueCardRepository;
     private final CulpritProfileRegistry culpritProfileRegistry;
-    private final NpcLocationResolver locationResolver;
     private final StaminaService staminaService;
     private final GameSaveService gameSaveService;
     private final LlmProxyClient llmProxyClient;
+    private final SessionPersistenceService persistence;
 
     private final Random random = new Random();
 
     @Transactional
     public SessionResponse createSession(CreateSessionRequest request, Account account) {
+        long activeSaveCount = sessionRepository.countByAccountAndStatusNot(account, SessionStatus.DELETED);
+        if (activeSaveCount >= GameConstants.MAX_SAVES_PER_ACCOUNT) {
+            throw new IllegalStateException(
+                    "세이브 슬롯이 가득 찼습니다 (최대 " + GameConstants.MAX_SAVES_PER_ACCOUNT + "개). 세이브를 삭제한 후 다시 시도해주세요.");
+        }
+
         List<Npc> npcs = npcRepository.findAll();
         if (npcs.isEmpty()) {
             throw new IllegalStateException("NPC 마스터 데이터가 없습니다. 서버 기동 시 시딩이 안 된 것 같습니다.");
@@ -139,49 +139,52 @@ public class SessionService {
                 .map(session -> toResponse(session, currentStat(session)));
     }
 
+    /**
+     * "이어서하기" 슬롯 선택 화면용 — 이 계정의 세이브(삭제되지 않은 세션) 전체를 최신순으로
+     * 반환한다. 진행중/성공/배드엔딩 상태를 그대로 노출해서, 프론트가 진행중인 건 이어서
+     * 플레이하고 끝난 건 엔딩을 다시 보여주는 식으로 구분해 처리할 수 있게 한다.
+     */
+    @Transactional(readOnly = true)
+    public List<SessionResponse> listSessions(Account account) {
+        return sessionRepository.findByAccountAndStatusNotOrderByStartedAtDesc(account, SessionStatus.DELETED).stream()
+                .map(session -> toResponse(session, currentStat(session)))
+                .toList();
+    }
+
+    /**
+     * 세이브 슬롯 삭제. 연관된 대화 로그/단서/호감도 등을 물리적으로 지우려면 여러 테이블을
+     * 순서대로 지워야 해서 위험도가 높다 — 대신 상태만 DELETED로 바꿔 목록/슬롯 수 계산에서
+     * 제외한다(소프트 삭제). 세션 소유권 검증은 SessionOwnershipInterceptor가 이미 처리한다.
+     */
     @Transactional
-    public SessionResponse advanceDay(Long sessionId) {
+    public void deleteSession(Long sessionId) {
         GameSession session = findSession(sessionId);
-        if (session.getStatus() != SessionStatus.IN_PROGRESS) {
-            throw new IllegalStateException("이미 종료된 세션입니다.");
-        }
-        int day = session.getCurrentDay();
-        PlayerStat today = currentStat(session);
-
-        if (day <= GameConstants.SABOTAGE_NIGHTS) {
-            generateNightSabotage(session, day);
-        }
-
-        // 9일차(마지막 재도전일)까지 정답 고발을 못 했다면 더 이상 다음 날로 넘어가지 않고
-        // 배드엔딩으로 종료한다. (정답 고발 시 이미 accuse()에서 SUCCESS로 끝나 여기까지 오지 않고,
-        // 9일차 오답도 accuse()에서 이미 BAD_ENDING 처리되므로, 여기서 걸리는 건 "9일차에
-        // 고발을 아예 하지 않고 넘기려는 경우"뿐이다.)
-        if (day >= GameConstants.LAST_ACCUSATION_DAY) {
-            session.setStatus(SessionStatus.BAD_ENDING);
-            session.setEndedAt(LocalDateTime.now());
-            sessionRepository.save(session);
-            gameSaveService.syncEndingState(session.getAccount(), GameSaveService.ENDING_STATE_BAD_ENDING);
-            return toResponse(session, today);
-        }
-
-        int nextDay = day + 1;
-        session.setCurrentDay(nextDay);
+        session.setStatus(SessionStatus.DELETED);
         sessionRepository.save(session);
+    }
 
-        double newStamina = Boolean.TRUE.equals(today.getFainted())
-                ? GameConstants.FAINT_RESTART_STAMINA
-                : GameConstants.DEFAULT_STAMINA_MAX;
+    /**
+     * 낮 -&gt; 밤(사보타주 발생, 1~5일차) -&gt; 다음날. DB 읽기/쓰기는
+     * {@link SessionPersistenceService}의 짧은 트랜잭션들로 처리하고, 이 메서드는 그 사이에서
+     * LLM(llm-proxy) 호출만 담당한다 — 예전엔 이 메서드 전체가 하나의 트랜잭션이라 밤마다
+     * LLM 호출(사보타주 연출 + 단서 문구, 최대 60초) 동안 DB 커넥션을 계속 붙들고 있었다.
+     */
+    public SessionResponse advanceDay(Long sessionId) {
+        AdvanceDayContext ctx = persistence.prepareAdvanceDay(sessionId);
 
-        PlayerStat next = playerStatRepository.save(PlayerStat.builder()
-                .session(session)
-                .day(nextDay)
-                .staminaCurrent(newStamina)
-                .staminaMax(GameConstants.DEFAULT_STAMINA_MAX)
-                .gold(today.getGold())
-                .fainted(false)
-                .build());
+        String summaryText = null;
+        String clueText = null;
+        if (ctx.sabotage() != null) {
+            SabotagePrepContext sabotage = ctx.sabotage();
+            // 다음날 아침 화면(NightTransitionScreen)에 노출되는 연출 문구 — 범인 정보는 안 들어간다.
+            summaryText = llmProxyClient.generateSabotageSummary(
+                    sabotage.location(), sabotage.type().name(), sabotage.subTarget(), ctx.day());
+            clueText = llmProxyClient.generateClueContent(
+                    sabotage.topic().name(), sabotage.culpritAppearanceDesc(), sabotage.culpritPersonalityDesc(),
+                    sabotage.location(), sabotage.subTarget());
+        }
 
-        return toResponse(session, next);
+        return persistence.finalizeAdvanceDay(ctx, summaryText, clueText);
     }
 
     /**
@@ -202,81 +205,6 @@ public class SessionService {
         return toResponse(session, stat);
     }
 
-    private void generateNightSabotage(GameSession session, int day) {
-        NpcCaseAssignment assignment = caseAssignmentRepository.findBySession(session)
-                .orElseThrow(() -> new IllegalStateException("범인 배정 정보가 없습니다."));
-        CulpritProfile profile = culpritProfileRegistry.get(assignment.getNpc().getName());
-
-        Target previousTarget = sabotageEventRepository.findBySessionAndDay(session, day - 1).stream()
-                .findFirst()
-                .map(prev -> new Target(prev.getLocation(), prev.getSubTarget()))
-                .orElse(null);
-        Target tonight = profile.pickTonight(random, previousTarget);
-
-        boolean selfDecoy = random.nextInt(100) < 10; // 낮은 확률(10%)로 자작극
-        Npc witness = findWitness(session, assignment.getNpc(), tonight.location());
-        SabotageType tonightType = pickTonightType(assignment, random);
-
-        // 다음날 아침 화면(NightTransitionScreen)에 노출되는 연출 문구 — 범인 정보는 안 들어간다.
-        String summaryText = llmProxyClient.generateSabotageSummary(
-                tonight.location(), tonightType.name(), tonight.subTarget(), day);
-
-        SabotageEvent event = sabotageEventRepository.save(SabotageEvent.builder()
-                .session(session)
-                .day(day)
-                .location(tonight.location())
-                .type(tonightType)
-                .subTarget(tonight.subTarget())
-                .selfDecoy(selfDecoy)
-                .witnessNpc(witness)
-                .summaryText(summaryText)
-                .createdAt(LocalDateTime.now())
-                .build());
-
-        // 단서 카드 5장 총량에 맞춰 1~5일차 밤마다 주제를 하나씩 순환 배정
-        ClueTopic topic = ClueTopic.values()[(day - 1) % ClueTopic.values().length];
-        String witnessHint = witness != null
-                ? " 그 시각 근처에 " + witness.getName() + "이(가) 있었다는 이야기도 있다."
-                : "";
-        Npc culprit = assignment.getNpc();
-        String clueText = llmProxyClient.generateClueContent(
-                topic.name(), culprit.getAppearanceDesc(), culprit.getPersonalityDesc(),
-                tonight.location(), tonight.subTarget()) + witnessHint;
-        clueCardRepository.save(ClueCard.builder()
-                .session(session)
-                .sabotageEvent(event)
-                .topic(topic)
-                .textAmbiguous(clueText)
-                .textClarified(null)
-                .acquired(false)
-                .acquiredAt(null)
-                .build());
-    }
-
-    /**
-     * 유형만으로 범인이 특정되지 않도록, 주 유형을 기본으로 하되 보조 유형이 배정돼 있으면
-     * 낮은 확률(기본 20%)로 그날 밤은 보조 유형을 대신 쓴다.
-     */
-    private SabotageType pickTonightType(NpcCaseAssignment assignment, Random random) {
-        if (assignment.getSecondaryType() == null) {
-            return assignment.getPrimaryType();
-        }
-        boolean useSecondary = random.nextInt(100) < GameConstants.SECONDARY_SABOTAGE_TYPE_CHANCE_PERCENT;
-        return useSecondary ? assignment.getSecondaryType() : assignment.getPrimaryType();
-    }
-
-    /** 사보타주 발생 장소에 그 시간 실제로 있었을 법한(낮 동선상 그 장소인) 범인 외 NPC를 찾는다. 없으면 null. */
-    private Npc findWitness(GameSession session, Npc culprit, String sabotageLocation) {
-        List<Npc> candidates = npcRepository.findAll().stream()
-                .filter(npc -> !npc.getNpcId().equals(culprit.getNpcId()))
-                .filter(npc -> sabotageLocation.equals(locationResolver.resolveToday(session, npc)))
-                .toList();
-        if (candidates.isEmpty()) {
-            return null;
-        }
-        return candidates.get(random.nextInt(candidates.size()));
-    }
-
     public GameSession findSession(Long sessionId) {
         return sessionRepository.findById(sessionId)
                 .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 세션입니다: " + sessionId));
@@ -287,7 +215,8 @@ public class SessionService {
                 .orElseThrow(() -> new IllegalStateException("현재 일차의 플레이어 상태가 없습니다."));
     }
 
-    private SessionResponse toResponse(GameSession session, PlayerStat stat) {
+    /** package-private static — SessionPersistenceService도 순환 의존 없이 그대로 재사용한다. */
+    static SessionResponse toResponse(GameSession session, PlayerStat stat) {
         // honestModeNpcId는 실제로 소모되기 전까지 남아있을 수 있어(예: 구매만 하고 그날 안 씀),
         // DialogueService와 같은 기준(당일 여부)으로 걸러야 "어제 산 정직모드가 오늘도 활성"으로
         // 잘못 표시되지 않는다.

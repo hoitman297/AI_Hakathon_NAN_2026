@@ -2,6 +2,7 @@ package com.gameproject.backend.service;
 
 import java.util.List;
 
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -62,10 +63,22 @@ public class DialogueService {
                 ctx.affinityScore(), ctx.restrictDetectiveTalk(), ctx.witnessContext(), ctx.recentVillageEventContext());
         String reply = llmResult.reply();
 
+        // 대화 로그는 호감도 반영과 별개 트랜잭션으로 먼저 확정 커밋한다 — 아래 호감도 반영이
+        // 실패해도(동시에 선물 등으로 같은 NPC 호감도가 바뀌어 낙관적 락 충돌이 나는 경우 등)
+        // 이미 LLM까지 호출해서 만든 대화 내용 자체는 사라지지 않는다.
+        persistence.saveDialogueExchange(ctx.session(), ctx.npc(), userMessage, reply, ctx.honestMode());
+
         // 호감도 증감은 더 이상 고정 랜덤이 아니라, NPC 성격에 비추어 이번 발화가 어땠는지 LLM이
         // 직접 판단한 값(llm-proxy에서 -5~+5로 clamp됨)을 그대로 반영한다.
         int affinityDelta = llmResult.affinityDelta() != null ? llmResult.affinityDelta() : 0;
-        int newAffinity = persistence.finalizeChat(ctx.session(), ctx.npc(), userMessage, reply, ctx.honestMode(), affinityDelta);
+        int newAffinity;
+        try {
+            newAffinity = persistence.applyAffinityDelta(ctx.session(), ctx.npc(), affinityDelta);
+        } catch (ObjectOptimisticLockingFailureException e) {
+            // 대화 자체는 이미 저장됐으니 이 정도 동시성 충돌로 전체 요청을 실패시키지 않는다 —
+            // 이번 턴의 호감도 변화만 반영이 안 된 채로(대화 시작 시점 값) 넘어간다.
+            newAffinity = ctx.affinityScore();
+        }
 
         return new DialogueReplyResponse(reply, newAffinity, ctx.stat().getStaminaCurrent());
     }

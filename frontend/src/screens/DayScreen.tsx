@@ -46,15 +46,20 @@ export function DayScreen({
   // NPC 이름 -> 실제 백엔드 npcId. Phaser 씬은 로컬 스프라이트 로스터(이름 기준)만 알고 있어서,
   // 대화 API를 호출하려면 이 매핑을 통해 클릭된 NPC 이름을 npcId로 바꿔줘야 한다.
   const npcIdByNameRef = useRef<Map<string, number>>(new Map())
+  // Phaser 씬은 이 목록 로딩을 기다리지 않고 바로 시작돼서, 로딩이 끝나기 전에 NPC를 클릭하면
+  // npcIdByNameRef가 아직 비어 있어 매핑을 못 찾는 경우가 있었다(새로고침 직후 등) — 그 요청
+  // 자체를 들고 있다가, 클릭 시점에 아직 비어 있으면 이 요청이 끝나길 한 번 더 기다려서 재조회한다.
+  const npcListPromiseRef = useRef<Promise<Map<string, number>> | null>(null)
 
   useEffect(() => {
     let cancelled = false
-    listNpcsToday(session.sessionId)
-      .then((npcs) => {
-        if (cancelled) return
-        npcIdByNameRef.current = new Map(npcs.map((npc) => [npc.name, npc.npcId]))
-      })
-      .catch((err) => console.error('NPC 목록을 불러오지 못했습니다.', err))
+    const promise = listNpcsToday(session.sessionId).then((npcs) => {
+      const map = new Map(npcs.map((npc) => [npc.name, npc.npcId]))
+      if (!cancelled) npcIdByNameRef.current = map
+      return map
+    })
+    npcListPromiseRef.current = promise
+    promise.catch((err) => console.error('NPC 목록을 불러오지 못했습니다.', err))
     return () => {
       cancelled = true
     }
@@ -63,14 +68,29 @@ export function DayScreen({
   useEffect(() => {
     if (!containerRef.current) return
 
-    // 이동으로 실제 경과한 시간(초)을 서버에 보고하고, 서버가 계산한 값(운동화 착용 시 20% 할인 반영)으로
-    // 로컬 체력 표시를 다시 맞춘다 — 프레임마다 로컬로 미리 깎아둔 값은 예측치일 뿐, 서버 응답이 최종값이다.
+    // 이동 중엔 대략 1초마다 handleMove가 호출되는데, 요청을 기다리지 않고 매번 새로 쏘면
+    // 응답이 도착하는 순서가 요청 순서와 어긋날 수 있다(네트워크 지연 편차) — 그러면 나중에
+    // 도착한 "더 과거" 요청의 응답이 최신 응답을 덮어써서 체력바가 95→35→95처럼 튀어 보였다.
+    // 한 번에 하나의 요청만 보내고, 그사이 쌓인 이동 시간은 다음 요청에 합쳐서 보고한다 —
+    // 응답을 항상 보낸 순서대로만 받게 되므로 이 역전이 원천적으로 불가능해진다.
+    const pendingSecondsRef = { current: 0 }
+    let moveInFlight = false
+
     async function handleMove(seconds: number) {
+      pendingSecondsRef.current += seconds
+      if (moveInFlight) return
+      moveInFlight = true
       try {
-        const updated = await moveSession(session.sessionId, seconds)
-        setStamina(updated.staminaCurrent)
+        while (pendingSecondsRef.current > 0) {
+          const toReport = pendingSecondsRef.current
+          pendingSecondsRef.current = 0
+          const updated = await moveSession(session.sessionId, toReport)
+          setStamina(updated.staminaCurrent)
+        }
       } catch (err) {
         console.error('이동 체력 반영에 실패했습니다.', err)
+      } finally {
+        moveInFlight = false
       }
     }
 
@@ -85,12 +105,23 @@ export function DayScreen({
       onStaminaChange: setStamina,
       onMove: handleMove,
       onNpcClick: (name, role) => {
-        const npcId = npcIdByNameRef.current.get(name)
-        if (npcId === undefined) {
-          console.error(`"${name}"에 대응하는 npcId를 찾지 못했습니다.`)
+        const resolveNpcId = (npcId: number | undefined) => {
+          if (npcId === undefined) {
+            console.error(`"${name}"에 대응하는 npcId를 찾지 못했습니다.`)
+            return
+          }
+          setDialogueNpc({ npcId, name, role })
+        }
+
+        const cachedNpcId = npcIdByNameRef.current.get(name)
+        if (cachedNpcId !== undefined) {
+          resolveNpcId(cachedNpcId)
           return
         }
-        setDialogueNpc({ npcId, name, role })
+        // 아직 NPC 목록 로딩이 안 끝났을 수 있다 — 그 요청이 끝나길 기다렸다가 한 번 더 조회.
+        npcListPromiseRef.current
+          ?.then((map) => resolveNpcId(map.get(name)))
+          .catch(() => {})
       },
     }
     game.scene.start('DayScene', initData)
@@ -124,13 +155,17 @@ export function DayScreen({
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [dialogueNpc, inventoryOpen])
 
-  // 체력(낮 시간)이 다 떨어지면 버튼 없이 자동으로 밤으로 넘어간다.
+  // 체력(낮 시간)이 다 떨어지면 버튼 없이 자동으로 밤으로 넘어간다. 대화창이 열려 있는 동안엔
+  // 넘어가지 않고 기다린다 — 안 그러면 대화 도중에 화면이 통째로 밤으로 전환되며 대화창이
+  // 갑자기 사라지는 문제가 있었다. 대화창은 체력이 바닥나면 스스로 마무리 인사를 보여주고
+  // 닫히므로(DialogueBox 참고), dialogueNpc가 null이 되는 순간 이 effect가 다시 평가되어
+  // 자연스럽게 밤으로 넘어간다.
   const nightTriggeredRef = useRef(false)
   useEffect(() => {
-    if (stamina > 0 || advancing || nightTriggeredRef.current) return
+    if (stamina > 0 || advancing || nightTriggeredRef.current || dialogueNpc) return
     nightTriggeredRef.current = true
     onAdvanceDay()
-  }, [stamina, advancing, onAdvanceDay])
+  }, [stamina, advancing, onAdvanceDay, dialogueNpc])
 
   const canAccuse =
     session.status === 'IN_PROGRESS' &&
@@ -175,6 +210,7 @@ export function DayScreen({
           npcId={dialogueNpc.npcId}
           npcName={dialogueNpc.name}
           npcRole={dialogueNpc.role}
+          staminaCurrent={stamina}
           onStaminaChange={setStamina}
           onClose={() => setDialogueNpc(null)}
         />

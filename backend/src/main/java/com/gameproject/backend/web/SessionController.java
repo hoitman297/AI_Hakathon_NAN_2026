@@ -1,6 +1,9 @@
 package com.gameproject.backend.web;
 
+import java.util.List;
+
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -49,6 +52,20 @@ public class SessionController {
         return sessionService.getCurrentSession(account)
                 .map(ResponseEntity::ok)
                 .orElseGet(() -> ResponseEntity.noContent().build());
+    }
+
+    /** 세이브 슬롯 선택 화면용 — 이 계정의 세이브(삭제된 것 제외) 전체를 최신순으로 반환한다. */
+    @GetMapping
+    public ResponseEntity<List<SessionResponse>> list(
+            @RequestAttribute(SessionOwnershipInterceptor.ACCOUNT_ATTRIBUTE) Account account) {
+        return ResponseEntity.ok(sessionService.listSessions(account));
+    }
+
+    /** 세이브 슬롯 삭제 — 소유권 검증은 SessionOwnershipInterceptor가 처리한다. */
+    @DeleteMapping("/{sessionId}")
+    public ResponseEntity<Void> delete(@PathVariable("sessionId") Long sessionId) {
+        sessionService.deleteSession(sessionId);
+        return ResponseEntity.noContent().build();
     }
 
     @GetMapping("/{sessionId}")

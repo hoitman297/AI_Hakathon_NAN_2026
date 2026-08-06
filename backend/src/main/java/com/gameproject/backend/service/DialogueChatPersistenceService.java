@@ -16,6 +16,7 @@ import com.gameproject.backend.domain.NpcPersonaState;
 import com.gameproject.backend.domain.PlayerStat;
 import com.gameproject.backend.domain.RandomEventLog;
 import com.gameproject.backend.domain.SabotageEvent;
+import com.gameproject.backend.domain.SessionStatus;
 import com.gameproject.backend.dto.llm.DialogueTurn;
 import com.gameproject.backend.repository.DialogueLogRepository;
 import com.gameproject.backend.repository.GameSessionRepository;
@@ -63,6 +64,9 @@ class DialogueChatPersistenceService {
     @Transactional
     DialogueChatContext prepareChatContext(Long sessionId, Long npcId) {
         GameSession session = sessionService.findSession(sessionId);
+        if (session.getStatus() != SessionStatus.IN_PROGRESS) {
+            throw new IllegalStateException("이미 종료된 세션입니다.");
+        }
         Npc npc = findNpc(npcId);
 
         // 대화는 체력 소모(하루 최대 ~12회)로만 자연스럽게 제한돼 있고 별도 횟수 제한이 없어서,
@@ -128,9 +132,16 @@ class DialogueChatPersistenceService {
                 .build());
     }
 
-    /** 대화 로그 저장 + 정직 모드 해제 + 호감도 반영을 한 트랜잭션으로 묶어 커밋한다. */
+    /**
+     * 대화 로그 저장 + 정직 모드 해제를 커밋한다. 호감도 반영({@link #applyAffinityDelta})과
+     * 일부러 별도 트랜잭션으로 분리했다 — Affinity 엔티티는 낙관적 락(@Version)이 걸려 있어서
+     * 선물 주기 등 다른 요청과 동시에 같은 NPC 호감도를 건드리면 충돌(409)이 날 수 있는데,
+     * 예전엔 이 메서드 하나로 묶여 있어서 그 충돌이 나면 이미 LLM 호출까지 끝낸 대화 로그
+     * 저장(USER+NPC 메시지)까지 통째로 롤백돼 대화 내용 자체가 사라지는 문제가 있었다.
+     * 이제 대화 로그는 호감도 반영 성패와 무관하게 먼저 확정 커밋된다.
+     */
     @Transactional
-    int finalizeChat(GameSession session, Npc npc, String userMessage, String reply, boolean honestMode, int affinityDelta) {
+    void saveDialogueExchange(GameSession session, Npc npc, String userMessage, String reply, boolean honestMode) {
         dialogueLogRepository.save(DialogueLog.builder()
                 .session(session).npc(npc).day(session.getCurrentDay())
                 .sender(DialogueSender.USER).message(userMessage).createdAt(LocalDateTime.now())
@@ -145,7 +156,11 @@ class DialogueChatPersistenceService {
             session.setHonestModeDay(null);
             sessionRepository.save(session);
         }
+    }
 
+    /** saveDialogueExchange()가 이미 커밋된 뒤에 별도 트랜잭션으로 호감도만 반영한다. */
+    @Transactional
+    int applyAffinityDelta(GameSession session, Npc npc, int affinityDelta) {
         return npcService.adjustAffinity(session, npc, affinityDelta);
     }
 

@@ -72,15 +72,14 @@ export function InventoryHubPanel({ sessionId, onStaminaChange, onClose }: Inven
       .catch((err: unknown) => setClueError(err instanceof Error ? err.message : '습득한 단서를 불러오지 못했습니다.'))
   }
 
-  async function loadAffinity() {
-    setAffinityError(null)
-    try {
-      const npcs = await listNpcsToday(sessionId)
-      const details = await Promise.all(npcs.map((npc) => getNpcDetail(sessionId, npc.npcId)))
-      setAffinityList(details.map((d) => ({ npcId: d.npcId, name: d.name, role: d.role, score: d.affinityScore })))
-    } catch (err) {
-      setAffinityError(err instanceof Error ? err.message : '호감도 정보를 불러오지 못했습니다.')
-    }
+  function loadAffinity() {
+    return listNpcsToday(sessionId)
+      .then((npcs) => Promise.all(npcs.map((npc) => getNpcDetail(sessionId, npc.npcId))))
+      .then((details) => {
+        setAffinityList(details.map((d) => ({ npcId: d.npcId, name: d.name, role: d.role, score: d.affinityScore })))
+        setAffinityError(null)
+      })
+      .catch((err: unknown) => setAffinityError(err instanceof Error ? err.message : '호감도 정보를 불러오지 못했습니다.'))
   }
 
   useEffect(reloadInventory, [sessionId])

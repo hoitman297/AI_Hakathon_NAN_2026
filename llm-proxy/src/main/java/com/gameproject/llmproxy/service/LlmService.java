@@ -58,6 +58,14 @@ public class LlmService {
     @Value("${anthropic.model}")
     private String model;
 
+    /**
+     * 대화(chat)만 더 빠른 모델을 쓴다 — 나머지(페르소나/엔딩/단서/이벤트 등)는 실시간성보다
+     * 품질이 중요해 위 model(기본 Opus)을 그대로 쓰지만, 대화는 매 턴마다 플레이어가 응답을
+     * 기다리는 구간이라 체감 속도가 가장 중요하다.
+     */
+    @Value("${anthropic.chat-model}")
+    private String chatModel;
+
     public String generatePersona(Long npcId, String name, String role, Integer age,
                                    String personalityDesc, String speechStyle, String sampleLine,
                                    String motiveText) {
@@ -168,7 +176,7 @@ public class LlmService {
 
         try {
             StructuredMessageCreateParams<DialogueChatResponse> params = MessageCreateParams.builder()
-                    .model(model)
+                    .model(chatModel)
                     .maxTokens(1024L)
                     .system(systemPrompt.toString())
                     .thinking(ThinkingConfigDisabled.builder().build())

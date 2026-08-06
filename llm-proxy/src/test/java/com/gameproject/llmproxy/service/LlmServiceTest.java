@@ -56,14 +56,15 @@ class LlmServiceTest {
     @BeforeEach
     void setUp() throws Exception {
         llmService = new LlmService(anthropicClient, new ObjectMapper());
-        setModel(llmService, "claude-test-model");
+        setField(llmService, "model", "claude-test-model");
+        setField(llmService, "chatModel", "claude-test-chat-model");
         when(anthropicClient.messages()).thenReturn(messageService);
     }
 
-    private static void setModel(LlmService service, String model) throws Exception {
-        Field field = LlmService.class.getDeclaredField("model");
+    private static void setField(LlmService service, String fieldName, String value) throws Exception {
+        Field field = LlmService.class.getDeclaredField(fieldName);
         field.setAccessible(true);
-        field.set(service, model);
+        field.set(service, value);
     }
 
     // ------------------------------------------------------------------
@@ -148,6 +149,21 @@ class LlmServiceTest {
 
         assertThat(result.reply()).isEqualTo("마을 일은 제가 챙깁니다.");
         assertThat(result.affinityDelta()).isEqualTo(3);
+    }
+
+    @Test
+    void chat_usesFasterChatModel_notTheDefaultGenerationModel() throws Exception {
+        DialogueChatResponse llmOutput = new DialogueChatResponse("반갑습니다.", 0);
+        when(messageService.create(any(StructuredMessageCreateParams.class)))
+                .thenReturn(structuredMessage(StopReason.END_TURN,
+                        new ObjectMapper().writeValueAsString(llmOutput), DialogueChatResponse.class));
+        ArgumentCaptor<StructuredMessageCreateParams<DialogueChatResponse>> captor =
+                ArgumentCaptor.forClass(StructuredMessageCreateParams.class);
+
+        llmService.chat(new DialogueChatRequest(personaJson(), List.of(), "안녕하세요", false, 50, false, null, null));
+
+        verify(messageService).create(captor.capture());
+        assertThat(captor.getValue().rawParams().model().asString()).isEqualTo("claude-test-chat-model");
     }
 
     @Test
@@ -290,6 +306,18 @@ class LlmServiceTest {
         String text = llmService.generateEventContent("마을 게시판 도발 쪽지", "VILLAGE", 7, "현수동");
 
         assertThat(text).isEqualTo("게시판에 도발적인 쪽지가 붙었다.");
+    }
+
+    @Test
+    void generateEventContent_usesDefaultGenerationModel_notTheChatModel() {
+        when(messageService.create(any(MessageCreateParams.class)))
+                .thenReturn(message(StopReason.END_TURN, "게시판에 도발적인 쪽지가 붙었다."));
+        ArgumentCaptor<MessageCreateParams> captor = ArgumentCaptor.forClass(MessageCreateParams.class);
+
+        llmService.generateEventContent("마을 게시판 도발 쪽지", "VILLAGE", 7, "현수동");
+
+        verify(messageService).create(captor.capture());
+        assertThat(captor.getValue().model().asString()).isEqualTo("claude-test-model");
     }
 
     @Test

@@ -21,6 +21,9 @@ public final class GameConstants {
 
     public static final int INVENTORY_SLOT_COUNT = 7;
 
+    /** 계정당 동시에 보유 가능한 세이브(게임 세션) 슬롯 수. 삭제된(DELETED) 세션은 여기 안 낀다. */
+    public static final int MAX_SAVES_PER_ACCOUNT = 3;
+
     public static final int FIRST_ACCUSATION_DAY = 7;
     public static final int LAST_ACCUSATION_DAY = 9;
     public static final int SABOTAGE_NIGHTS = 5; // 1~5일차 밤

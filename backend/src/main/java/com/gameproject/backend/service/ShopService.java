@@ -11,6 +11,7 @@ import com.gameproject.backend.domain.GameSession;
 import com.gameproject.backend.domain.InventoryItemType;
 import com.gameproject.backend.domain.ItemCategory;
 import com.gameproject.backend.domain.PlayerStat;
+import com.gameproject.backend.domain.SessionStatus;
 import com.gameproject.backend.domain.ShopItemCode;
 import com.gameproject.backend.domain.ShopItemMaster;
 import com.gameproject.backend.dto.SellRequest;
@@ -46,6 +47,9 @@ public class ShopService {
     @Transactional
     public void purchase(Long sessionId, Long itemId) {
         GameSession session = sessionService.findSession(sessionId);
+        if (session.getStatus() != SessionStatus.IN_PROGRESS) {
+            throw new IllegalStateException("이미 종료된 세션입니다.");
+        }
         ShopItemMaster item = shopItemMasterRepository.findById(itemId)
                 .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 아이템입니다: " + itemId));
 
@@ -76,6 +80,9 @@ public class ShopService {
     @Transactional
     public void sell(Long sessionId, SellRequest request) {
         GameSession session = sessionService.findSession(sessionId);
+        if (session.getStatus() != SessionStatus.IN_PROGRESS) {
+            throw new IllegalStateException("이미 종료된 세션입니다.");
+        }
         int quantity = request.quantity() == null ? 1 : request.quantity();
 
         int unitPrice;

@@ -2,19 +2,19 @@ import { useEffect, useRef, useState } from 'react'
 import { TitleScreen } from './screens/TitleScreen'
 import { LoginModal } from './screens/LoginModal'
 import { CharacterCreateScreen } from './screens/CharacterCreateScreen'
+import { SaveSlotPicker } from './screens/SaveSlotPicker'
 import { DayScreen } from './screens/DayScreen'
 import { NightTransitionScreen } from './screens/NightTransitionScreen'
 import { AccusationScreen } from './screens/AccusationScreen'
 import { EndingScreen } from './screens/EndingScreen'
-import { Modal } from './components/Modal'
 import { fetchMe, logout as logoutRequest, type AccountInfo, type AuthResult } from './api/authApi'
-import { createSession, getCurrentSession, advanceDay, type SessionResponse } from './api/sessionApi'
+import { createSession, advanceDay, type SessionResponse } from './api/sessionApi'
 import type { AccuseResult } from './api/accusationApi'
 import { getAuthToken, clearAuthToken } from './api/authToken'
 import { createDayChangeAutoSave } from './game/autoSave'
 import { setPlayerProfile, type CharacterGender } from './state/playerProfile'
 
-type Screen = 'title' | 'character-create' | 'day' | 'night' | 'accusation' | 'ending'
+type Screen = 'title' | 'character-create' | 'save-select' | 'day' | 'night' | 'accusation' | 'ending'
 
 function App() {
   const [screen, setScreen] = useState<Screen>('title')
@@ -23,9 +23,6 @@ function App() {
   const [nightInfo, setNightInfo] = useState<{ day: number; nextDay: number } | null>(null)
 
   const [showLoginModal, setShowLoginModal] = useState(false)
-  const [showNoSaveModal, setShowNoSaveModal] = useState(false)
-  const [continueLoading, setContinueLoading] = useState(false)
-  const [continueError, setContinueError] = useState<string | null>(null)
 
   const [creatingSession, setCreatingSession] = useState(false)
   const [createError, setCreateError] = useState<string | null>(null)
@@ -100,22 +97,9 @@ function App() {
     }
   }
 
-  async function handleContinue() {
-    setContinueError(null)
-    setContinueLoading(true)
-    try {
-      const current = await getCurrentSession()
-      if (!current) {
-        setShowNoSaveModal(true)
-        return
-      }
-      setSession(current)
-      setScreen('day')
-    } catch (err) {
-      setContinueError(err instanceof Error ? err.message : '이어서하기에 실패했습니다.')
-    } finally {
-      setContinueLoading(false)
-    }
+  function handleSelectSave(selected: SessionResponse) {
+    setSession(selected)
+    setScreen(selected.status === 'IN_PROGRESS' ? 'day' : 'ending')
   }
 
   async function handleAdvanceDay() {
@@ -161,7 +145,7 @@ function App() {
           onLoginClick={() => setShowLoginModal(true)}
           onLogoutClick={handleLogout}
           onStartNewGame={handleStartNewGame}
-          onContinue={handleContinue}
+          onContinue={() => setScreen('save-select')}
         />
       )}
 
@@ -171,6 +155,14 @@ function App() {
           onBack={() => setScreen('title')}
           submitting={creatingSession}
           error={createError}
+        />
+      )}
+
+      {screen === 'save-select' && (
+        <SaveSlotPicker
+          onSelectSave={handleSelectSave}
+          onStartNewGame={handleStartNewGame}
+          onBack={() => setScreen('title')}
         />
       )}
 
@@ -209,38 +201,6 @@ function App() {
       )}
 
       {showLoginModal && <LoginModal onSuccess={handleAuthSuccess} onClose={() => setShowLoginModal(false)} />}
-
-      {continueLoading && (
-        <Modal title="불러오는 중">
-          <p>저장된 게임을 불러오고 있습니다...</p>
-        </Modal>
-      )}
-
-      {continueError && (
-        <Modal
-          title="오류"
-          actions={
-            <button className="pixel-button" onClick={() => setContinueError(null)}>
-              확인
-            </button>
-          }
-        >
-          <p>{continueError}</p>
-        </Modal>
-      )}
-
-      {showNoSaveModal && (
-        <Modal
-          title="알림"
-          actions={
-            <button className="pixel-button pixel-button--accent" onClick={() => setShowNoSaveModal(false)}>
-              확인
-            </button>
-          }
-        >
-          <p>저장 내역이 없어요!</p>
-        </Modal>
-      )}
     </>
   )
 }

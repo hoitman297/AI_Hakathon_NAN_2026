@@ -10,16 +10,32 @@ import './DialogueBox.css'
 // NPC가 대화를 마무리하고, 다시 말을 걸려면 대화창을 닫았다 새로 열어야 한다.
 const MAX_EXCHANGES_PER_VISIT = 3
 
+// 백엔드 GameConstants.DIALOGUE_STAMINA와 맞춰야 한다. 이 값을 조회하는 API가 없어
+// 프론트에 그대로 하드코딩했다(FIRST_ACCUSATION_DAY와 같은 패턴).
+const DIALOGUE_STAMINA_COST = 8
+
+// 체력이 다 떨어져 대화가 자동으로 마무리될 때, 마지막 답변을 읽을 시간을 준 뒤 닫는다.
+const STAMINA_DEPLETED_AUTO_CLOSE_MS = 1600
+
 interface DialogueBoxProps {
   sessionId: number
   npcId: number
   npcName: string
   npcRole: string
+  staminaCurrent: number
   onStaminaChange: (value: number) => void
   onClose: () => void
 }
 
-export function DialogueBox({ sessionId, npcId, npcName, npcRole, onStaminaChange, onClose }: DialogueBoxProps) {
+export function DialogueBox({
+  sessionId,
+  npcId,
+  npcName,
+  npcRole,
+  staminaCurrent,
+  onStaminaChange,
+  onClose,
+}: DialogueBoxProps) {
   const roster = findRosterEntry(npcName)
   const [messages, setMessages] = useState<DialogueMessage[]>([])
   const [loadingHistory, setLoadingHistory] = useState(true)
@@ -29,8 +45,20 @@ export function DialogueBox({ sessionId, npcId, npcName, npcRole, onStaminaChang
   const [honestModeActive, setHonestModeActive] = useState(false)
   const [exchangeCount, setExchangeCount] = useState(0)
   const [affinity, setAffinity] = useState<number | null>(null)
+  // 서버 응답으로 실제 체력이 0 이하가 된 경우(정상 케이스는 아래 staminaTooLowToContinue가
+  // 미리 막지만, 만일을 대비한 안전망) — 대화를 강제로 마무리하고 잠시 후 자동으로 닫는다.
+  const [staminaDepleted, setStaminaDepleted] = useState(false)
   const listRef = useRef<HTMLDivElement>(null)
-  const conversationEnded = exchangeCount >= MAX_EXCHANGES_PER_VISIT
+  const turnLimitReached = exchangeCount >= MAX_EXCHANGES_PER_VISIT
+  // 다음 메시지를 보내면 체력이 바닥나 밤으로 넘어갈 상황이면, 보내기 전에 미리 입력을 막는다.
+  const staminaTooLowToContinue = staminaCurrent - DIALOGUE_STAMINA_COST <= 0
+  const conversationEnded = turnLimitReached || staminaDepleted || staminaTooLowToContinue
+
+  useEffect(() => {
+    if (!staminaDepleted) return
+    const timer = setTimeout(onClose, STAMINA_DEPLETED_AUTO_CLOSE_MS)
+    return () => clearTimeout(timer)
+  }, [staminaDepleted, onClose])
 
   useEffect(() => {
     fetchDialogueHistory(sessionId, npcId)
@@ -57,7 +85,8 @@ export function DialogueBox({ sessionId, npcId, npcName, npcRole, onStaminaChang
 
     setError(null)
     setSending(true)
-    setMessages((prev) => [...prev, { sender: 'USER', message, createdAt: new Date().toISOString() }])
+    const optimisticMessage: DialogueMessage = { sender: 'USER', message, createdAt: new Date().toISOString() }
+    setMessages((prev) => [...prev, optimisticMessage])
     setInput('')
 
     try {
@@ -71,7 +100,15 @@ export function DialogueBox({ sessionId, npcId, npcName, npcRole, onStaminaChang
       // 서버는 정직 모드가 걸려있던 경우 이번 한 턴에 소모하고 해제한다.
       setHonestModeActive(false)
       setExchangeCount((prev) => prev + 1)
+      if (result.staminaCurrent <= 0) {
+        setStaminaDepleted(true)
+      }
     } catch (err) {
+      // 요청이 실패하면 서버에는 이 메시지가 저장되지 않았다 — 방금 낙관적으로 추가한 내
+      // 메시지를 화면에 그대로 남겨두면 실제로는 저장 안 된 대화가 나눈 것처럼 보이므로
+      // 목록에서 지우고 입력창에 되돌려서 다시 보낼 수 있게 한다.
+      setMessages((prev) => prev.filter((m) => m !== optimisticMessage))
+      setInput(message)
       setError(err instanceof Error ? err.message : 'NPC가 응답하지 못했습니다.')
     } finally {
       setSending(false)
@@ -116,7 +153,15 @@ export function DialogueBox({ sessionId, npcId, npcName, npcRole, onStaminaChang
               </p>
             ))}
             {sending && <p className="dialogue-status dialogue-status--thinking">{npcName}이(가) 생각하는 중...</p>}
-            {conversationEnded && (
+            {staminaDepleted && (
+              <p className="dialogue-status dialogue-status--warning">체력이 다 떨어졌습니다. 대화를 마치고 곧 밤이 됩니다...</p>
+            )}
+            {!staminaDepleted && staminaTooLowToContinue && (
+              <p className="dialogue-status dialogue-status--warning">
+                체력이 부족해 오늘은 더 대화할 수 없습니다. 다음에 다시 말을 걸어주세요.
+              </p>
+            )}
+            {!staminaDepleted && !staminaTooLowToContinue && turnLimitReached && (
               <p className="dialogue-status">{npcName}이(가) 대화를 마무리했습니다. 다음에 다시 말을 걸어보세요.</p>
             )}
           </div>
