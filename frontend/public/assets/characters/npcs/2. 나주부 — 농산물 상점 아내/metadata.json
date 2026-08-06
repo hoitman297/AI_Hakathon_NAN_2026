@@ -1,0 +1,36 @@
+{
+  "group_id": "3195c532-5750-4e8c-96c8-4a2f053282e3",
+  "states": [
+    {
+      "character": {
+        "id": "a55cfb03-4b7b-4f67-96bb-f6416e428885",
+        "name": "Idle",
+        "prompt": "A clearly recognizable Korean woman in her early thirties who helps run a produce shop in a 1990s rural village. She has feminine facial features, warm eyes, and long neat black hair tied in a low bun, with softly curved side bangs. She has a friendly welcoming smile that feels slightly guarded around strangers.\n\nShe wears a muted lavender blouse with a rounded collar, a dusty rose calf-length skirt, a simple warm-beige waist apron, and practical dark brown shoes. Feminine average build with narrow shoulders, a defined waist, a slightly large head, and a clear readable silhouette.\n\nCozy Korean countryside mystery game character, muted natural colors, simple low-detail pixel art, restrained two-step shading, subtle dark-brown selective outlines, low top-down camera view.\n\nHer long hair and low bun must remain visible from every direction. No short haircut, no masculine hairstyle, no trousers, no hat, no weapon, no item in hands, no modern accessories, no jewelry, no text, plain transparent background.",
+        "size": {
+          "width": 48,
+          "height": 48
+        },
+        "template_id": "mannequin",
+        "directions": 8,
+        "view": "low top-down",
+        "created_at": "2026-08-02T11:38:21.112653+00:00"
+      },
+      "folder": "Idle",
+      "frames": {
+        "rotations": {
+          "south": "Idle/rotations/south.png",
+          "south-east": "Idle/rotations/south-east.png",
+          "east": "Idle/rotations/east.png",
+          "north-east": "Idle/rotations/north-east.png",
+          "north": "Idle/rotations/north.png",
+          "north-west": "Idle/rotations/north-west.png",
+          "west": "Idle/rotations/west.png",
+          "south-west": "Idle/rotations/south-west.png"
+        },
+        "animations": {}
+      }
+    }
+  ],
+  "export_version": "3.1",
+  "export_date": "2026-08-02T11:39:36.322985"
+}

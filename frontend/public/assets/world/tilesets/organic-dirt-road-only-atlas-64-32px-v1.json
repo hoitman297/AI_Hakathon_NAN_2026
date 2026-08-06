@@ -1,0 +1,12 @@
+{
+  "image": "organic-dirt-road-only-atlas-64-32px-v1.png",
+  "tileWidth": 32,
+  "tileHeight": 32,
+  "columns": 8,
+  "rows": 8,
+  "tileCount": 64,
+  "margin": 0,
+  "spacing": 0,
+  "transparent": true,
+  "source": "organic-dirt-road-transparent-v1.png"
+}

@@ -1,0 +1,36 @@
+{
+  "group_id": "d44d6849-13f7-4f81-940e-bf37a1722755",
+  "states": [
+    {
+      "character": {
+        "id": "cf7c3c78-a681-475e-b8fb-46fb8ce69fb5",
+        "name": "Idle",
+        "prompt": "A clearly recognizable Korean woman in her mid-twenties who works alone from home in a 1990s rural village. She has pale feminine facial features, tired eyes, and very long slightly unkempt straight black hair reaching below her shoulders, with heavy bangs partially covering one eye. She has a nervous, withdrawn, uncomfortable expression and a slightly hunched posture.\n\nShe wears an oversized muted blue-gray cardigan over a plain cream blouse, a long dark charcoal skirt, and simple faded brown slip-on shoes. Slim feminine build with narrow shoulders, a slightly large head, and a quiet readable silhouette.\n\nCozy Korean countryside mystery game character with a subtle uneasy mood, muted natural colors, simple low-detail pixel art, restrained two-step shading, subtle dark-brown selective outlines, low top-down camera view.\n\nHer long hair must remain clearly visible below her shoulders from every direction. No short haircut, no masculine hairstyle, no trousers, no hat, no weapon, no item in hands, no modern accessories, no jewelry, no text, plain transparent background.",
+        "size": {
+          "width": 48,
+          "height": 48
+        },
+        "template_id": "mannequin",
+        "directions": 8,
+        "view": "low top-down",
+        "created_at": "2026-08-02T11:57:44.417514+00:00"
+      },
+      "folder": "Idle",
+      "frames": {
+        "rotations": {
+          "south": "Idle/rotations/south.png",
+          "south-east": "Idle/rotations/south-east.png",
+          "east": "Idle/rotations/east.png",
+          "north-east": "Idle/rotations/north-east.png",
+          "north": "Idle/rotations/north.png",
+          "north-west": "Idle/rotations/north-west.png",
+          "west": "Idle/rotations/west.png",
+          "south-west": "Idle/rotations/south-west.png"
+        },
+        "animations": {}
+      }
+    }
+  ],
+  "export_version": "3.1",
+  "export_date": "2026-08-02T11:59:32.416923"
+}

@@ -1,0 +1,36 @@
+{
+  "group_id": "0574ae23-fee6-430a-9754-ff7b0a245ada",
+  "states": [
+    {
+      "character": {
+        "id": "1861d778-deb2-41e4-95df-1cd20a6d41cd",
+        "name": "Idle",
+        "prompt": "An elderly Korean man in his seventies who serves as the village head in a 1990s rural village. He has neatly combed short white hair with a slightly receding hairline, thick white eyebrows, deep wrinkles, and a stern grumpy expression that still feels dependable. His posture is slightly bent with age.\n\nHe wears a faded white long-sleeved shirt with rolled sleeves, a dark forest-green buttoned vest, loose dark brown trousers, and worn black slip-on shoes. Short elderly proportions with slightly narrow shoulders, a round head, and a clear recognizable silhouette.\n\nCozy Korean countryside mystery game character, muted natural colors, simple low-detail pixel art, restrained two-step shading, subtle dark-brown selective outlines, low top-down camera view.\n\nNo hat, no cane, no weapon, no item in hands, no modern accessories, no text, plain transparent background.",
+        "size": {
+          "width": 48,
+          "height": 48
+        },
+        "template_id": "mannequin",
+        "directions": 8,
+        "view": "low top-down",
+        "created_at": "2026-08-02T11:36:37.314773+00:00"
+      },
+      "folder": "Idle",
+      "frames": {
+        "rotations": {
+          "south": "Idle/rotations/south.png",
+          "south-east": "Idle/rotations/south-east.png",
+          "east": "Idle/rotations/east.png",
+          "north-east": "Idle/rotations/north-east.png",
+          "north": "Idle/rotations/north.png",
+          "north-west": "Idle/rotations/north-west.png",
+          "west": "Idle/rotations/west.png",
+          "south-west": "Idle/rotations/south-west.png"
+        },
+        "animations": {}
+      }
+    }
+  ],
+  "export_version": "3.1",
+  "export_date": "2026-08-02T11:37:59.555155"
+}

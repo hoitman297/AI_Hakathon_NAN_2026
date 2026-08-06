@@ -1,0 +1,182 @@
+{
+  "image": "grass-atlas-24-v1.png",
+  "tileWidth": 32,
+  "tileHeight": 32,
+  "columns": 6,
+  "rows": 4,
+  "tileCount": 24,
+  "margin": 0,
+  "spacing": 0,
+  "uniqueTileCount": 24,
+  "arbitraryNeighborEdgesMatch": true,
+  "tiles": [
+    {
+      "id": 0,
+      "x": 0,
+      "y": 0,
+      "width": 32,
+      "height": 32
+    },
+    {
+      "id": 1,
+      "x": 32,
+      "y": 0,
+      "width": 32,
+      "height": 32
+    },
+    {
+      "id": 2,
+      "x": 64,
+      "y": 0,
+      "width": 32,
+      "height": 32
+    },
+    {
+      "id": 3,
+      "x": 96,
+      "y": 0,
+      "width": 32,
+      "height": 32
+    },
+    {
+      "id": 4,
+      "x": 128,
+      "y": 0,
+      "width": 32,
+      "height": 32
+    },
+    {
+      "id": 5,
+      "x": 160,
+      "y": 0,
+      "width": 32,
+      "height": 32
+    },
+    {
+      "id": 6,
+      "x": 0,
+      "y": 32,
+      "width": 32,
+      "height": 32
+    },
+    {
+      "id": 7,
+      "x": 32,
+      "y": 32,
+      "width": 32,
+      "height": 32
+    },
+    {
+      "id": 8,
+      "x": 64,
+      "y": 32,
+      "width": 32,
+      "height": 32
+    },
+    {
+      "id": 9,
+      "x": 96,
+      "y": 32,
+      "width": 32,
+      "height": 32
+    },
+    {
+      "id": 10,
+      "x": 128,
+      "y": 32,
+      "width": 32,
+      "height": 32
+    },
+    {
+      "id": 11,
+      "x": 160,
+      "y": 32,
+      "width": 32,
+      "height": 32
+    },
+    {
+      "id": 12,
+      "x": 0,
+      "y": 64,
+      "width": 32,
+      "height": 32
+    },
+    {
+      "id": 13,
+      "x": 32,
+      "y": 64,
+      "width": 32,
+      "height": 32
+    },
+    {
+      "id": 14,
+      "x": 64,
+      "y": 64,
+      "width": 32,
+      "height": 32
+    },
+    {
+      "id": 15,
+      "x": 96,
+      "y": 64,
+      "width": 32,
+      "height": 32
+    },
+    {
+      "id": 16,
+      "x": 128,
+      "y": 64,
+      "width": 32,
+      "height": 32
+    },
+    {
+      "id": 17,
+      "x": 160,
+      "y": 64,
+      "width": 32,
+      "height": 32
+    },
+    {
+      "id": 18,
+      "x": 0,
+      "y": 96,
+      "width": 32,
+      "height": 32
+    },
+    {
+      "id": 19,
+      "x": 32,
+      "y": 96,
+      "width": 32,
+      "height": 32
+    },
+    {
+      "id": 20,
+      "x": 64,
+      "y": 96,
+      "width": 32,
+      "height": 32
+    },
+    {
+      "id": 21,
+      "x": 96,
+      "y": 96,
+      "width": 32,
+      "height": 32
+    },
+    {
+      "id": 22,
+      "x": 128,
+      "y": 96,
+      "width": 32,
+      "height": 32
+    },
+    {
+      "id": 23,
+      "x": 160,
+      "y": 96,
+      "width": 32,
+      "height": 32
+    }
+  ]
+}

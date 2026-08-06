@@ -1,0 +1,36 @@
+{
+  "group_id": "a3aa3327-ade4-48e3-90fd-5874fca270e0",
+  "states": [
+    {
+      "character": {
+        "id": "d0c4214d-08f7-47e7-b5dc-f1a8a861b308",
+        "name": "Idle",
+        "prompt": "A young newcomer living in a 1990s Korean rural village, with short slightly messy black hair and a curious but cautious expression. Wearing a simple cream short-sleeved shirt, navy shorts, red canvas sneakers, and a small worn olive-green backpack. Slim childlike proportions with a slightly large head, short limbs, and a clear readable silhouette. Cozy rural mystery game character, muted natural colors, simple low-detail pixel art, restrained shading, subtle dark-brown selective outlines. No hat, no weapon, no item in hands, no modern accessories, no text.",
+        "size": {
+          "width": 48,
+          "height": 48
+        },
+        "template_id": "mannequin",
+        "directions": 8,
+        "view": "low top-down",
+        "created_at": "2026-08-02T11:27:36.323443+00:00"
+      },
+      "folder": "Idle",
+      "frames": {
+        "rotations": {
+          "south": "Idle/rotations/south.png",
+          "south-east": "Idle/rotations/south-east.png",
+          "east": "Idle/rotations/east.png",
+          "north-east": "Idle/rotations/north-east.png",
+          "north": "Idle/rotations/north.png",
+          "north-west": "Idle/rotations/north-west.png",
+          "west": "Idle/rotations/west.png",
+          "south-west": "Idle/rotations/south-west.png"
+        },
+        "animations": {}
+      }
+    }
+  ],
+  "export_version": "3.1",
+  "export_date": "2026-08-02T11:29:08.848081"
+}
