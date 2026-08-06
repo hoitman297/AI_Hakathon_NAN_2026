@@ -138,6 +138,15 @@ export function DayScreen({
     scene?.setInputLocked(!!dialogueNpc || escOpen || inventoryOpen || advancing)
   }, [dialogueNpc, escOpen, inventoryOpen, advancing])
 
+  // 대화/아이템 사용/농사 등으로 stamina가 바뀔 때마다 Phaser 씬의 내부 체력값도 맞춰준다 —
+  // 이동 중 체력 계산과 다른 이유로 값이 바뀐 뒤 다시 이동하면, 씬이 그 변화를 모른 채
+  // 자기가 들고 있던 오래된 값으로 되돌려버리는 문제(대화창을 닫고 걸으면 체력이 도로 올라가는
+  // 현상)가 있었다.
+  useEffect(() => {
+    const scene = gameRef.current?.scene.getScene('DayScene') as DayScene | undefined
+    scene?.syncStamina(stamina)
+  }, [stamina])
+
   useEffect(() => {
     function handleKeyDown(event: KeyboardEvent) {
       if (event.key !== 'Escape') return

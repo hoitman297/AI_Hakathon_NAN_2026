@@ -192,6 +192,13 @@ export class DayScene extends Phaser.Scene {
     this.cameras.main.setSize(gameSize.width, gameSize.height)
   }
 
+  /** 대화/아이템 사용/농사 등 이 씬 바깥에서 체력이 바뀌었을 때 내부 값도 맞춰준다 — 안 그러면
+   * 다음 이동 프레임에서 이 씬이 들고 있던(그 사이의 변화를 모르는) 오래된 체력값으로
+   * update()가 다시 계산해서 방금 반영된 변화를 덮어써 버린다. */
+  syncStamina(value: number) {
+    this.stamina = value
+  }
+
   setInputLocked(locked: boolean) {
     this.inputLocked = locked
     if (locked) {
