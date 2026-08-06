@@ -9,36 +9,31 @@ import org.springframework.transaction.annotation.Transactional;
 import com.gameproject.backend.client.LlmProxyClient;
 import com.gameproject.backend.domain.ClueCard;
 import com.gameproject.backend.domain.GameSession;
-import com.gameproject.backend.domain.InventoryItemType;
-import com.gameproject.backend.domain.NpcCaseAssignment;
-import com.gameproject.backend.domain.ShopItemCode;
-import com.gameproject.backend.domain.ShopItemMaster;
 import com.gameproject.backend.dto.ClueCardResponse;
 import com.gameproject.backend.dto.UnacquiredClueResponse;
 import com.gameproject.backend.repository.ClueCardRepository;
-import com.gameproject.backend.repository.GameSessionRepository;
-import com.gameproject.backend.repository.NpcCaseAssignmentRepository;
-import com.gameproject.backend.repository.ShopItemMasterRepository;
 
 import lombok.RequiredArgsConstructor;
 
+/**
+ * 단서 습득/조회와 명확화(clarify) 흐름 담당. clarify()의 DB 읽기/쓰기는
+ * {@link CluePersistenceService}의 짧은 트랜잭션들로 처리하고, 이 클래스는 그 사이에서
+ * LLM(llm-proxy) 호출만 담당한다 — 이유는 DialogueChatPersistenceService 클래스 주석 참고.
+ */
 @Service
 @RequiredArgsConstructor
 public class ClueService {
 
     private final ClueCardRepository clueCardRepository;
-    private final ShopItemMasterRepository shopItemMasterRepository;
-    private final GameSessionRepository sessionRepository;
-    private final InventoryService inventoryService;
     private final SessionService sessionService;
-    private final NpcCaseAssignmentRepository caseAssignmentRepository;
     private final LlmProxyClient llmProxyClient;
+    private final CluePersistenceService persistence;
 
     @Transactional(readOnly = true)
     public List<ClueCardResponse> listAcquired(Long sessionId) {
         GameSession session = sessionService.findSession(sessionId);
         return clueCardRepository.findBySessionAndAcquiredTrue(session).stream()
-                .map(this::toResponse)
+                .map(ClueService::toResponse)
                 .toList();
     }
 
@@ -62,7 +57,8 @@ public class ClueService {
     /** 사보타주 발생 장소에 가서 습득하는 동작 (지도/이동은 클라이언트 담당, 여기선 상태만 기록) */
     @Transactional
     public ClueCardResponse acquire(Long sessionId, Long clueId) {
-        ClueCard clue = getOwnedClue(sessionId, clueId);
+        GameSession session = sessionService.findSession(sessionId);
+        ClueCard clue = getOwnedClue(session, clueId);
         if (Boolean.TRUE.equals(clue.getAcquired())) {
             return toResponse(clue);
         }
@@ -72,38 +68,13 @@ public class ClueService {
     }
 
     /** 돋보기 1개를 소모해서 단서 문구를 더 명확하게 갱신 (1일 1회, 이미 명확화된 단서는 재사용 불가) */
-    @Transactional
     public ClueCardResponse clarify(Long sessionId, Long clueId) {
-        GameSession session = sessionService.findSession(sessionId);
-        ClueCard clue = getOwnedClue(sessionId, clueId);
-        if (!Boolean.TRUE.equals(clue.getAcquired())) {
-            throw new IllegalStateException("아직 습득하지 않은 단서입니다.");
-        }
-        if (clue.getTextClarified() != null) {
-            throw new IllegalStateException("이미 명확화된 단서입니다.");
-        }
-        if (session.getLastMagnifierUseDay() != null
-                && session.getLastMagnifierUseDay().equals(session.getCurrentDay())) {
-            throw new IllegalStateException("돋보기는 하루에 한 번만 사용할 수 있습니다.");
-        }
-
-        ShopItemMaster magnifier = shopItemMasterRepository.findByItemCode(ShopItemCode.MAGNIFIER)
-                .orElseThrow(() -> new IllegalStateException("돋보기 마스터 데이터가 없습니다."));
-        inventoryService.removeItem(session, InventoryItemType.SHOP_ITEM, magnifier.getItemId(), 1);
-
-        session.setLastMagnifierUseDay(session.getCurrentDay());
-        sessionRepository.save(session);
-
-        NpcCaseAssignment assignment = caseAssignmentRepository.findBySession(session)
-                .orElseThrow(() -> new IllegalStateException("범인 배정 정보가 없습니다."));
-        String clarifiedText = llmProxyClient.clarifyClueContent(
-                clue.getTopic().name(), assignment.getNpc().getAppearanceDesc(), clue.getTextAmbiguous());
-        clue.setTextClarified(clarifiedText);
-        return toResponse(clueCardRepository.save(clue));
+        ClarifyContext ctx = persistence.prepareClarify(sessionId, clueId);
+        String clarifiedText = llmProxyClient.clarifyClueContent(ctx.topicName(), ctx.appearanceDesc(), ctx.previousText());
+        return persistence.saveClarifiedText(ctx.clue(), clarifiedText);
     }
 
-    private ClueCard getOwnedClue(Long sessionId, Long clueId) {
-        GameSession session = sessionService.findSession(sessionId);
+    private ClueCard getOwnedClue(GameSession session, Long clueId) {
         ClueCard clue = clueCardRepository.findById(clueId)
                 .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 단서입니다: " + clueId));
         if (!clue.getSession().getSessionId().equals(session.getSessionId())) {
@@ -112,7 +83,7 @@ public class ClueService {
         return clue;
     }
 
-    private ClueCardResponse toResponse(ClueCard clue) {
+    static ClueCardResponse toResponse(ClueCard clue) {
         String text = clue.getTextClarified() != null ? clue.getTextClarified() : clue.getTextAmbiguous();
         return new ClueCardResponse(clue.getClueId(), clue.getTopic().name(), text, clue.getTextClarified() != null);
     }

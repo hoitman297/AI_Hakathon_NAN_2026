@@ -17,6 +17,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import com.anthropic.client.AnthropicClient;
+import com.anthropic.core.RequestOptions;
 import com.anthropic.models.messages.ContentBlock;
 import com.anthropic.models.messages.Message;
 import com.anthropic.models.messages.MessageCreateParams;
@@ -69,11 +70,17 @@ class LlmServiceTest {
     // generatePersona
     // ------------------------------------------------------------------
 
+    // generatePersona는 다른 메서드들과 달리 별도 타임아웃(RequestOptions)을 주는
+    // create(params, requestOptions) 2-인자 오버로드를 호출하므로, 1-인자 matcher로는
+    // 스텁이 매칭되지 않는다(매칭 안 되면 Mockito가 null을 반환 → NPE → 의도와 무관하게
+    // catch(RuntimeException) 폴백 경로로 빠져 우연히 "폴백" 계열 테스트만 통과해버리는
+    // 함정이 있었다) — 2-인자 matcher로 명시해서 실제로 검증하려는 경로를 정확히 탄다.
+
     @Test
     void generatePersona_success_returnsSerializedPersonaFromLlm() throws Exception {
         GeneratedPersona persona = new GeneratedPersona(1L, "나박수", "수박밭 주인", 32,
                 "다혈질", "사투리", "3년 키운 수박이여", null, false, List.of("아이고"));
-        when(messageService.create(any(StructuredMessageCreateParams.class)))
+        when(messageService.create(any(StructuredMessageCreateParams.class), any(RequestOptions.class)))
                 .thenReturn(structuredMessage(StopReason.END_TURN, new ObjectMapper().writeValueAsString(persona), GeneratedPersona.class));
 
         String json = llmService.generatePersona(1L, "나박수", "수박밭 주인", 32,
@@ -85,7 +92,7 @@ class LlmServiceTest {
 
     @Test
     void generatePersona_llmRefuses_fallsBackToInputFields() throws Exception {
-        when(messageService.create(any(StructuredMessageCreateParams.class)))
+        when(messageService.create(any(StructuredMessageCreateParams.class), any(RequestOptions.class)))
                 .thenReturn(structuredMessage(StopReason.REFUSAL, null, GeneratedPersona.class));
 
         String json = llmService.generatePersona(1L, "나박수", "수박밭 주인", 32,
@@ -99,7 +106,7 @@ class LlmServiceTest {
 
     @Test
     void generatePersona_llmThrows_fallsBackToInputFields() throws Exception {
-        when(messageService.create(any(StructuredMessageCreateParams.class)))
+        when(messageService.create(any(StructuredMessageCreateParams.class), any(RequestOptions.class)))
                 .thenThrow(new RuntimeException("network error"));
 
         String json = llmService.generatePersona(1L, "현수동", "이장", 70,
@@ -108,6 +115,21 @@ class LlmServiceTest {
         GeneratedPersona fallback = new ObjectMapper().readValue(json, GeneratedPersona.class);
         assertThat(fallback.name()).isEqualTo("현수동");
         assertThat(fallback.isCulprit()).isFalse();
+    }
+
+    @Test
+    void generatePersona_usesLongerTimeoutThanClientDefault() throws Exception {
+        GeneratedPersona persona = new GeneratedPersona(1L, "나박수", "수박밭 주인", 32,
+                "다혈질", "사투리", "3년 키운 수박이여", null, false, List.of("아이고"));
+        when(messageService.create(any(StructuredMessageCreateParams.class), any(RequestOptions.class)))
+                .thenReturn(structuredMessage(StopReason.END_TURN, new ObjectMapper().writeValueAsString(persona), GeneratedPersona.class));
+        ArgumentCaptor<RequestOptions> optionsCaptor = ArgumentCaptor.forClass(RequestOptions.class);
+
+        llmService.generatePersona(1L, "나박수", "수박밭 주인", 32, "다혈질", "사투리", "아이고", null);
+
+        verify(messageService).create(any(StructuredMessageCreateParams.class), optionsCaptor.capture());
+        assertThat(optionsCaptor.getValue().getTimeout()).isNotNull();
+        assertThat(optionsCaptor.getValue().getTimeout().request()).isEqualTo(java.time.Duration.ofSeconds(40));
     }
 
     // ------------------------------------------------------------------

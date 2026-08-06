@@ -9,6 +9,7 @@ import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.client.RestClientException;
+import org.springframework.web.client.RestClientResponseException;
 
 import com.gameproject.backend.service.AuthException;
 import com.gameproject.backend.service.ForbiddenException;
@@ -45,10 +46,30 @@ public class GlobalExceptionHandler {
     }
 
     /**
-     * llm-proxy(대화/페르소나 생성) 호출이 타임아웃되거나 연결/응답 처리에 실패한 경우.
-     * 연결 단계 실패는 ResourceAccessException으로 오지만, 응답 바디를 읽는 도중 타임아웃이 나면
-     * (RestClient가 응답 헤더/스트림을 늦게 받는 경우) 상위 타입인 RestClientException으로만 온다 —
-     * 실제로 대화 중 read timeout이 이 경로로 발생해 500으로 새는 걸 확인하고 상위 타입으로 넓혔다.
+     * llm-proxy가 연결/타임아웃 실패가 아니라 명시적인 HTTP 오류 상태로 응답한 경우
+     * (예: INTERNAL_API_KEY 불일치로 인한 401, 잘못된 경로로 인한 404, llm-proxy 내부 5xx).
+     * RestClientResponseException은 아래 RestClientException의 하위 타입이라 더 구체적인
+     * 이 핸들러가 먼저 매칭된다.
+     *
+     * <p>이 핸들러가 없으면 이런 즉시-실패 케이스도 아래 handleUpstreamTimeout이 잡아서
+     * "LLM 서버 응답이 지연되고 있습니다"로 뭉뚱그려지는데, 실제로는 "지연"이 아니라
+     * 설정/배포 문제(예: 두 서비스의 API 키가 어긋남)라서 원인 파악이 크게 늦어진다 —
+     * 응답 지연 진단 중 이 구분이 없어서 헛다리를 짚을 뻔한 적이 있어 분리했다.
+     */
+    @ExceptionHandler(RestClientResponseException.class)
+    public ResponseEntity<Map<String, String>> handleUpstreamHttpError(RestClientResponseException e) {
+        return ResponseEntity.status(HttpStatus.BAD_GATEWAY)
+                .body(Map.of("error", "LLM 서버 연동 중 오류가 발생했습니다 (상태 코드 "
+                        + e.getStatusCode().value() + "). 잠시 후 다시 시도해주세요."));
+    }
+
+    /**
+     * llm-proxy(대화/페르소나 생성) 호출이 타임아웃되거나 연결에 실패한 경우(응답 자체를
+     * 못 받음). 연결 단계 실패는 ResourceAccessException으로 오지만, 응답 바디를 읽는 도중
+     * 타임아웃이 나면(RestClient가 응답 헤더/스트림을 늦게 받는 경우) 상위 타입인
+     * RestClientException으로만 온다 — 실제로 대화 중 read timeout이 이 경로로 발생해 500으로
+     * 새는 걸 확인하고 상위 타입으로 넓혔다. HTTP 오류 상태로 응답이 오긴 온 경우는 위
+     * handleUpstreamHttpError가 먼저 잡으므로 여기로는 안 온다.
      */
     @ExceptionHandler(RestClientException.class)
     public ResponseEntity<Map<String, String>> handleUpstreamTimeout(RestClientException e) {

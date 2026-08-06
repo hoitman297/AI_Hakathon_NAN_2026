@@ -1,5 +1,6 @@
 package com.gameproject.llmproxy.service;
 
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -8,6 +9,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import com.anthropic.client.AnthropicClient;
+import com.anthropic.core.RequestOptions;
 import com.anthropic.models.messages.Message;
 import com.anthropic.models.messages.MessageCreateParams;
 import com.anthropic.models.messages.MessageParam;
@@ -38,6 +40,17 @@ public class LlmService {
      * LLM이 이 범위를 벗어난 값을 낼 가능성에 대비해 애플리케이션 코드에서 방어적으로 clamp한다. */
     private static final int AFFINITY_DELTA_MIN = -5;
     private static final int AFFINITY_DELTA_MAX = 5;
+
+    /**
+     * AnthropicClientConfig의 클라이언트 기본 타임아웃(30초)은 실시간 대화(chat)를 기준으로
+     * 빠듯하게 잡은 값이다. 페르소나 생성은 NPC당 최초 1회, 대화 흐름을 막지 않는 시점(첫 상호작용
+     * 시점)에 실행되고 실측 지연도 더 크므로(~23초 — maxTokens가 가장 큰데도 이벤트/엔딩과 비슷한
+     * 수준인 걸 보면 네트워크·모델 지연이 지배적) 30초로는 여유가 6~7초뿐이라 살짝만 느려져도
+     * 폴백 페르소나로 조용히 굳어버린다(페르소나는 캐싱되어 이후 재생성되지 않음). backend가
+     * llm-proxy 호출 전체에 두는 예산(45초)보다는 짧게, chat보다는 넉넉하게 40초로 별도 지정한다.
+     */
+    private static final RequestOptions PERSONA_REQUEST_OPTIONS =
+            RequestOptions.builder().timeout(Duration.ofSeconds(40)).build();
 
     private final AnthropicClient anthropicClient;
     private final ObjectMapper objectMapper;
@@ -78,7 +91,7 @@ public class LlmService {
                     .addUserMessage(userPrompt)
                     .build();
 
-            var response = anthropicClient.messages().create(params);
+            var response = anthropicClient.messages().create(params, PERSONA_REQUEST_OPTIONS);
             checkRefusal(response.stopReason(), "페르소나 생성");
 
             GeneratedPersona persona = response.content().stream()

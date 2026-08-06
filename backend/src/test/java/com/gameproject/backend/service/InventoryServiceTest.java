@@ -1,13 +1,12 @@
 package com.gameproject.backend.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.time.LocalDateTime;
 import java.util.List;
-import java.util.Optional;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -18,21 +17,19 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import com.gameproject.backend.client.LlmProxyClient;
 import com.gameproject.backend.domain.Account;
 import com.gameproject.backend.domain.GameSession;
-import com.gameproject.backend.domain.InventoryItem;
-import com.gameproject.backend.domain.InventoryItemType;
-import com.gameproject.backend.domain.ItemCategory;
-import com.gameproject.backend.domain.Npc;
 import com.gameproject.backend.domain.SessionStatus;
-import com.gameproject.backend.domain.ShopItemCode;
-import com.gameproject.backend.domain.ShopItemMaster;
 import com.gameproject.backend.dto.InventorySlotResponse;
 import com.gameproject.backend.repository.CropMasterRepository;
 import com.gameproject.backend.repository.FruitMasterRepository;
-import com.gameproject.backend.repository.GameSessionRepository;
 import com.gameproject.backend.repository.InventoryItemRepository;
-import com.gameproject.backend.repository.NpcRepository;
 import com.gameproject.backend.repository.ShopItemMasterRepository;
 
+/**
+ * useItem()의 DB 읽기/쓰기는 InventoryPersistenceService(짧은 트랜잭션)로 옮겨졌으므로, 이
+ * 테스트는 "LLM 호출(선물 반응 생성)은 항상 그 트랜잭션 바깥에서 일어난다"는 오케스트레이션만
+ * 검증한다. InventoryPersistenceService 자체 로직(아이템별 효과, 소모 등)은
+ * InventoryPersistenceServiceTest에서 검증한다.
+ */
 @ExtendWith(MockitoExtension.class)
 class InventoryServiceTest {
 
@@ -45,17 +42,11 @@ class InventoryServiceTest {
     @Mock
     private ShopItemMasterRepository shopItemMasterRepository;
     @Mock
-    private NpcRepository npcRepository;
-    @Mock
-    private GameSessionRepository sessionRepository;
-    @Mock
-    private StaminaService staminaService;
-    @Mock
-    private NpcService npcService;
-    @Mock
     private SessionService sessionService;
     @Mock
     private LlmProxyClient llmProxyClient;
+    @Mock
+    private InventoryPersistenceService persistence;
 
     private InventoryService inventoryService;
 
@@ -64,8 +55,7 @@ class InventoryServiceTest {
     @BeforeEach
     void setUp() {
         inventoryService = new InventoryService(inventoryItemRepository, cropMasterRepository, fruitMasterRepository,
-                shopItemMasterRepository, npcRepository, sessionRepository, staminaService, npcService, sessionService,
-                llmProxyClient);
+                shopItemMasterRepository, sessionService, llmProxyClient, persistence);
 
         Account account = Account.builder().accountId(1L).username("u").passwordHash("h").nickname("n")
                 .createdAt(LocalDateTime.now()).build();
@@ -75,12 +65,11 @@ class InventoryServiceTest {
                 .startedAt(LocalDateTime.now())
                 .sneakersEquipped(false)
                 .build();
-
-        when(sessionService.findSession(100L)).thenReturn(session);
     }
 
     @Test
     void list_fetchesSessionThroughSessionServiceRatherThanReceivingDetachedEntity() {
+        when(sessionService.findSession(100L)).thenReturn(session);
         when(inventoryItemRepository.findBySession(session)).thenReturn(List.of());
 
         List<InventorySlotResponse> result = inventoryService.list(100L);
@@ -90,59 +79,42 @@ class InventoryServiceTest {
     }
 
     @Test
-    void useItem_sneakers_equipsAndConsumesFromInventory() {
-        InventoryItem sneakersSlot = InventoryItem.builder().session(session).slotIndex(1)
-                .itemType(InventoryItemType.SHOP_ITEM).itemRefId(1L).quantity(1).build();
-        ShopItemMaster sneakers = ShopItemMaster.builder()
-                .itemId(1L).name("운동화").itemCode(ShopItemCode.SNEAKERS).category(ItemCategory.PERMANENT_EQUIPMENT)
-                .price(50).build();
-        when(inventoryItemRepository.findBySessionAndSlotIndex(session, 1)).thenReturn(Optional.of(sneakersSlot));
-        when(shopItemMasterRepository.findById(1L)).thenReturn(Optional.of(sneakers));
+    void useItem_nonGiftItem_returnsFinishedMessageWithoutAnyLlmCall() {
+        when(persistence.prepareUseItem(100L, 1, null))
+                .thenReturn(UseItemOutcome.finished("운동화를 장착했습니다. 이동 체력 소모가 줄어듭니다."));
 
         String result = inventoryService.useItem(100L, 1, null);
 
-        assertThat(result).contains("장착");
-        assertThat(session.getSneakersEquipped()).isTrue();
-        verify(inventoryItemRepository).delete(sneakersSlot); // quantity 1개라 소모 시 슬롯 자체가 삭제됨
+        assertThat(result).isEqualTo("운동화를 장착했습니다. 이동 체력 소모가 줄어듭니다.");
+        verify(llmProxyClient, never())
+                .generateGiftReaction(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(),
+                        org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(),
+                        org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any());
     }
 
     @Test
-    void useItem_magnifier_doesNotConsumeOrThrow_directsToClueScreenInstead() {
-        // 돋보기는 어떤 단서를 명확화할지 지정해야 해서, 실제 소모는
-        // ClueService.clarify()에서 처리한다 — 여기서는 안내 메시지만 반환하고 아무것도 소모하지 않는다.
-        InventoryItem magnifierSlot = InventoryItem.builder().session(session).slotIndex(2)
-                .itemType(InventoryItemType.SHOP_ITEM).itemRefId(2L).quantity(1).build();
-        ShopItemMaster magnifier = ShopItemMaster.builder()
-                .itemId(2L).name("돋보기").itemCode(ShopItemCode.MAGNIFIER).category(ItemCategory.CONSUMABLE)
-                .price(30).build();
-        when(inventoryItemRepository.findBySessionAndSlotIndex(session, 2)).thenReturn(Optional.of(magnifierSlot));
-        when(shopItemMasterRepository.findById(2L)).thenReturn(Optional.of(magnifier));
-
-        String result = inventoryService.useItem(100L, 2, null);
-
-        assertThat(result).contains("단서 카드 화면");
-        verify(inventoryItemRepository, org.mockito.Mockito.never()).delete(any());
-        verify(inventoryItemRepository, org.mockito.Mockito.never()).save(any());
-    }
-
-    @Test
-    void useItem_giftSet_includesLlmGeneratedReactionInResult() {
-        InventoryItem giftSlot = InventoryItem.builder().session(session).slotIndex(3)
-                .itemType(InventoryItemType.SHOP_ITEM).itemRefId(4L).quantity(1).build();
-        ShopItemMaster giftSet = ShopItemMaster.builder()
-                .itemId(4L).name("선물세트").itemCode(ShopItemCode.GIFT_SET).category(ItemCategory.CONSUMABLE)
-                .price(40).build();
-        Npc target = Npc.builder().npcId(2L).name("나주부").role("아내").age(32)
-                .personalityDesc("상냥함").speechStyle("존댓말").sampleLine("어머").build();
-        when(inventoryItemRepository.findBySessionAndSlotIndex(session, 3)).thenReturn(Optional.of(giftSlot));
-        when(shopItemMasterRepository.findById(4L)).thenReturn(Optional.of(giftSet));
-        when(npcRepository.findById(2L)).thenReturn(Optional.of(target));
-        when(npcService.adjustAffinity(any(), any(), org.mockito.ArgumentMatchers.anyInt())).thenReturn(60);
+    void useItem_giftSet_callsLlmAfterPersistenceAndBuildsMessage() {
+        UseItemOutcome outcome = new UseItemOutcome(null, "나주부", "아내", 32,
+                "상냥함", "존댓말", "어머", 5, 60);
+        when(persistence.prepareUseItem(100L, 3, 2L)).thenReturn(outcome);
         when(llmProxyClient.generateGiftReaction("나주부", "아내", 32, "상냥함", "존댓말", "어머"))
                 .thenReturn("어머, 이런 것까지... 고마워요!");
 
         String result = inventoryService.useItem(100L, 3, 2L);
 
-        assertThat(result).contains("어머, 이런 것까지... 고마워요!").contains("호감도 +");
+        assertThat(result).contains("어머, 이런 것까지... 고마워요!").contains("호감도 +5").contains("60");
+    }
+
+    @Test
+    void useItem_giftSet_llmReturnsNull_fallsBackToDefaultReaction() {
+        UseItemOutcome outcome = new UseItemOutcome(null, "나주부", "아내", 32,
+                "상냥함", "존댓말", "어머", 5, 60);
+        when(persistence.prepareUseItem(100L, 3, 2L)).thenReturn(outcome);
+        when(llmProxyClient.generateGiftReaction("나주부", "아내", 32, "상냥함", "존댓말", "어머"))
+                .thenReturn(null);
+
+        String result = inventoryService.useItem(100L, 3, 2L);
+
+        assertThat(result).contains("나주부이(가) 선물을 받고 반가워합니다.");
     }
 }

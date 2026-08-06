@@ -2,7 +2,6 @@ package com.gameproject.backend.service;
 
 import java.util.List;
 import java.util.Optional;
-import java.util.Random;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -13,19 +12,20 @@ import com.gameproject.backend.domain.FruitMaster;
 import com.gameproject.backend.domain.GameSession;
 import com.gameproject.backend.domain.InventoryItem;
 import com.gameproject.backend.domain.InventoryItemType;
-import com.gameproject.backend.domain.Npc;
-import com.gameproject.backend.domain.ShopItemCode;
 import com.gameproject.backend.domain.ShopItemMaster;
 import com.gameproject.backend.dto.InventorySlotResponse;
 import com.gameproject.backend.repository.CropMasterRepository;
 import com.gameproject.backend.repository.FruitMasterRepository;
-import com.gameproject.backend.repository.GameSessionRepository;
 import com.gameproject.backend.repository.InventoryItemRepository;
-import com.gameproject.backend.repository.NpcRepository;
 import com.gameproject.backend.repository.ShopItemMasterRepository;
 
 import lombok.RequiredArgsConstructor;
 
+/**
+ * useItem()의 선물세트(GIFT_SET) 분기만 LLM(NPC 반응 생성)을 호출한다. 그 DB 읽기/쓰기는
+ * {@link InventoryPersistenceService}의 트랜잭션으로 처리하고, 이 클래스는 그 뒤에서
+ * LLM 호출만 담당한다 — 이유는 DialogueChatPersistenceService 클래스 주석 참고.
+ */
 @Service
 @RequiredArgsConstructor
 public class InventoryService {
@@ -34,14 +34,9 @@ public class InventoryService {
     private final CropMasterRepository cropMasterRepository;
     private final FruitMasterRepository fruitMasterRepository;
     private final ShopItemMasterRepository shopItemMasterRepository;
-    private final NpcRepository npcRepository;
-    private final GameSessionRepository sessionRepository;
-    private final StaminaService staminaService;
-    private final NpcService npcService;
     private final SessionService sessionService;
     private final LlmProxyClient llmProxyClient;
-
-    private final Random random = new Random();
+    private final InventoryPersistenceService persistence;
 
     /**
      * 세션 ID만 받아 이 메서드의 트랜잭션 안에서 직접 조회한다 — 컨트롤러에서 미리 조회한
@@ -115,95 +110,18 @@ public class InventoryService {
      * - CROP/FRUIT: 1개 소모하고 섭취회복만큼 체력 회복
      * - SHOP_ITEM(운동화/거짓말탐지기/돋보기/선물세트): 아이템별 효과 적용
      */
-    @Transactional
     public String useItem(Long sessionId, Integer slotIndex, Long targetNpcId) {
-        GameSession session = sessionService.findSession(sessionId);
-        InventoryItem item = inventoryItemRepository.findBySessionAndSlotIndex(session, slotIndex)
-                .orElseThrow(() -> new IllegalArgumentException("해당 슬롯에 아이템이 없습니다: " + slotIndex));
-
-        switch (item.getItemType()) {
-            case CROP -> {
-                CropMaster crop = cropMasterRepository.findById(item.getItemRefId())
-                        .orElseThrow(() -> new IllegalStateException("작물 마스터 데이터를 찾을 수 없습니다."));
-                consumeOne(session, item);
-                restoreStamina(session, crop.getRestoreHp());
-                return crop.getName() + " 섭취, 체력 " + crop.getRestoreHp() + " 회복";
-            }
-            case FRUIT -> {
-                FruitMaster fruit = fruitMasterRepository.findById(item.getItemRefId())
-                        .orElseThrow(() -> new IllegalStateException("과일 마스터 데이터를 찾을 수 없습니다."));
-                consumeOne(session, item);
-                restoreStamina(session, fruit.getRestoreHp());
-                return fruit.getName() + " 섭취, 체력 " + fruit.getRestoreHp() + " 회복";
-            }
-            case SHOP_ITEM -> {
-                ShopItemMaster shopItem = shopItemMasterRepository.findById(item.getItemRefId())
-                        .orElseThrow(() -> new IllegalStateException("상점 아이템 마스터 데이터를 찾을 수 없습니다."));
-                return applyShopItemEffect(session, item, shopItem, targetNpcId);
-            }
-            default -> throw new IllegalStateException("알 수 없는 아이템 타입입니다.");
+        UseItemOutcome outcome = persistence.prepareUseItem(sessionId, slotIndex, targetNpcId);
+        if (outcome.finishedMessage() != null) {
+            return outcome.finishedMessage();
         }
-    }
 
-    private String applyShopItemEffect(GameSession session, InventoryItem item, ShopItemMaster shopItem, Long targetNpcId) {
-        String result = switch (shopItem.getItemCode()) {
-            case SNEAKERS -> {
-                session.setSneakersEquipped(true);
-                sessionRepository.save(session);
-                consumeOne(session, item); // 1회 구매/영구 장착 후 인벤토리에서는 사라짐
-                yield "운동화를 장착했습니다. 이동 체력 소모가 줄어듭니다.";
-            }
-            case LIE_DETECTOR -> {
-                if (targetNpcId == null) {
-                    throw new IllegalArgumentException("거짓말탐지기는 대상 NPC(targetNpcId)가 필요합니다.");
-                }
-                if (session.getLastLieDetectorUseDay() != null
-                        && session.getLastLieDetectorUseDay().equals(session.getCurrentDay())) {
-                    throw new IllegalStateException("거짓말탐지기는 하루에 한 번만 사용할 수 있습니다.");
-                }
-                session.setHonestModeNpcId(targetNpcId);
-                session.setHonestModeDay(session.getCurrentDay());
-                session.setLastLieDetectorUseDay(session.getCurrentDay());
-                sessionRepository.save(session);
-                consumeOne(session, item);
-                yield "다음 대화 1턴 동안 정직 모드가 적용됩니다.";
-            }
-            case GIFT_SET -> {
-                if (targetNpcId == null) {
-                    throw new IllegalArgumentException("선물세트는 대상 NPC(targetNpcId)가 필요합니다.");
-                }
-                Npc target = npcRepository.findById(targetNpcId)
-                        .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 NPC입니다: " + targetNpcId));
-                int gain = GameConstants.AFFINITY_GIFT_MIN
-                        + random.nextInt(GameConstants.AFFINITY_GIFT_MAX - GameConstants.AFFINITY_GIFT_MIN + 1);
-                int newScore = npcService.adjustAffinity(session, target, gain);
-                consumeOne(session, item);
-                String reaction = llmProxyClient.generateGiftReaction(target.getName(), target.getRole(),
-                        target.getAge(), target.getPersonalityDesc(), target.getSpeechStyle(), target.getSampleLine());
-                if (reaction == null) {
-                    reaction = target.getName() + "이(가) 선물을 받고 반가워합니다.";
-                }
-                yield reaction + " (호감도 +" + gain + ", 현재 " + newScore + ")";
-            }
-            case MAGNIFIER ->
-                    // 돋보기는 어떤 단서를 명확화할지 지정해야 하므로 실제 소모/적용은
-                    // POST /api/sessions/{id}/clues/{clueId}/clarify 에서 처리한다.
-                    "돋보기는 단서 카드 화면에서 '명확화' 기능으로 사용하세요.";
-        };
-        return result;
-    }
-
-    private void consumeOne(GameSession session, InventoryItem item) {
-        if (item.getQuantity() <= 1) {
-            inventoryItemRepository.delete(item);
-        } else {
-            item.setQuantity(item.getQuantity() - 1);
-            inventoryItemRepository.save(item);
+        String reaction = llmProxyClient.generateGiftReaction(outcome.targetName(), outcome.targetRole(),
+                outcome.targetAge(), outcome.targetPersonalityDesc(), outcome.targetSpeechStyle(), outcome.targetSampleLine());
+        if (reaction == null) {
+            reaction = outcome.targetName() + "이(가) 선물을 받고 반가워합니다.";
         }
-    }
-
-    private void restoreStamina(GameSession session, int amount) {
-        staminaService.restore(session, amount);
+        return reaction + " (호감도 +" + outcome.gain() + ", 현재 " + outcome.newAffinityScore() + ")";
     }
 
     private String resolveName(InventoryItemType type, Long refId) {
