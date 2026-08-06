@@ -43,7 +43,12 @@ export function NightTransitionScreen({ sessionId, day, nextDay, onContinue }: N
           <p className="night-note">(사보타주 상세 내용은 추후 단서 카드로 확인할 수 있습니다.)</p>
         )}
 
-        <button className="pixel-button pixel-button--accent" onClick={onContinue}>
+        <button
+          className="pixel-button pixel-button--accent"
+          onClick={onContinue}
+          disabled={loading}
+          title={loading ? '지난밤 소식을 확인하는 중입니다.' : undefined}
+        >
           {nextDay}일차 아침으로
         </button>
       </div>

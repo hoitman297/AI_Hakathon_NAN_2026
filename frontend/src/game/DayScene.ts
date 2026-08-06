@@ -155,7 +155,7 @@ export class DayScene extends Phaser.Scene {
 
     this.cameras.main.setBounds(0, 0, WORLD_W, WORLD_H)
     this.cameras.main.startFollow(this.player, true, 0.15, 0.15)
-    this.cameras.main.setZoom(1.4)
+    this.cameras.main.setZoom(1.7)
 
     // RESIZE 스케일 모드에서는 캔버스가 브라우저 창 크기에 맞춰 계속 바뀌는데,
     // 카메라 뷰포트는 자동으로 따라오지 않으므로 직접 맞춰줘야 한다.
