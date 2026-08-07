@@ -1,13 +1,19 @@
 package com.gameproject.backend.config;
 
+import org.slf4j.MDC;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.web.client.RestClient;
 
+import com.gameproject.backend.web.SessionOwnershipInterceptor;
+
 @Configuration
 public class LlmProxyRestClientConfig {
+
+    /** llm-proxy 쪽 SessionIdMdcFilter가 이 헤더명으로 읽어 자기 MDC에도 심는다. */
+    private static final String SESSION_ID_HEADER = "X-Session-Id";
 
     /**
      * DialogueService/AccusationService가 @Transactional 안에서 이 클라이언트로
@@ -36,6 +42,13 @@ public class LlmProxyRestClientConfig {
                 .baseUrl(baseUrl)
                 .defaultHeader("X-Internal-Api-Key", apiKey)
                 .requestFactory(requestFactory)
+                .requestInterceptor((request, body, execution) -> {
+                    String sessionId = MDC.get(SessionOwnershipInterceptor.SESSION_ID_MDC_KEY);
+                    if (sessionId != null) {
+                        request.getHeaders().add(SESSION_ID_HEADER, sessionId);
+                    }
+                    return execution.execute(request, body);
+                })
                 .build();
     }
 }
