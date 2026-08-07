@@ -7,6 +7,17 @@ spring:
 server:
   port: ${SERVER_PORT:8081}
 
+# 배포 플랫폼(Render 등)이 이 서비스의 생존 여부를 확인할 수 있도록 헬스체크만 공개
+# 노출한다 (InternalApiKeyFilter는 /internal/** 만 막으므로 /actuator/health는 그대로 통과됨).
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+  endpoint:
+    health:
+      show-details: never
+
 anthropic:
   api-key: ${LLM_API_KEY}
   model: ${LLM_MODEL:claude-opus-5}

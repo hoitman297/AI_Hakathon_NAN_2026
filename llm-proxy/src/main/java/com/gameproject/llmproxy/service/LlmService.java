@@ -10,12 +10,15 @@ import org.springframework.stereotype.Service;
 
 import com.anthropic.client.AnthropicClient;
 import com.anthropic.core.RequestOptions;
+import com.anthropic.models.messages.CacheControlEphemeral;
 import com.anthropic.models.messages.Message;
 import com.anthropic.models.messages.MessageCreateParams;
 import com.anthropic.models.messages.MessageParam;
 import com.anthropic.models.messages.StopReason;
 import com.anthropic.models.messages.StructuredMessageCreateParams;
+import com.anthropic.models.messages.TextBlockParam;
 import com.anthropic.models.messages.ThinkingConfigDisabled;
+import com.anthropic.models.messages.Usage;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.gameproject.llmproxy.dto.DialogueChatRequest;
@@ -101,6 +104,7 @@ public class LlmService {
 
             var response = anthropicClient.messages().create(params, PERSONA_REQUEST_OPTIONS);
             checkRefusal(response.stopReason(), "페르소나 생성");
+            logUsage("페르소나 생성", response.usage());
 
             GeneratedPersona persona = response.content().stream()
                     .flatMap(block -> block.text().stream())
@@ -121,13 +125,21 @@ public class LlmService {
     public DialogueChatResponse chat(DialogueChatRequest request) {
         GeneratedPersona persona = parsePersona(request.personaJson());
 
+        // 캐릭터 시트(이름/성격/말투/배경)는 같은 세션 안에서 이 NPC와 나누는 모든 턴에 걸쳐
+        // 토씨 하나 안 바뀐다 — 프롬프트 캐싱 브레이크포인트를 여기 걸어두면, 같은 NPC와
+        // 대화를 이어갈수록(체력 허용 한도 내 하루 최대 ~12회) 매턴 이 부분만큼의 입력
+        // 토큰을 캐시로 대체해 비용/지연을 줄일 수 있다. 호감도 점수·목격담·최근 마을 소식
+        // 등 턴마다 바뀌는 내용은 별도 블록으로 뒤에 붙여서 캐시 적중을 깨지 않게 한다.
+        String personaBlock = """
+                당신은 '%s'(%s, %s세) 역할을 연기합니다.
+                성격: %s
+                말투: %s
+                배경: %s
+                이 말투와 배경에 맞춰 1~3문장으로 짧게 대답하세요. 캐릭터에서 벗어나지 마세요.
+                """.formatted(persona.name(), persona.role(), persona.age(),
+                persona.personality(), persona.speechStyle(), persona.backstory());
+
         StringBuilder systemPrompt = new StringBuilder();
-        systemPrompt.append("당신은 '%s'(%s, %s세) 역할을 연기합니다.\n".formatted(
-                persona.name(), persona.role(), persona.age()));
-        systemPrompt.append("성격: %s\n".formatted(persona.personality()));
-        systemPrompt.append("말투: %s\n".formatted(persona.speechStyle()));
-        systemPrompt.append("배경: %s\n".formatted(persona.backstory()));
-        systemPrompt.append("이 말투와 배경에 맞춰 1~3문장으로 짧게 대답하세요. 캐릭터에서 벗어나지 마세요.\n");
         if (request.honestMode()) {
             systemPrompt.append("지금은 '정직 모드'입니다: 알리바이 관련 질문에 평소보다 더 구체적으로 답하되, ")
                     .append("본인이 범인인지 여부는 절대 직접 밝히지 마세요.\n");
@@ -184,10 +196,19 @@ public class LlmService {
         messages.add(MessageParam.builder().role(MessageParam.Role.USER).content(request.userMessage()).build());
 
         try {
+            List<TextBlockParam> systemBlocks = List.of(
+                    TextBlockParam.builder()
+                            .text(personaBlock)
+                            .cacheControl(CacheControlEphemeral.builder().build())
+                            .build(),
+                    TextBlockParam.builder()
+                            .text(systemPrompt.toString())
+                            .build());
+
             StructuredMessageCreateParams<DialogueChatResponse> params = MessageCreateParams.builder()
                     .model(chatModel)
                     .maxTokens(1024L)
-                    .system(systemPrompt.toString())
+                    .systemOfTextBlockParams(systemBlocks)
                     .thinking(ThinkingConfigDisabled.builder().build())
                     .outputConfig(DialogueChatResponse.class)
                     .messages(messages)
@@ -195,6 +216,7 @@ public class LlmService {
 
             var response = anthropicClient.messages().create(params);
             checkRefusal(response.stopReason(), "대화 응답");
+            logUsage("대화", response.usage());
 
             DialogueChatResponse result = response.content().stream()
                     .flatMap(block -> block.text().stream())
@@ -276,6 +298,7 @@ public class LlmService {
 
             Message response = anthropicClient.messages().create(params);
             checkRefusal(response.stopReason(), "랜덤 이벤트 연출");
+            logUsage("랜덤 이벤트 연출", response.usage());
 
             return response.content().stream()
                     .flatMap(block -> block.text().stream())
@@ -318,6 +341,7 @@ public class LlmService {
 
             Message response = anthropicClient.messages().create(params);
             checkRefusal(response.stopReason(), "밤 사보타주 아침 알림 생성");
+            logUsage("밤 사보타주 아침 알림 생성", response.usage());
 
             return response.content().stream()
                     .flatMap(block -> block.text().stream())
@@ -358,6 +382,7 @@ public class LlmService {
 
             Message response = anthropicClient.messages().create(params);
             checkRefusal(response.stopReason(), "선물 반응 생성");
+            logUsage("선물 반응 생성", response.usage());
 
             return response.content().stream()
                     .flatMap(block -> block.text().stream())
@@ -405,6 +430,7 @@ public class LlmService {
 
             Message response = anthropicClient.messages().create(params);
             checkRefusal(response.stopReason(), "오답 고발 반응 생성");
+            logUsage("오답 고발 반응 생성", response.usage());
 
             return response.content().stream()
                     .flatMap(block -> block.text().stream())
@@ -449,6 +475,7 @@ public class LlmService {
 
             Message response = anthropicClient.messages().create(params);
             checkRefusal(response.stopReason(), "엔딩 스토리 생성");
+            logUsage("엔딩 스토리 생성", response.usage());
 
             return response.content().stream()
                     .flatMap(block -> block.text().stream())
@@ -502,6 +529,7 @@ public class LlmService {
 
             Message response = anthropicClient.messages().create(params);
             checkRefusal(response.stopReason(), "단서 카드 생성");
+            logUsage("단서 카드 생성", response.usage());
 
             return response.content().stream()
                     .flatMap(block -> block.text().stream())
@@ -538,6 +566,7 @@ public class LlmService {
 
             Message response = anthropicClient.messages().create(params);
             checkRefusal(response.stopReason(), "단서 카드 명확화");
+            logUsage("단서 카드 명확화", response.usage());
 
             return response.content().stream()
                     .flatMap(block -> block.text().stream())
@@ -593,6 +622,17 @@ public class LlmService {
         if (stopReason.filter(StopReason.REFUSAL::equals).isPresent()) {
             throw new IllegalStateException("LLM이 안전 정책상 응답을 거부했습니다 (" + context + ")");
         }
+    }
+
+    /**
+     * 호출 지점별 토큰 사용량을 로그로 남긴다 — 지금까지는 Anthropic 콘솔을 직접 봐야만
+     * 어떤 기능이 비용을 얼마나 쓰는지 알 수 있었다. cacheRead가 0보다 크면 chat()의 프롬프트
+     * 캐싱(페르소나 블록)이 실제로 적중했다는 뜻이라, 캐싱 효과를 이 로그만으로 확인할 수 있다.
+     */
+    private void logUsage(String context, Usage usage) {
+        log.info("LLM 사용량 ({}): input={} output={} cacheWrite={} cacheRead={}",
+                context, usage.inputTokens(), usage.outputTokens(),
+                usage.cacheCreationInputTokens().orElse(0L), usage.cacheReadInputTokens().orElse(0L));
     }
 
     private GeneratedPersona parsePersona(String personaJson) {

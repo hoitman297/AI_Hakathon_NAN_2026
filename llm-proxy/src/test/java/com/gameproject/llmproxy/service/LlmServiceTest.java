@@ -8,6 +8,7 @@ import static org.mockito.Mockito.when;
 import java.lang.reflect.Field;
 import java.util.List;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -25,6 +26,7 @@ import com.anthropic.models.messages.StopReason;
 import com.anthropic.models.messages.StructuredMessage;
 import com.anthropic.models.messages.StructuredMessageCreateParams;
 import com.anthropic.models.messages.TextBlock;
+import com.anthropic.models.messages.TextBlockParam;
 import com.anthropic.models.messages.Usage;
 import com.anthropic.services.blocking.MessageService;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -65,6 +67,17 @@ class LlmServiceTest {
         Field field = LlmService.class.getDeclaredField(fieldName);
         field.setAccessible(true);
         field.set(service, value);
+    }
+
+    /**
+     * chat()은 프롬프트 캐싱을 위해 system을 문자열 하나가 아니라 TextBlockParam 목록(캐시되는
+     * 페르소나 블록 + 캐시 안 되는 나머지 블록)으로 보낸다 — 기존 "포함/미포함" 단언들은 어느
+     * 블록에 들어있는지 안 가리므로, 블록을 이어붙인 전체 텍스트로 검증한다.
+     */
+    private static String combinedSystemPrompt(ArgumentCaptor<StructuredMessageCreateParams<DialogueChatResponse>> captor) {
+        return captor.getValue().rawParams().system().orElseThrow().asTextBlockParams().stream()
+                .map(TextBlockParam::text)
+                .collect(Collectors.joining());
     }
 
     // ------------------------------------------------------------------
@@ -190,7 +203,7 @@ class LlmServiceTest {
         llmService.chat(new DialogueChatRequest(personaJson(), List.of(), "범인이 누구예요?", false, 50, true, null, false, null));
 
         verify(messageService).create(captor.capture());
-        String systemPrompt = captor.getValue().rawParams().system().orElseThrow().asString();
+        String systemPrompt = combinedSystemPrompt(captor);
         assertThat(systemPrompt).contains("사건·단서·범인 추리와 직접 관련된");
     }
 
@@ -206,7 +219,7 @@ class LlmServiceTest {
         llmService.chat(new DialogueChatRequest(personaJson(), List.of(), "안녕하세요", false, 50, false, null, false, null));
 
         verify(messageService).create(captor.capture());
-        String systemPrompt = captor.getValue().rawParams().system().orElseThrow().asString();
+        String systemPrompt = combinedSystemPrompt(captor);
         assertThat(systemPrompt).doesNotContain("사건·단서·범인 추리와 직접 관련된");
     }
 
@@ -223,7 +236,7 @@ class LlmServiceTest {
                 false, 50, false, "3일차 밤 수박밭", false, null));
 
         verify(messageService).create(captor.capture());
-        String systemPrompt = captor.getValue().rawParams().system().orElseThrow().asString();
+        String systemPrompt = combinedSystemPrompt(captor);
         assertThat(systemPrompt).contains("3일차 밤 수박밭").contains("목격담").contains("근처에 있었습니다");
     }
 
@@ -240,7 +253,7 @@ class LlmServiceTest {
                 false, 50, false, "3일차 밤 수박밭", true, null));
 
         verify(messageService).create(captor.capture());
-        String systemPrompt = captor.getValue().rawParams().system().orElseThrow().asString();
+        String systemPrompt = combinedSystemPrompt(captor);
         assertThat(systemPrompt).contains("3일차 밤 수박밭")
                 .contains("전해 들었습니다")
                 .contains("직접 본 것처럼 말하지 말고")
@@ -260,7 +273,7 @@ class LlmServiceTest {
                 false, 50, true, "3일차 밤 수박밭", false, null));
 
         verify(messageService).create(captor.capture());
-        String systemPrompt = captor.getValue().rawParams().system().orElseThrow().asString();
+        String systemPrompt = combinedSystemPrompt(captor);
         assertThat(systemPrompt).doesNotContain("목격담");
     }
 
@@ -277,8 +290,32 @@ class LlmServiceTest {
                 false, 50, false, null, false, "게시판에 도발적인 쪽지가 붙었다."));
 
         verify(messageService).create(captor.capture());
-        String systemPrompt = captor.getValue().rawParams().system().orElseThrow().asString();
+        String systemPrompt = combinedSystemPrompt(captor);
         assertThat(systemPrompt).contains("게시판에 도발적인 쪽지가 붙었다.");
+    }
+
+    @Test
+    void chat_systemPrompt_cachesOnlyTheStaticPersonaBlock() throws Exception {
+        DialogueChatResponse llmOutput = new DialogueChatResponse("반갑습니다.", 0);
+        when(messageService.create(any(StructuredMessageCreateParams.class)))
+                .thenReturn(structuredMessage(StopReason.END_TURN,
+                        new ObjectMapper().writeValueAsString(llmOutput), DialogueChatResponse.class));
+        ArgumentCaptor<StructuredMessageCreateParams<DialogueChatResponse>> captor =
+                ArgumentCaptor.forClass(StructuredMessageCreateParams.class);
+
+        llmService.chat(new DialogueChatRequest(personaJson(), List.of(), "안녕하세요", false, 80, false, null, false, null));
+
+        verify(messageService).create(captor.capture());
+        List<TextBlockParam> blocks = captor.getValue().rawParams().system().orElseThrow().asTextBlockParams();
+        assertThat(blocks).hasSize(2);
+
+        TextBlockParam personaBlock = blocks.get(0);
+        assertThat(personaBlock.text()).contains("현수동").contains("오랜 세월 마을을 지켜온 인물");
+        assertThat(personaBlock.cacheControl()).isPresent();
+
+        TextBlockParam dynamicBlock = blocks.get(1);
+        assertThat(dynamicBlock.text()).contains("호감도는 80점");
+        assertThat(dynamicBlock.cacheControl()).isEmpty();
     }
 
     @Test
