@@ -66,6 +66,25 @@
   margin: 0 0 8px;
 }
 
+.day-armed-hint,
+.day-map-message {
+  margin: 0 0 8px;
+  padding: 6px 14px;
+  border: 2px solid var(--ink);
+  border-radius: 999px;
+  background: var(--paper-dim);
+  color: var(--ink);
+  font-size: 0.82rem;
+  font-weight: 700;
+  align-self: center;
+}
+
+.day-map-message {
+  background: var(--leaf);
+  color: var(--paper);
+  border-color: var(--leaf-dark);
+}
+
 .day-canvas-wrap {
   position: relative;
   line-height: 0;

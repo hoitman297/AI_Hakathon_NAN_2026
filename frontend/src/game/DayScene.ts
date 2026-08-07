@@ -10,6 +10,8 @@ export interface DaySceneInitData {
   /** 이동으로 실제 경과한 시간(초)을 주기적으로 보고 — 서버가 초당 소모량을 반영해 체력을 깎는다. */
   onMove: (seconds: number) => void
   onNpcClick: (npcName: string, npcRole: string) => void
+  /** 지도 위 장소(마을회관/상점/양계장 등)를 플레이어가 가까이서 클릭했을 때 spot.key를 보고한다. */
+  onLocationClick: (spotKey: string) => void
 }
 
 // 기획서 체력 세부 수치(✅ 확정): 이동 초당 0.15 소모, 운동화 착용 시 초당 0.12(20% 감소).
@@ -32,6 +34,9 @@ const WORLD_H = WORLD_TILES_H * TILE
 // 조금 여유 있게 붙으면 클릭할 수 있는 정도로 잡았다.
 const NPC_INTERACT_RANGE = TILE * 2
 
+// 장소(건물/시설)는 NPC보다 판정 영역이 넓어서 상호작용 가능 거리도 조금 더 넉넉하게 잡았다.
+const LOCATION_INTERACT_RANGE = TILE * 2.5
+
 // 넓은 화면(RESIZE 스케일 모드)에서는 카메라 뷰포트가 마을(WORLD_W x WORLD_H)보다 커질 수 있다.
 // 카메라는 월드 경계 밖으로 스크롤하지 않으므로, 잔디만 이 범위까지 더 깔아서 배경색 여백이
 // 그대로 드러나지 않게 한다 — 이동 가능 범위(WORLD_W/H)나 건물/NPC 배치는 그대로 둔다.
@@ -50,8 +55,10 @@ const BUILDING_SPOTS: BuildingSpot[] = [
   { key: 'village-hall', tileX: 6, tileY: 3, label: '마을회관', tilesWide: 6 },
   { key: 'produce-shop', tileX: 13, tileY: 3, label: '농산물 상점', tilesWide: 5 },
   { key: 'item-shop', tileX: 19, tileY: 3, label: '아이템 상점', tilesWide: 5 },
+  { key: 'chicken-coop', tileX: 25, tileY: 3, label: '양계장', tilesWide: 4 },
   { key: 'house1', tileX: 4, tileY: 13, label: '민가', tilesWide: 5 },
   { key: 'house2', tileX: 10, tileY: 13, label: '민가', tilesWide: 5 },
+  { key: 'watermelon-field', tileX: 17, tileY: 13, label: '수박밭', tilesWide: 5 },
 ]
 
 const NPC_TILE_POSITIONS: Array<{ x: number; y: number }> = [
@@ -93,6 +100,8 @@ export class DayScene extends Phaser.Scene {
     this.load.image('produce-shop', '/assets/background-assets/buildings/public/produce-shop.png')
     this.load.image('item-shop', '/assets/background-assets/buildings/public/item-shop.png')
     this.load.image('village-hall', '/assets/background-assets/buildings/public/village-hall.png')
+    this.load.image('chicken-coop', '/assets/background-assets/facilities/chicken-coop-normal.png')
+    this.load.image('watermelon-field', '/assets/background-assets/facilities/watermelon-field-normal.png')
     this.load.image('tree', '/assets/background-assets/objects/ordinary-tree.png')
     NPC_ROSTER.forEach((npc) => this.load.image(`npc-${npc.slug}`, npc.portrait))
   }
@@ -113,6 +122,20 @@ export class DayScene extends Phaser.Scene {
           padding: { x: 4, y: 2 },
         })
         .setDepth(5)
+
+      const centerX = spot.tileX * TILE + image.displayWidth / 2
+      const centerY = spot.tileY * TILE - image.displayHeight / 2
+      image.setInteractive({ useHandCursor: true })
+      image.on('pointerover', () => image.setTint(0xfff1b5))
+      image.on('pointerout', () => image.clearTint())
+      image.on('pointerdown', () => {
+        const distance = Phaser.Math.Distance.Between(this.player.x, this.player.y, centerX, centerY)
+        if (distance <= LOCATION_INTERACT_RANGE) {
+          this.initData.onLocationClick(spot.key)
+        } else {
+          this.showFloatingHint(centerX, spot.tileY * TILE - image.displayHeight - 4, '너무 멀어요! 가까이 가주세요')
+        }
+      })
     })
 
     const treeSpots: Array<[number, number]> = [
@@ -136,7 +159,7 @@ export class DayScene extends Phaser.Scene {
         if (distance <= NPC_INTERACT_RANGE) {
           this.initData.onNpcClick(npc.name, npc.role)
         } else {
-          this.showTooFarHint(sprite.x, sprite.y)
+          this.showFloatingHint(sprite.x, sprite.y - TILE, '너무 멀어요! 가까이 가주세요')
         }
       })
       this.add
@@ -240,10 +263,10 @@ export class DayScene extends Phaser.Scene {
     }
   }
 
-  /** NPC와 너무 멀리 떨어진 채로 클릭했을 때, 그 위치 위에 잠깐 안내 문구를 띄웠다가 지운다. */
-  private showTooFarHint(x: number, y: number) {
+  /** NPC/장소와 너무 멀리 떨어진 채로 클릭했을 때, 그 위치 위에 잠깐 안내 문구를 띄웠다가 지운다. */
+  private showFloatingHint(x: number, y: number, text: string) {
     const hint = this.add
-      .text(x, y - TILE, '너무 멀어요! 가까이 가주세요', {
+      .text(x, y, text, {
         fontSize: '11px',
         color: '#fff8ec',
         backgroundColor: '#b23a2fcc',

@@ -4,23 +4,65 @@ import { listNpcsToday, getNpcDetail, type NpcSummary } from '../api/npcApi'
 import {
   listAcquiredClues,
   listUnacquiredClues,
-  acquireClue,
   clarifyClue,
   topicLabel,
   type ClueCard,
   type UnacquiredClue,
 } from '../api/clueApi'
+import { getNightSummary } from '../api/sabotageApi'
 import { HeartMeter } from './HeartMeter'
+import { Modal } from './Modal'
 import './InventoryHubPanel.css'
 
 // 이 두 아이템은 사용 시 대상 NPC를 지정해야 한다(백엔드 UseItemRequest.targetNpcId).
 // ShopItemResponse에 itemCode가 안 내려오므로 표시 이름으로 판별한다.
 const NEEDS_TARGET_NPC = new Set(['거짓말탐지기', '선물세트'])
 
-// 백엔드 GameConstants상 한 게임당 총 단서 카드 수. 조회 API가 없어 프론트에 하드코딩했다.
+// 백엔드상 한 게임당 사보타주/단서는 1~5일차 밤에 하루 1건씩, 총 5건 고정이다
+// (SabotageEvent 주석 참고). 조회 API가 없어 프론트에 하드코딩했다.
 const TOTAL_CLUES = 5
 
 type MainTab = 'items' | 'clues' | 'affinity'
+
+type ClueSlotStatus = 'locked' | 'pending' | 'acquired'
+
+interface ClueSlot {
+  day: number
+  status: ClueSlotStatus
+  location?: string
+  clue?: ClueCard
+}
+
+/**
+ * 단서 카드는 1~5일차 순서로 고정 5칸에 배치된다. 미습득 목록(day 포함)은 정확하지만,
+ * 습득한 단서(ClueCardResponse)에는 day가 없다 — 세션당 하루 1건씩 클루ID가 생성 순서(=일차
+ * 순서) 그대로 오름차순이라는 전제로, "습득된 것으로 추정되는 지난 날짜"와 "미습득 목록에
+ * 없는 습득 단서"를 순서대로 짝지어 채운다.
+ */
+function buildClueSlots(
+  currentDay: number,
+  unacquired: UnacquiredClue[],
+  acquired: ClueCard[],
+  nightLocations: Map<number, string | null>,
+): ClueSlot[] {
+  const unacquiredByDay = new Map(unacquired.map((clue) => [clue.day, clue]))
+  const pastDays = Array.from({ length: TOTAL_CLUES }, (_, i) => i + 1).filter((day) => day < currentDay)
+  const acquiredDays = pastDays.filter((day) => !unacquiredByDay.has(day))
+  const sortedAcquired = [...acquired].sort((a, b) => a.clueId - b.clueId)
+  const dayToClue = new Map<number, ClueCard>()
+  acquiredDays.forEach((day, index) => {
+    const clue = sortedAcquired[index]
+    if (clue) dayToClue.set(day, clue)
+  })
+
+  return Array.from({ length: TOTAL_CLUES }, (_, i) => {
+    const day = i + 1
+    if (day >= currentDay) return { day, status: 'locked' as const }
+    const pending = unacquiredByDay.get(day)
+    if (pending) return { day, status: 'pending' as const, location: pending.location }
+    return { day, status: 'acquired' as const, location: nightLocations.get(day) ?? undefined, clue: dayToClue.get(day) }
+  })
+}
 
 interface AffinityEntry {
   npcId: number
@@ -31,11 +73,12 @@ interface AffinityEntry {
 
 interface InventoryHubPanelProps {
   sessionId: number
+  currentDay: number
   onStaminaChange: (value: number) => void
   onClose: () => void
 }
 
-export function InventoryHubPanel({ sessionId, onStaminaChange, onClose }: InventoryHubPanelProps) {
+export function InventoryHubPanel({ sessionId, currentDay, onStaminaChange, onClose }: InventoryHubPanelProps) {
   const [mainTab, setMainTab] = useState<MainTab>('items')
 
   const [slots, setSlots] = useState<InventorySlot[] | null>(null)
@@ -47,9 +90,10 @@ export function InventoryHubPanel({ sessionId, onStaminaChange, onClose }: Inven
 
   const [unacquired, setUnacquired] = useState<UnacquiredClue[] | null>(null)
   const [acquired, setAcquired] = useState<ClueCard[] | null>(null)
+  const [nightLocations, setNightLocations] = useState<Map<number, string | null>>(new Map())
   const [clueError, setClueError] = useState<string | null>(null)
   const [busyClueKey, setBusyClueKey] = useState<string | null>(null)
-  const [clueMessage, setClueMessage] = useState<string | null>(null)
+  const [selectedSlot, setSelectedSlot] = useState<ClueSlot | null>(null)
 
   const [affinityList, setAffinityList] = useState<AffinityEntry[] | null>(null)
   const [affinityError, setAffinityError] = useState<string | null>(null)
@@ -86,6 +130,25 @@ export function InventoryHubPanel({ sessionId, onStaminaChange, onClose }: Inven
   useEffect(loadUnacquired, [sessionId])
   // 상단 탭에 습득 개수(n/5)를 보여줘야 해서, 단서 탭을 열기 전에도 미리 불러온다.
   useEffect(loadAcquired, [sessionId])
+
+  // 습득한 단서 카드에는 발생 일차가 안 내려와서(day 없음), 지난 밤 소식 API로 일차별
+  // 장소를 따로 모아 슬롯 표시(장소 이름 텍스트)에 사용한다 — 습득 여부와 무관하게 조회 가능.
+  useEffect(() => {
+    let cancelled = false
+    const pastDays = Array.from({ length: TOTAL_CLUES }, (_, i) => i + 1).filter((day) => day < currentDay)
+    Promise.all(
+      pastDays.map((day) =>
+        getNightSummary(sessionId, day)
+          .then((summary) => [day, summary?.location ?? null] as const)
+          .catch(() => [day, null] as const),
+      ),
+    ).then((entries) => {
+      if (!cancelled) setNightLocations(new Map(entries))
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [sessionId, currentDay])
 
   useEffect(() => {
     if (mainTab === 'affinity' && affinityList === null) loadAffinity()
@@ -128,30 +191,13 @@ export function InventoryHubPanel({ sessionId, onStaminaChange, onClose }: Inven
     handleUse(slot)
   }
 
-  async function handleAcquire(clue: UnacquiredClue) {
-    setClueMessage(null)
-    setClueError(null)
-    setBusyClueKey(`acquire-${clue.clueId}`)
-    try {
-      await acquireClue(sessionId, clue.clueId)
-      setClueMessage(`${clue.location}에서 단서(${topicLabel(clue.topic)})를 습득했습니다.`)
-      loadUnacquired()
-      loadAcquired()
-    } catch (err) {
-      setClueError(err instanceof Error ? err.message : '단서를 습득하지 못했습니다.')
-    } finally {
-      setBusyClueKey(null)
-    }
-  }
-
   async function handleClarify(clue: ClueCard) {
-    setClueMessage(null)
     setClueError(null)
     setBusyClueKey(`clarify-${clue.clueId}`)
     try {
-      await clarifyClue(sessionId, clue.clueId)
-      setClueMessage('돋보기로 단서를 더 명확하게 밝혀냈습니다.')
-      loadAcquired()
+      const updated = await clarifyClue(sessionId, clue.clueId)
+      setAcquired((prev) => prev?.map((c) => (c.clueId === updated.clueId ? updated : c)) ?? prev)
+      setSelectedSlot((prev) => (prev?.clue?.clueId === updated.clueId ? { ...prev, clue: updated } : prev))
     } catch (err) {
       setClueError(err instanceof Error ? err.message : '단서를 명확화하지 못했습니다.')
     } finally {
@@ -160,6 +206,8 @@ export function InventoryHubPanel({ sessionId, onStaminaChange, onClose }: Inven
   }
 
   const acquiredCount = acquired?.length ?? 0
+  const clueSlots =
+    unacquired !== null && acquired !== null ? buildClueSlots(currentDay, unacquired, acquired, nightLocations) : null
 
   return (
     <div className="inventory-hub-overlay">
@@ -244,47 +292,28 @@ export function InventoryHubPanel({ sessionId, onStaminaChange, onClose }: Inven
             </div>
 
             {clueError && <p className="pixel-error">{clueError}</p>}
-            {clueMessage && <p className="clue-message">{clueMessage}</p>}
+            <p className="clue-hint">사보타주가 발생한 장소를 직접 찾아가야 단서를 습득할 수 있습니다.</p>
 
-            <div className="clue-list">
-              {unacquired === null || acquired === null ? (
+            <div className="clue-slot-grid">
+              {clueSlots === null ? (
                 <p className="clue-status">불러오는 중...</p>
-              ) : unacquired.length === 0 && acquired.length === 0 ? (
-                <p className="clue-status">아직 발견한 단서가 없습니다.</p>
               ) : (
-                <>
-                  {acquired.map((clue) => (
-                    <div key={`acquired-${clue.clueId}`} className="clue-card-item">
-                      <div className="clue-item-name">{topicLabel(clue.topic)}</div>
-                      <p className="clue-card-text">{clue.text}</p>
-                      <button
-                        className="pixel-button"
-                        disabled={clue.clarified || busyClueKey === `clarify-${clue.clueId}`}
-                        onClick={() => handleClarify(clue)}
-                      >
-                        {clue.clarified ? '명확화됨' : '돋보기로 명확화'}
-                      </button>
-                    </div>
-                  ))}
-
-                  {unacquired.map((clue) => (
-                    <div key={`unacquired-${clue.clueId}`} className="clue-item-row">
-                      <div className="clue-item-info">
-                        <div className="clue-item-name">
-                          {clue.location} <span className="clue-item-topic">· {topicLabel(clue.topic)}</span>
-                        </div>
-                        <div className="clue-item-desc">{clue.day}일차 밤 발생</div>
-                      </div>
-                      <button
-                        className="pixel-button pixel-button--accent"
-                        disabled={busyClueKey === `acquire-${clue.clueId}`}
-                        onClick={() => handleAcquire(clue)}
-                      >
-                        습득
-                      </button>
-                    </div>
-                  ))}
-                </>
+                clueSlots.map((slot) => (
+                  <button
+                    key={slot.day}
+                    type="button"
+                    className={`clue-slot clue-slot--${slot.status}`}
+                    disabled={slot.status !== 'acquired'}
+                    onClick={() => setSelectedSlot(slot)}
+                  >
+                    <div className="clue-slot-day">{slot.day}일차</div>
+                    {slot.status === 'locked' && <div className="clue-slot-icon clue-slot-icon--locked">🔒</div>}
+                    {slot.status === 'pending' && <div className="clue-slot-icon clue-slot-icon--pending">?</div>}
+                    {slot.status === 'acquired' && (
+                      <div className="clue-slot-label">{slot.location ?? '단서 확보'}</div>
+                    )}
+                  </button>
+                ))
               )}
             </div>
           </div>
@@ -321,6 +350,32 @@ export function InventoryHubPanel({ sessionId, onStaminaChange, onClose }: Inven
           닫기
         </button>
       </div>
+
+      {selectedSlot && selectedSlot.clue && (
+        <Modal
+          title={`${selectedSlot.day}일차 단서${selectedSlot.location ? ` · ${selectedSlot.location}` : ''}`}
+          actions={
+            <>
+              <button
+                className="pixel-button"
+                disabled={selectedSlot.clue.clarified || busyClueKey === `clarify-${selectedSlot.clue.clueId}`}
+                onClick={() => selectedSlot.clue && handleClarify(selectedSlot.clue)}
+              >
+                {selectedSlot.clue.clarified ? '명확화됨' : '돋보기로 명확화'}
+              </button>
+              <button className="pixel-button pixel-button--accent" onClick={() => setSelectedSlot(null)}>
+                닫기
+              </button>
+            </>
+          }
+        >
+          <div className="clue-detail-image" aria-hidden="true">
+            🗂️
+          </div>
+          <div className="clue-detail-topic">{topicLabel(selectedSlot.clue.topic)}</div>
+          <p className="clue-card-text">{selectedSlot.clue.text}</p>
+        </Modal>
+      )}
     </div>
   )
 }

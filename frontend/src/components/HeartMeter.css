@@ -5,14 +5,24 @@
 }
 
 .heart {
+  position: relative;
+  display: inline-block;
   font-size: 1rem;
 }
 
-.heart--filled {
-  color: #e0456b;
+.heart-icon {
+  display: block;
 }
 
-.heart--empty {
+.heart-icon--empty {
   color: var(--ink-soft);
   opacity: 0.5;
+}
+
+.heart-icon--filled {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  color: #e0456b;
 }

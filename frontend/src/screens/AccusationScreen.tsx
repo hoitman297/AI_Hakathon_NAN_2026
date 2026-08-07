@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, type DragEvent } from 'react'
 import { listNpcsToday, type NpcSummary } from '../api/npcApi'
 import { accuseNpc, type AccuseResult } from '../api/accusationApi'
 import { findRosterEntry } from '../types/npc'
@@ -15,6 +15,7 @@ export function AccusationScreen({ sessionId, day, onResolved, onCancel }: Accus
   const [npcs, setNpcs] = useState<NpcSummary[] | null>(null)
   const [loadError, setLoadError] = useState<string | null>(null)
   const [selected, setSelected] = useState<NpcSummary | null>(null)
+  const [dragOverNpcId, setDragOverNpcId] = useState<number | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
   const [result, setResult] = useState<AccuseResult | null>(null)
@@ -24,6 +25,23 @@ export function AccusationScreen({ sessionId, day, onResolved, onCancel }: Accus
       .then(setNpcs)
       .catch((err: unknown) => setLoadError(err instanceof Error ? err.message : 'NPC 목록을 불러오지 못했습니다.'))
   }, [sessionId])
+
+  function handleCardDragStart(event: DragEvent<HTMLDivElement>) {
+    event.dataTransfer.setData('text/plain', 'accusation-card')
+    event.dataTransfer.effectAllowed = 'move'
+  }
+
+  function handleNpcDragOver(event: DragEvent<HTMLDivElement>, npcId: number) {
+    event.preventDefault()
+    event.dataTransfer.dropEffect = 'move'
+    setDragOverNpcId(npcId)
+  }
+
+  function handleNpcDrop(event: DragEvent<HTMLDivElement>, npc: NpcSummary) {
+    event.preventDefault()
+    setDragOverNpcId(null)
+    setSelected(npc)
+  }
 
   async function handleConfirm() {
     if (!selected) return
@@ -57,26 +75,46 @@ export function AccusationScreen({ sessionId, day, onResolved, onCancel }: Accus
   return (
     <div className="accusation-screen">
       <div className="accusation-header">
-        <h2>범인 지목</h2>
-        <p>{day}일차 · 진범이라 생각되는 마을 사람을 지목해 고발하세요.</p>
+        <h2>누구에게 고발 카드를 건네줄까요?</h2>
+        <p>{day}일차 · 고발 카드를 지목하려는 마을 사람 위로 드래그해서 놓으세요.</p>
       </div>
 
       {loadError && <p className="pixel-error">{loadError}</p>}
 
       {!selected && npcs && (
-        <div className="accusation-list">
-          {npcs.map((npc) => {
-            const roster = findRosterEntry(npc.name)
-            return (
-              <button key={npc.npcId} className="accusation-npc-card pixel-panel" onClick={() => setSelected(npc)}>
-                {roster && <img className="accusation-npc-portrait pixel-art" src={roster.portrait} alt="" />}
-                <div className="accusation-npc-name">{npc.name}</div>
-                <div className="accusation-npc-role">{npc.role}</div>
-                <div className="accusation-npc-location">현재 위치: {npc.currentLocation}</div>
-              </button>
-            )
-          })}
-        </div>
+        <>
+          <div className="accusation-list">
+            {npcs.map((npc) => {
+              const roster = findRosterEntry(npc.name)
+              return (
+                <div
+                  key={npc.npcId}
+                  className={`accusation-npc-card pixel-panel ${dragOverNpcId === npc.npcId ? 'is-drag-over' : ''}`}
+                  onDragOver={(event) => handleNpcDragOver(event, npc.npcId)}
+                  onDragLeave={() => setDragOverNpcId((prev) => (prev === npc.npcId ? null : prev))}
+                  onDrop={(event) => handleNpcDrop(event, npc)}
+                >
+                  {roster && <img className="accusation-npc-portrait pixel-art" src={roster.portrait} alt="" />}
+                  <div className="accusation-npc-name">{npc.name}</div>
+                  <div className="accusation-npc-role">{npc.role}</div>
+                  <div className="accusation-npc-location">현재 위치: {npc.currentLocation}</div>
+                </div>
+              )
+            })}
+          </div>
+
+          <div
+            className="accusation-card"
+            draggable
+            onDragStart={handleCardDragStart}
+            onDragEnd={() => setDragOverNpcId(null)}
+          >
+            <span className="accusation-card-icon" aria-hidden="true">
+              📜
+            </span>
+            <span className="accusation-card-label">고발 카드</span>
+          </div>
+        </>
       )}
 
       {selected && (

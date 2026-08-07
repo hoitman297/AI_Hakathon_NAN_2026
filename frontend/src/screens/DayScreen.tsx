@@ -9,6 +9,8 @@ import { InventoryHubPanel } from '../components/InventoryHubPanel'
 import { NightLoadingOverlay } from '../components/NightLoadingOverlay'
 import { moveSession, type SessionResponse } from '../api/sessionApi'
 import { listNpcsToday } from '../api/npcApi'
+import { listUnacquiredClues, acquireClue, topicLabel, type UnacquiredClue } from '../api/clueApi'
+import { matchesLocationSpot } from '../game/clueLocations'
 import { villageAssets } from '../assets/asset-manifest'
 import './DayScreen.css'
 
@@ -16,6 +18,9 @@ import './DayScreen.css'
 // 이 값을 조회하는 API가 없어 프론트에 그대로 하드코딩했다.
 const FIRST_ACCUSATION_DAY = 7
 const LAST_ACCUSATION_DAY = 9
+
+// 고발 카드는 마을회관(이장 사무실)에 가서 그 자리에서 건네야 한다.
+const ACCUSATION_LOCATION_SPOT = 'village-hall'
 
 interface DayScreenProps {
   session: SessionResponse
@@ -42,6 +47,65 @@ export function DayScreen({
   const [escOpen, setEscOpen] = useState(false)
   const [inventoryOpen, setInventoryOpen] = useState(false)
   const sneakersEquipped = session.sneakersEquipped ?? false
+
+  const canAccuse =
+    session.status === 'IN_PROGRESS' &&
+    session.currentDay >= FIRST_ACCUSATION_DAY &&
+    session.currentDay <= LAST_ACCUSATION_DAY
+
+  // 사보타주 단서는 지도 위 해당 장소를 직접 클릭해야 습득된다 — 항상 최신값을 봐야 해서
+  // Phaser 씬 콜백(아래 handleLocationClick)에서는 state 대신 이 ref를 읽는다.
+  const [unacquiredClues, setUnacquiredClues] = useState<UnacquiredClue[] | null>(null)
+  const unacquiredCluesRef = useRef<UnacquiredClue[] | null>(null)
+  useEffect(() => {
+    unacquiredCluesRef.current = unacquiredClues
+  }, [unacquiredClues])
+
+  const [mapMessage, setMapMessage] = useState<string | null>(null)
+  useEffect(() => {
+    if (!mapMessage) return
+    const timer = setTimeout(() => setMapMessage(null), 3200)
+    return () => clearTimeout(timer)
+  }, [mapMessage])
+
+  // 7일차부터 [범인 고발하기] 버튼은 이 상태를 "무장"만 시키고, 실제 UI는 마을회관에서
+  // 다시 한번 클릭해야 열린다 — 마찬가지 이유로 ref로도 들고 있는다.
+  const [accusationArmed, setAccusationArmed] = useState(false)
+  const accusationArmedRef = useRef(false)
+  useEffect(() => {
+    accusationArmedRef.current = accusationArmed
+  }, [accusationArmed])
+  const locationBusyRef = useRef(false)
+
+  function reloadUnacquiredClues() {
+    listUnacquiredClues(session.sessionId)
+      .then(setUnacquiredClues)
+      .catch((err: unknown) => console.error('미습득 단서 목록을 불러오지 못했습니다.', err))
+  }
+  useEffect(reloadUnacquiredClues, [session.sessionId])
+
+  async function handleLocationClick(spotKey: string) {
+    if (spotKey === ACCUSATION_LOCATION_SPOT && accusationArmedRef.current && canAccuse) {
+      setAccusationArmed(false)
+      onOpenAccusation()
+      return
+    }
+
+    if (locationBusyRef.current) return
+    const target = (unacquiredCluesRef.current ?? []).find((clue) => matchesLocationSpot(clue.location, spotKey))
+    if (!target) return
+
+    locationBusyRef.current = true
+    try {
+      await acquireClue(session.sessionId, target.clueId)
+      setMapMessage(`${target.location}에서 단서(${topicLabel(target.topic)})를 습득했습니다.`)
+      reloadUnacquiredClues()
+    } catch (err) {
+      setMapMessage(err instanceof Error ? err.message : '단서를 습득하지 못했습니다.')
+    } finally {
+      locationBusyRef.current = false
+    }
+  }
 
   // NPC 이름 -> 실제 백엔드 npcId. Phaser 씬은 로컬 스프라이트 로스터(이름 기준)만 알고 있어서,
   // 대화 API를 호출하려면 이 매핑을 통해 클릭된 NPC 이름을 npcId로 바꿔줘야 한다.
@@ -123,6 +187,7 @@ export function DayScreen({
           ?.then((map) => resolveNpcId(map.get(name)))
           .catch(() => {})
       },
+      onLocationClick: handleLocationClick,
     }
     game.scene.start('DayScene', initData)
 
@@ -176,11 +241,6 @@ export function DayScreen({
     onAdvanceDay()
   }, [stamina, advancing, onAdvanceDay, dialogueNpc])
 
-  const canAccuse =
-    session.status === 'IN_PROGRESS' &&
-    session.currentDay >= FIRST_ACCUSATION_DAY &&
-    session.currentDay <= LAST_ACCUSATION_DAY
-
   return (
     <div className="day-screen">
       <div className="day-hud">
@@ -196,14 +256,28 @@ export function DayScreen({
             인벤토리
           </button>
           {canAccuse && (
-            <button className="pixel-button pixel-button--danger" onClick={onOpenAccusation}>
-              범인 고발하기
+            <button
+              className="pixel-button pixel-button--danger"
+              onClick={() => setAccusationArmed((prev) => !prev)}
+            >
+              {accusationArmed ? '고발 준비 취소' : '범인 고발하기'}
             </button>
           )}
+          <button
+            className="pixel-button"
+            onClick={onAdvanceDay}
+            disabled={advancing || !!dialogueNpc}
+          >
+            집으로 돌아가기
+          </button>
         </div>
       </div>
 
       {advanceError && <p className="day-advance-error pixel-error">{advanceError}</p>}
+      {accusationArmed && (
+        <p className="day-armed-hint">마을회관으로 이동해 그 자리에서 다시 한번 클릭하면 고발 카드를 건넬 수 있습니다.</p>
+      )}
+      {mapMessage && <p className="day-map-message">{mapMessage}</p>}
 
       <div className="day-canvas-wrap">
         <StaminaBar value={stamina} max={session.staminaMax} />
@@ -228,6 +302,7 @@ export function DayScreen({
       {inventoryOpen && (
         <InventoryHubPanel
           sessionId={session.sessionId}
+          currentDay={session.currentDay}
           onStaminaChange={(restored) => setStamina((prev) => Math.min(session.staminaMax, prev + restored))}
           onClose={() => setInventoryOpen(false)}
         />
