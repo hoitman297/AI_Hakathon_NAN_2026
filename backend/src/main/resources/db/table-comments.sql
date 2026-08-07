@@ -112,6 +112,11 @@ ALTER TABLE random_event_log
   MODIFY event_type VARCHAR(50)              NOT NULL COMMENT '이벤트 종류 (예: 협박 편지, 밭 훼손)',
   MODIFY target      ENUM('PLAYER','VILLAGE') NOT NULL COMMENT '이벤트 대상: 마을/주민(VILLAGE) 또는 플레이어(PLAYER)';
 
+ALTER TABLE npc_witness_awareness COMMENT = '목격담이 관계망을 타고 2차 전파된 기록 (최초 기획 초안에는 없던 구현 보완 테이블)';
+ALTER TABLE npc_witness_awareness
+  MODIFY npc_id      BIGINT NOT NULL COMMENT '이 목격담을 전해 들어서 알게 된 NPC (원래 목격자 본인은 포함하지 않음)',
+  MODIFY learned_day INT    NOT NULL COMMENT '전해 들은 일차';
+
 ALTER TABLE farm_plot COMMENT = '파종된 작물의 재배 상태 (파종→성장→수확). 최초 기획 초안에는 없던 구현 보완 테이블';
 ALTER TABLE farm_plot
   MODIFY planted_day INT    NOT NULL COMMENT '파종한 일차',

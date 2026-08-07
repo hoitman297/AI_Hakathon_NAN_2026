@@ -55,6 +55,7 @@ class SessionPersistenceService {
     private final NpcLocationResolver locationResolver;
     private final CulpritProfileRegistry culpritProfileRegistry;
     private final GameSaveService gameSaveService;
+    private final WitnessGossipService witnessGossipService;
 
     private final Random random = new Random();
 
@@ -102,6 +103,7 @@ class SessionPersistenceService {
         int nextDay = day + 1;
         session.setCurrentDay(nextDay);
         sessionRepository.save(session);
+        witnessGossipService.spreadOvernight(session, nextDay);
 
         double newStamina = Boolean.TRUE.equals(today.getFainted())
                 ? GameConstants.FAINT_RESTART_STAMINA

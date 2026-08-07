@@ -28,6 +28,7 @@ import com.gameproject.backend.domain.GameSession;
 import com.gameproject.backend.domain.Npc;
 import com.gameproject.backend.domain.NpcCaseAssignment;
 import com.gameproject.backend.domain.NpcPersonaState;
+import com.gameproject.backend.domain.NpcWitnessAwareness;
 import com.gameproject.backend.domain.PlayerStat;
 import com.gameproject.backend.domain.RandomEventLog;
 import com.gameproject.backend.domain.SabotageEvent;
@@ -37,6 +38,7 @@ import com.gameproject.backend.repository.GameSessionRepository;
 import com.gameproject.backend.repository.NpcCaseAssignmentRepository;
 import com.gameproject.backend.repository.NpcPersonaStateRepository;
 import com.gameproject.backend.repository.NpcRepository;
+import com.gameproject.backend.repository.NpcWitnessAwarenessRepository;
 import com.gameproject.backend.repository.RandomEventLogRepository;
 import com.gameproject.backend.repository.SabotageEventRepository;
 
@@ -70,6 +72,8 @@ class DialogueChatPersistenceServiceTest {
     private SabotageEventRepository sabotageEventRepository;
     @Mock
     private RandomEventLogRepository randomEventLogRepository;
+    @Mock
+    private NpcWitnessAwarenessRepository witnessAwarenessRepository;
 
     private DialogueChatPersistenceService service;
 
@@ -82,7 +86,7 @@ class DialogueChatPersistenceServiceTest {
     void setUp() {
         service = new DialogueChatPersistenceService(npcRepository, personaStateRepository, caseAssignmentRepository,
                 dialogueLogRepository, sessionRepository, sessionService, staminaService, npcService,
-                llmRateLimiter, sabotageEventRepository, randomEventLogRepository);
+                llmRateLimiter, sabotageEventRepository, randomEventLogRepository, witnessAwarenessRepository);
 
         account = Account.builder().accountId(1L).username("u").passwordHash("h").nickname("n")
                 .createdAt(LocalDateTime.now()).build();
@@ -129,6 +133,7 @@ class DialogueChatPersistenceServiceTest {
         when(npcService.getAffinityScore(session, npc)).thenReturn(50);
         when(sabotageEventRepository.findBySession(session)).thenReturn(List.of());
         when(randomEventLogRepository.findBySession(session)).thenReturn(List.of());
+        when(witnessAwarenessRepository.findBySessionAndNpc(session, npc)).thenReturn(List.of());
 
         DialogueChatContext ctx = service.prepareChatContext(100L, 1L);
 
@@ -146,6 +151,7 @@ class DialogueChatPersistenceServiceTest {
         when(npcService.getAffinityScore(session, npc)).thenReturn(50);
         when(sabotageEventRepository.findBySession(session)).thenReturn(List.of());
         when(randomEventLogRepository.findBySession(session)).thenReturn(List.of());
+        when(witnessAwarenessRepository.findBySessionAndNpc(session, npc)).thenReturn(List.of());
         NpcCaseAssignment assignment = NpcCaseAssignment.builder().session(session).npc(npc)
                 .motiveText("김치준과의 갈등").build();
         when(caseAssignmentRepository.findBySession(session)).thenReturn(Optional.of(assignment));
@@ -166,6 +172,7 @@ class DialogueChatPersistenceServiceTest {
         when(npcService.getAffinityScore(session, otherNpc)).thenReturn(50);
         when(sabotageEventRepository.findBySession(session)).thenReturn(List.of());
         when(randomEventLogRepository.findBySession(session)).thenReturn(List.of());
+        when(witnessAwarenessRepository.findBySessionAndNpc(session, otherNpc)).thenReturn(List.of());
 
         DialogueChatContext ctx = service.prepareChatContext(100L, 2L);
 
@@ -185,6 +192,7 @@ class DialogueChatPersistenceServiceTest {
         when(npcService.getAffinityScore(session, npc)).thenReturn(50);
         when(sabotageEventRepository.findBySession(session)).thenReturn(List.of());
         when(randomEventLogRepository.findBySession(session)).thenReturn(List.of());
+        when(witnessAwarenessRepository.findBySessionAndNpc(session, npc)).thenReturn(List.of());
 
         DialogueChatContext ctx = service.prepareChatContext(100L, 1L);
 
@@ -212,6 +220,34 @@ class DialogueChatPersistenceServiceTest {
         DialogueChatContext ctx = service.prepareChatContext(100L, 1L);
 
         assertThat(ctx.witnessContext()).isEqualTo("3일차 밤 농기구 창고");
+        assertThat(ctx.witnessIsSecondhand()).isFalse();
+        verify(witnessAwarenessRepository, never()).findBySessionAndNpc(any(), any());
+    }
+
+    @Test
+    void prepareChatContext_secondhandWitness_usedOnlyWhenNoDirectWitnessAndFlaggedSecondhand() {
+        stubSessionAndNpcLookup();
+        when(personaStateRepository.findBySessionAndNpc(session, npc))
+                .thenReturn(Optional.of(NpcPersonaState.builder().session(session).npc(npc)
+                        .generatedPersonaJson("{}").generatedAt(LocalDateTime.now()).build()));
+        when(staminaService.consume(session, GameConstants.DIALOGUE_STAMINA)).thenReturn(stat());
+        when(dialogueLogRepository.findBySessionAndNpcOrderByCreatedAtAsc(session, npc)).thenReturn(List.of());
+        when(npcService.getAffinityScore(session, npc)).thenReturn(50);
+        // npc 본인은 직접 목격자가 아니고(otherNpc가 목격자), WitnessGossipService가 관계망을 통해
+        // 전파한 결과로 이 사건을 "전해 들어서" 안다.
+        SabotageEvent heard = SabotageEvent.builder().session(session).day(2).location("양계장")
+                .witnessNpc(otherNpc).createdAt(LocalDateTime.now()).build();
+        when(sabotageEventRepository.findBySession(session)).thenReturn(List.of(heard));
+        when(randomEventLogRepository.findBySession(session)).thenReturn(List.of());
+        NpcWitnessAwareness awareness = NpcWitnessAwareness.builder()
+                .session(session).sabotageEvent(heard).npc(npc).learnedDay(3)
+                .createdAt(LocalDateTime.now()).build();
+        when(witnessAwarenessRepository.findBySessionAndNpc(session, npc)).thenReturn(List.of(awareness));
+
+        DialogueChatContext ctx = service.prepareChatContext(100L, 1L);
+
+        assertThat(ctx.witnessContext()).isEqualTo("2일차 밤 양계장");
+        assertThat(ctx.witnessIsSecondhand()).isTrue();
     }
 
     @Test
@@ -224,6 +260,7 @@ class DialogueChatPersistenceServiceTest {
         when(dialogueLogRepository.findBySessionAndNpcOrderByCreatedAtAsc(session, npc)).thenReturn(List.of());
         when(npcService.getAffinityScore(session, npc)).thenReturn(50);
         when(sabotageEventRepository.findBySession(session)).thenReturn(List.of());
+        when(witnessAwarenessRepository.findBySessionAndNpc(session, npc)).thenReturn(List.of());
         RandomEventLog playerEvent = RandomEventLog.builder().session(session).day(8).target(EventTarget.PLAYER)
                 .eventType("X").description("플레이어 전용 사건").createdAt(LocalDateTime.now()).build();
         RandomEventLog villageEvent = RandomEventLog.builder().session(session).day(7).target(EventTarget.VILLAGE)

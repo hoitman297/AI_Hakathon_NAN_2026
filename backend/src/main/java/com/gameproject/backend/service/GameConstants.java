@@ -39,4 +39,12 @@ public final class GameConstants {
 
     /** 사보타주 유형만으로 범인이 특정되는 것을 막기 위한 보조 유형 등장 확률(기획 방향성: 주 80% + 보조 20%) */
     public static final int SECONDARY_SABOTAGE_TYPE_CHANCE_PERCENT = 20;
+
+    /**
+     * 목격담이 관계망을 타고 밤마다 한 단계씩 2차 전파될 확률(%). 기획서에 없는 구현 보완
+     * 수치라 밸런스 미확정 잠정값 — 새 정보를 만들어내지 않고 "누가 아는지"만 넓히므로
+     * 값이 다소 커도 범인 특정에는 영향이 없다(WitnessGossipService 참고).
+     */
+    public static final int WITNESS_SPREAD_CLOSE_CHANCE_PERCENT = 55; // 부부 등 가까운 관계
+    public static final int WITNESS_SPREAD_HUB_CHANCE_PERCENT = 20; // 마을 소식통(박영계) 경유
 }

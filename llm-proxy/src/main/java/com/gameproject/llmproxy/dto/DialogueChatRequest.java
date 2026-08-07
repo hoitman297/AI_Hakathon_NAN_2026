@@ -13,6 +13,9 @@ import java.util.List;
  * recentVillageEventContext는 최근 마을 전체 대상 랜덤 이벤트(7→8일차) 설명 — 마을 사람이면
  * 누구나 알 법한 공개 사건이라 자연스러운 대화 소재로 넘긴다. 플레이어 대상 이벤트(8→9일차)는
  * 플레이어 개인 문제라 NPC가 알 리 없으므로 여기 포함하지 않는다.
+ * witnessIsSecondhand는 witnessContext가 이 NPC 본인의 직접 목격이 아니라 관계망(부부/마을
+ * 소식통)을 타고 전해 들은 소문일 때 true다 — 이 경우 "직접 봤다"는 투가 아니라 "~라고
+ * 들었다"는 전언 투로 말해야 한다.
  */
 public record DialogueChatRequest(
         String personaJson,
@@ -22,6 +25,7 @@ public record DialogueChatRequest(
         int affinityScore,
         boolean restrictDetectiveTalk,
         String witnessContext,
+        boolean witnessIsSecondhand,
         String recentVillageEventContext
 ) {
 }

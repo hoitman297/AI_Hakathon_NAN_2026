@@ -23,5 +23,6 @@ record DialogueChatContext(
         int affinityScore,
         boolean restrictDetectiveTalk,
         String witnessContext,
+        boolean witnessIsSecondhand,
         String recentVillageEventContext) {
 }

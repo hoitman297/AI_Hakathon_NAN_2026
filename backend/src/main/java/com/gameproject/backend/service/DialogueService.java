@@ -60,7 +60,8 @@ public class DialogueService {
         }
 
         DialogueChatResponse llmResult = llmProxyClient.chat(personaJson, ctx.history(), userMessage, ctx.honestMode(),
-                ctx.affinityScore(), ctx.restrictDetectiveTalk(), ctx.witnessContext(), ctx.recentVillageEventContext());
+                ctx.affinityScore(), ctx.restrictDetectiveTalk(), ctx.witnessContext(), ctx.witnessIsSecondhand(),
+                ctx.recentVillageEventContext());
         String reply = llmResult.reply();
 
         // 대화 로그는 호감도 반영과 별개 트랜잭션으로 먼저 확정 커밋한다 — 아래 호감도 반영이

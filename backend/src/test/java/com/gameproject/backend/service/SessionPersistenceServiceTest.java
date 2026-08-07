@@ -54,6 +54,8 @@ class SessionPersistenceServiceTest {
     private NpcLocationResolver locationResolver;
     @Mock
     private GameSaveService gameSaveService;
+    @Mock
+    private WitnessGossipService witnessGossipService;
 
     /** 순수 정적 룩업이라 실제 인스턴스를 그대로 사용 — 목킹할 이유가 없음. */
     private final CulpritProfileRegistry culpritProfileRegistry = new CulpritProfileRegistry();
@@ -68,7 +70,7 @@ class SessionPersistenceServiceTest {
     void setUp() {
         service = new SessionPersistenceService(sessionRepository, playerStatRepository, npcRepository,
                 caseAssignmentRepository, sabotageEventRepository, clueCardRepository, locationResolver,
-                culpritProfileRegistry, gameSaveService);
+                culpritProfileRegistry, gameSaveService, witnessGossipService);
 
         account = Account.builder().accountId(1L).username("u").passwordHash("h").nickname("n")
                 .createdAt(LocalDateTime.now()).build();

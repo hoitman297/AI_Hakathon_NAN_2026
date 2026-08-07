@@ -75,7 +75,7 @@ class DialogueServiceTest {
         PlayerStat stat = PlayerStat.builder().session(session).day(2)
                 .staminaCurrent(92.0).staminaMax(100).gold(0).fainted(false).build();
         return new DialogueChatContext(session, npc, stat, "{}", null, List.of(),
-                false, 50, restrictDetectiveTalk, null, null);
+                false, 50, restrictDetectiveTalk, null, false, null);
     }
 
     @Test
@@ -86,7 +86,7 @@ class DialogueServiceTest {
         assertThatThrownBy(() -> dialogueService.send(100L, 1L, "안녕하세요"))
                 .isInstanceOf(LlmRateLimitExceededException.class);
 
-        verify(llmProxyClient, never()).chat(any(), any(), any(), anyBoolean(), anyInt(), anyBoolean(), any(), any());
+        verify(llmProxyClient, never()).chat(any(), any(), any(), anyBoolean(), anyInt(), anyBoolean(), any(), anyBoolean(), any());
         verify(llmProxyClient, never()).generatePersona(any(), any(), any(), any(), any(), any(), any(), any());
         verify(persistence, never()).saveDialogueExchange(any(), any(), any(), any(), anyBoolean());
         verify(persistence, never()).applyAffinityDelta(any(), any(), anyInt());
@@ -95,7 +95,7 @@ class DialogueServiceTest {
     @Test
     void send_existingPersona_skipsPersonaGenerationAndCallsChat() {
         when(persistence.prepareChatContext(100L, 1L)).thenReturn(contextWithExistingPersona(false));
-        when(llmProxyClient.chat("{}", List.of(), "안녕하세요", false, 50, false, null, null))
+        when(llmProxyClient.chat("{}", List.of(), "안녕하세요", false, 50, false, null, false, null))
                 .thenReturn(new DialogueChatResponse("반갑습니다.", 3));
         when(persistence.applyAffinityDelta(session, npc, 3)).thenReturn(55);
 
@@ -112,11 +112,11 @@ class DialogueServiceTest {
         PlayerStat stat = PlayerStat.builder().session(session).day(2)
                 .staminaCurrent(92.0).staminaMax(100).gold(0).fainted(false).build();
         DialogueChatContext ctx = new DialogueChatContext(session, npc, stat, null, "동기", List.of(),
-                false, 50, false, null, null);
+                false, 50, false, null, false, null);
         when(persistence.prepareChatContext(100L, 1L)).thenReturn(ctx);
         when(llmProxyClient.generatePersona(1L, "현수동", "이장", null, null, null, null, "동기"))
                 .thenReturn("{\"generated\":true}");
-        when(llmProxyClient.chat("{\"generated\":true}", List.of(), "안녕하세요", false, 50, false, null, null))
+        when(llmProxyClient.chat("{\"generated\":true}", List.of(), "안녕하세요", false, 50, false, null, false, null))
                 .thenReturn(new DialogueChatResponse("반갑습니다.", 0));
         when(persistence.applyAffinityDelta(session, npc, 0)).thenReturn(50);
 
@@ -124,25 +124,25 @@ class DialogueServiceTest {
 
         verify(llmProxyClient).generatePersona(1L, "현수동", "이장", null, null, null, null, "동기");
         verify(persistence).savePersona(session, npc, "{\"generated\":true}");
-        verify(llmProxyClient).chat("{\"generated\":true}", List.of(), "안녕하세요", false, 50, false, null, null);
+        verify(llmProxyClient).chat("{\"generated\":true}", List.of(), "안녕하세요", false, 50, false, null, false, null);
     }
 
     @Test
     void send_day7OrLater_passesRestrictDetectiveTalkTrueToLlm() {
         when(persistence.prepareChatContext(100L, 1L)).thenReturn(contextWithExistingPersona(true));
-        when(llmProxyClient.chat("{}", List.of(), "범인이 누구예요?", false, 50, true, null, null))
+        when(llmProxyClient.chat("{}", List.of(), "범인이 누구예요?", false, 50, true, null, false, null))
                 .thenReturn(new DialogueChatResponse("글쎄, 그건 나도 모르겠구먼.", 0));
         when(persistence.applyAffinityDelta(any(), any(), anyInt())).thenReturn(50);
 
         dialogueService.send(100L, 1L, "범인이 누구예요?");
 
-        verify(llmProxyClient).chat("{}", List.of(), "범인이 누구예요?", false, 50, true, null, null);
+        verify(llmProxyClient).chat("{}", List.of(), "범인이 누구예요?", false, 50, true, null, false, null);
     }
 
     @Test
     void send_affinityDeltaNull_treatedAsZero() {
         when(persistence.prepareChatContext(100L, 1L)).thenReturn(contextWithExistingPersona(false));
-        when(llmProxyClient.chat("{}", List.of(), "...", false, 50, false, null, null))
+        when(llmProxyClient.chat("{}", List.of(), "...", false, 50, false, null, false, null))
                 .thenReturn(new DialogueChatResponse("...", null));
         when(persistence.applyAffinityDelta(session, npc, 0)).thenReturn(50);
 
@@ -154,7 +154,7 @@ class DialogueServiceTest {
     @Test
     void send_affinityUpdateOptimisticLockConflict_stillReturnsSuccessfullyWithPreExistingAffinity() {
         when(persistence.prepareChatContext(100L, 1L)).thenReturn(contextWithExistingPersona(false));
-        when(llmProxyClient.chat("{}", List.of(), "안녕하세요", false, 50, false, null, null))
+        when(llmProxyClient.chat("{}", List.of(), "안녕하세요", false, 50, false, null, false, null))
                 .thenReturn(new DialogueChatResponse("반갑습니다.", 3));
         when(persistence.applyAffinityDelta(session, npc, 3))
                 .thenThrow(new org.springframework.orm.ObjectOptimisticLockingFailureException(

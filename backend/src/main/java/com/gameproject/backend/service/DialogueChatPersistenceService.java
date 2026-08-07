@@ -13,6 +13,7 @@ import com.gameproject.backend.domain.EventTarget;
 import com.gameproject.backend.domain.GameSession;
 import com.gameproject.backend.domain.Npc;
 import com.gameproject.backend.domain.NpcPersonaState;
+import com.gameproject.backend.domain.NpcWitnessAwareness;
 import com.gameproject.backend.domain.PlayerStat;
 import com.gameproject.backend.domain.RandomEventLog;
 import com.gameproject.backend.domain.SabotageEvent;
@@ -23,6 +24,7 @@ import com.gameproject.backend.repository.GameSessionRepository;
 import com.gameproject.backend.repository.NpcCaseAssignmentRepository;
 import com.gameproject.backend.repository.NpcPersonaStateRepository;
 import com.gameproject.backend.repository.NpcRepository;
+import com.gameproject.backend.repository.NpcWitnessAwarenessRepository;
 import com.gameproject.backend.repository.RandomEventLogRepository;
 import com.gameproject.backend.repository.SabotageEventRepository;
 
@@ -55,6 +57,7 @@ class DialogueChatPersistenceService {
     private final LlmRateLimiter llmRateLimiter;
     private final SabotageEventRepository sabotageEventRepository;
     private final RandomEventLogRepository randomEventLogRepository;
+    private final NpcWitnessAwarenessRepository witnessAwarenessRepository;
 
     /**
      * LLM 호출에 필요한 데이터를 모으는 짧은 트랜잭션. session.getAccount()/session.getCulprit()는
@@ -104,12 +107,29 @@ class DialogueChatPersistenceService {
         // 기획서 "낮 동선과 밤 사보타주를 목격담으로 연결" — 이 NPC가 목격자로 배정된 밤이 있으면
         // "N일차 밤 장소" 형태로만 넘긴다(실제로 뭘 봤는지는 llm-proxy 프롬프트가 스스로 애매하게
         // 지어내게 한다 — 서버도 몰라야 범인을 특정할 정보가 새어나갈 일이 없다).
-        String witnessContext = sabotageEventRepository.findBySession(session).stream()
+        SabotageEvent directWitnessEvent = sabotageEventRepository.findBySession(session).stream()
                 .filter(event -> npc.getNpcId().equals(
                         event.getWitnessNpc() != null ? event.getWitnessNpc().getNpcId() : null))
                 .max(Comparator.comparing(SabotageEvent::getDay))
-                .map(event -> event.getDay() + "일차 밤 " + event.getLocation())
                 .orElse(null);
+
+        // 직접 목격자가 아니면, WitnessGossipService가 밤마다 관계망(부부/마을 소식통)을 타고
+        // 퍼뜨린 "전해 들은" 목격담이 있는지 확인한다 — 내용은 동일한 day/location 문자열을
+        // 재사용하고, witnessIsSecondhand만 true로 넘겨서 llm-proxy가 "직접 봤다"고 잘못
+        // 연기하지 않도록 구분한다.
+        String witnessContext;
+        boolean witnessIsSecondhand;
+        if (directWitnessEvent != null) {
+            witnessContext = directWitnessEvent.getDay() + "일차 밤 " + directWitnessEvent.getLocation();
+            witnessIsSecondhand = false;
+        } else {
+            SabotageEvent heardEvent = witnessAwarenessRepository.findBySessionAndNpc(session, npc).stream()
+                    .map(NpcWitnessAwareness::getSabotageEvent)
+                    .max(Comparator.comparing(SabotageEvent::getDay))
+                    .orElse(null);
+            witnessContext = heardEvent != null ? heardEvent.getDay() + "일차 밤 " + heardEvent.getLocation() : null;
+            witnessIsSecondhand = heardEvent != null;
+        }
 
         // 최근 마을 전체 대상 랜덤 이벤트(7→8일차)만 대화 소재로 넘긴다 — 플레이어 개인 대상
         // 이벤트(8→9일차)는 NPC가 알 도리가 없는 사적인 사건이라 제외한다.
@@ -120,7 +140,8 @@ class DialogueChatPersistenceService {
                 .orElse(null);
 
         return new DialogueChatContext(session, npc, stat, existingPersonaJson, motiveTextForPersonaGen, history,
-                honestMode, affinityScore, restrictDetectiveTalk, witnessContext, recentVillageEventContext);
+                honestMode, affinityScore, restrictDetectiveTalk, witnessContext, witnessIsSecondhand,
+                recentVillageEventContext);
     }
 
     @Transactional
