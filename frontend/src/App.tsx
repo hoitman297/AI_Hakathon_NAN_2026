@@ -129,7 +129,17 @@ function App() {
 
   function handleAccusationResolved(result: AccuseResult) {
     setSession((prev) => (prev ? { ...prev, status: result.sessionStatus } : prev))
-    setScreen(result.sessionStatus === 'IN_PROGRESS' ? 'day' : 'ending')
+
+    // 정답(SUCCESS)이거나 9일차 오답(BAD_ENDING)이면 이미 세션이 종료된 상태 — 곧바로
+    // 엔딩 화면으로 간다. 이 분기가 갈리는 기준은 오직 서버가 내려준 sessionStatus뿐이라,
+    // 정답인데 배드엔딩 화면이 먼저 뜨는 경우는 구조적으로 발생할 수 없다.
+    if (result.sessionStatus !== 'IN_PROGRESS') {
+      setScreen('ending')
+      return
+    }
+
+    // 7·8일차에 지목했지만 오답인 경우 — 결과 확인 후 자동으로 다음 날(8·9일차)로 넘어간다.
+    void handleAdvanceDay()
   }
 
   function handleQuitToTitle() {
