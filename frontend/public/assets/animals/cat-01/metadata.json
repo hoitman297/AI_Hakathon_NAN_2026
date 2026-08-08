@@ -1,0 +1,36 @@
+{
+  "group_id": "5215287e-eb08-46c5-aa70-e7c31adeeeac",
+  "states": [
+    {
+      "character": {
+        "id": "f947bb98-6dc4-44eb-a116-077d7d52120b",
+        "name": "Idle",
+        "prompt": "Cozy Korean countryside life-simulation game aesthetic. Clean pixel art with simple readable shapes, limited warm color palette, subtle shading, crisp pixel clusters and minimal details. Small compact proportions suitable for an NPC animal wandering around a village map. No accessories, no clothes.",
+        "size": {
+          "width": 48,
+          "height": 48
+        },
+        "template_id": "cat",
+        "directions": 8,
+        "view": "low top-down",
+        "created_at": "2026-08-08T09:11:50.072637+00:00"
+      },
+      "folder": "Idle",
+      "frames": {
+        "rotations": {
+          "south": "Idle/rotations/south.png",
+          "south-east": "Idle/rotations/south-east.png",
+          "east": "Idle/rotations/east.png",
+          "north-east": "Idle/rotations/north-east.png",
+          "north": "Idle/rotations/north.png",
+          "north-west": "Idle/rotations/north-west.png",
+          "west": "Idle/rotations/west.png",
+          "south-west": "Idle/rotations/south-west.png"
+        },
+        "animations": {}
+      }
+    }
+  ],
+  "export_version": "3.1",
+  "export_date": "2026-08-08T09:19:24.416778"
+}
