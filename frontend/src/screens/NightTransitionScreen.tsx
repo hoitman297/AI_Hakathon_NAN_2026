@@ -100,10 +100,10 @@ export function NightTransitionScreen({ sessionId, day, nextDay, onContinue }: N
     sabotage: '/assets/background-assets/facilities/chicken-coop-broken.png',
   }
 
-  const playerImg: Record<NightSummary['sabotageType'], string> = {
-    theft: '/assets/characters/player-male/Idle/rotations/east.png',
-    vandalism: '/assets/characters/player-male/Idle/rotations/north.png',
-    sabotage: '/assets/characters/player-male/Idle/rotations/west.png',
+  const walkSheet: Record<NightSummary['sabotageType'], string> = {
+    theft: '/assets/characters/player-male/walk/east_walk_sheet.png',
+    vandalism: '/assets/characters/player-male/walk/north_walk_sheet.png',
+    sabotage: '/assets/characters/player-male/walk/west_walk_sheet.png',
   }
 
   return (
@@ -156,7 +156,11 @@ export function NightTransitionScreen({ sessionId, day, nextDay, onContinue }: N
           )}
 
           <div className="ns-player-glow" />
-          <img className="ns-player" src={playerImg[type]} alt="" />
+          <div
+            className="ns-player"
+            style={{ backgroundImage: `url('${walkSheet[type]}')` }}
+            aria-hidden
+          />
 
           <div className="ns-vignette" aria-hidden />
           <div className="ns-vignette-center" aria-hidden />
