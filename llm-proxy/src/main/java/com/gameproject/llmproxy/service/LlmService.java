@@ -136,6 +136,10 @@ public class LlmService {
                 말투: %s
                 배경: %s
                 이 말투와 배경에 맞춰 1~3문장으로 짧게 대답하세요. 캐릭터에서 벗어나지 마세요.
+                단, 짧고 무뚝뚝한 성격이라도 매번 똑같은 문구("네, 손님." 같은 정형화된 인사말 등)를
+                기계적으로 반복하지 말고, 플레이어의 실제 발화 내용에 맞춰 조금씩 다르게 반응하세요 —
+                단답이 곧 무성의함은 아닙니다. 차분함/무뚝뚝함은 어휘·어조로 표현하되, 대화 자체가
+                꽉 막힌 벽처럼 느껴지지 않게 하세요.
                 """.formatted(persona.name(), persona.role(), persona.age(),
                 persona.personality(), persona.speechStyle(), persona.backstory());
 
