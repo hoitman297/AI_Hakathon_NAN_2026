@@ -223,7 +223,7 @@ export class MainScene extends Phaser.Scene {
     this.add.image(hall.x, hall.y, 'villageHall').setOrigin(0.5, 1).setScale(0.22).setDepth(hall.y)
     this.objectBlockers.push(new Phaser.Geom.Rectangle(hall.x - 164, hall.y - 82, 328, 78))
 
-    const pavilion = at(62, 76)
+    const pavilion = at(38, 40)
     this.add
       .image(pavilion.x, pavilion.y, 'villagePavilion')
       .setOrigin(0.5, 1)
@@ -318,12 +318,13 @@ export class MainScene extends Phaser.Scene {
       [14.1, 18.8], [36.7, 17.4],
     ].forEach(([x, y], index) => place('wildGrassCluster', x, y, 0.038 + (index % 3) * 0.004, undefined, index % 2 === 0))
 
-    // Pavilion: a compact shaded rest area in the lower-center district.
-    place('woodenPyeongsang', 66.2, 75.7, 0.12, { width: 52, height: 22 })
-    place('wildDeciduousTree', 57.5, 72.2, 0.135, { width: 25, height: 22 })
-    place('ordinaryTree', 67.4, 72.8, 0.095, { width: 35, height: 24 })
-    place('stoneFlowerBed', 64.9, 78.5, 0.05, { width: 54, height: 16 })
-    ;[[58.8, 77.3], [67, 77.8]].forEach(([x, y]) =>
+    // Pavilion: fills the open civic space below Hyeon Sudong and Najubu,
+    // while preserving a clear grass buffer before the northern riverbank.
+    place('woodenPyeongsang', 42.2, 39.7, 0.12, { width: 52, height: 22 })
+    place('wildDeciduousTree', 33.5, 36.2, 0.135, { width: 25, height: 22 })
+    place('ordinaryTree', 43.4, 36.8, 0.095, { width: 35, height: 24 })
+    place('stoneFlowerBed', 40.9, 42.5, 0.05, { width: 54, height: 16 })
+    ;[[34.8, 41.3], [43, 41.8]].forEach(([x, y]) =>
       place('wildShrubCluster', x, y, 0.05),
     )
 
