@@ -1,0 +1,36 @@
+{
+  "group_id": "44796470-c6b7-4397-a399-79e807cfbf71",
+  "states": [
+    {
+      "character": {
+        "id": "2e8886be-d25a-4ea0-b6a4-6cd175a5568a",
+        "name": "Idle",
+        "prompt": "A 10-year-old Korean elementary school girl from a quiet rural village.\n\nSmall child with straight black hair in a short bob cut with simple bangs, a round youthful face and simple natural features. She wears a pale yellow short-sleeved T-shirt, a simple navy skirt, white socks, simple sneakers, and a small muted red backpack.\n\nShe has realistic child proportions within the game's pixel-art style: clearly shorter and smaller than adult NPCs, about 75% of an adult character's height. Slightly larger head relative to her body, narrow shoulders, short arms and short legs.\n\nShe should look like an ordinary Korean elementary school girl walking around a countryside village, not a fantasy character and not an exaggerated chibi character.\n\nClassic Korean countryside life-simulation RPG pixel art. Clean 32x32 pixel sprite, compact readable silhouette, limited natural color palette, crisp pixel clusters, subtle shading and simple details.\n\nMatch the same pixel density, proportions, outline thickness and visual style as the adult village NPCs.\n\nNo oversized head, no anime style, no exaggerated facial features.",
+        "size": {
+          "width": 48,
+          "height": 48
+        },
+        "template_id": "mannequin",
+        "directions": 8,
+        "view": "low top-down",
+        "created_at": "2026-08-08T11:11:35.126992+00:00"
+      },
+      "folder": "Idle",
+      "frames": {
+        "rotations": {
+          "south": "Idle/rotations/south.png",
+          "south-east": "Idle/rotations/south-east.png",
+          "east": "Idle/rotations/east.png",
+          "north-east": "Idle/rotations/north-east.png",
+          "north": "Idle/rotations/north.png",
+          "north-west": "Idle/rotations/north-west.png",
+          "west": "Idle/rotations/west.png",
+          "south-west": "Idle/rotations/south-west.png"
+        },
+        "animations": {}
+      }
+    }
+  ],
+  "export_version": "3.1",
+  "export_date": "2026-08-08T11:13:36.278737"
+}

@@ -1,0 +1,36 @@
+{
+  "group_id": "2f9ff2a9-3295-43eb-bcce-3ac482c56103",
+  "states": [
+    {
+      "character": {
+        "id": "05d35075-109e-4df9-94f0-ff903ddf83cd",
+        "name": "Idle",
+        "prompt": "A small cute black village cat with solid deep black fur, subtle dark charcoal highlights, bright golden-yellow eyes and a small black nose. Short-haired domestic cat with a round face, small triangular ears, short legs and a slightly fluffy curved tail.\n\nCozy Korean countryside life-simulation game aesthetic. Clean pixel art with simple readable shapes, limited color palette, subtle shading, crisp pixel clusters and minimal details. Make the black fur silhouette clearly readable against different backgrounds. Small compact proportions suitable for an NPC animal wandering around a village map. No accessories, no clothes.",
+        "size": {
+          "width": 48,
+          "height": 48
+        },
+        "template_id": "cat",
+        "directions": 8,
+        "view": "low top-down",
+        "created_at": "2026-08-08T09:33:54.215155+00:00"
+      },
+      "folder": "Idle",
+      "frames": {
+        "rotations": {
+          "south": "Idle/rotations/south.png",
+          "south-east": "Idle/rotations/south-east.png",
+          "east": "Idle/rotations/east.png",
+          "north-east": "Idle/rotations/north-east.png",
+          "north": "Idle/rotations/north.png",
+          "north-west": "Idle/rotations/north-west.png",
+          "west": "Idle/rotations/west.png",
+          "south-west": "Idle/rotations/south-west.png"
+        },
+        "animations": {}
+      }
+    }
+  ],
+  "export_version": "3.1",
+  "export_date": "2026-08-08T09:38:52.708103"
+}

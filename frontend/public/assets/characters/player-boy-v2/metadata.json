@@ -1,0 +1,36 @@
+{
+  "group_id": "bb4ec2c8-e6e3-4923-995a-d9a582233b91",
+  "states": [
+    {
+      "character": {
+        "id": "20365384-0559-46d9-8be2-71a215c2fd54",
+        "name": "Idle",
+        "prompt": "A 10-year-old Korean elementary school boy from a quiet rural village.\n\nSmall child with short black hair, a round youthful face and simple natural features. He wears a white short-sleeved T-shirt, dark navy shorts, simple sneakers, and a small olive-green school backpack.\n\nHe has realistic child proportions within the game's pixel-art style: clearly shorter and smaller than adult NPCs, about 75% of an adult character's height. Slightly larger head relative to his body, narrow shoulders, short arms and short legs.\n\nHe should look like an ordinary Korean elementary school boy walking around a countryside village, not a fantasy character and not an exaggerated chibi character.\n\nClassic Korean countryside life-simulation RPG pixel art. Clean 32x32 pixel sprite, compact readable silhouette, limited natural color palette, crisp pixel clusters, subtle shading and simple details.\n\nMatch the same pixel density, proportions, outline thickness and visual style as the adult village NPCs.\n\nNo oversized head, no anime style, no exaggerated facial features.",
+        "size": {
+          "width": 48,
+          "height": 48
+        },
+        "template_id": "mannequin",
+        "directions": 8,
+        "view": "low top-down",
+        "created_at": "2026-08-08T11:05:32.681149+00:00"
+      },
+      "folder": "Idle",
+      "frames": {
+        "rotations": {
+          "south": "Idle/rotations/south.png",
+          "south-east": "Idle/rotations/south-east.png",
+          "east": "Idle/rotations/east.png",
+          "north-east": "Idle/rotations/north-east.png",
+          "north": "Idle/rotations/north.png",
+          "north-west": "Idle/rotations/north-west.png",
+          "west": "Idle/rotations/west.png",
+          "south-west": "Idle/rotations/south-west.png"
+        },
+        "animations": {}
+      }
+    }
+  ],
+  "export_version": "3.1",
+  "export_date": "2026-08-08T11:11:08.108815"
+}

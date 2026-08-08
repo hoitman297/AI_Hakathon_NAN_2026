@@ -117,12 +117,12 @@ def widen_road(centerline: set[tuple[int, int]]) -> set[tuple[int, int]]:
 
 
 def widen_river(centerline: set[tuple[int, int]]) -> set[tuple[int, int]]:
-    """Expand the stream to a variable seven-to-eleven-tile river channel."""
+    """Expand the stream to a broad, readable nine-to-thirteen-tile channel."""
     widened: set[tuple[int, int]] = set()
     for x, y in centerline:
         horizontal = (x - 1, y) in centerline or (x + 1, y) in centerline
         vertical = (x, y - 1) in centerline or (x, y + 1) in centerline
-        radius = 3 + (((x // 15) + (y // 11) + SEED) % 3)
+        radius = 4 + (((x // 15) + (y // 11) + SEED) % 3)
 
         if horizontal and not vertical:
             for offset in range(-radius, radius + 1):
@@ -207,11 +207,11 @@ def main() -> None:
     road_cells: set[tuple[int, int]] = set()
     secondary_path_count = 0
 
-    # A single stream now crosses the middle of the chunk with broad, readable
-    # bends instead of occupying isolated corners or following a straight channel.
+    # The stream runs through the lower half so the northern village and field
+    # have more breathing room. The bridge is derived from this same centerline.
     river_centerline = organic_path(
-        [(0, 58), (14, 55), (27, 60), (41, 54), (55, 59), (69, 53),
-         (83, 58), (98, 52), (112, 56), (127, 54)],
+        [(0, 68), (14, 65), (27, 70), (41, 64), (55, 69), (69, 63),
+         (83, 68), (98, 62), (112, 66), (127, 64)],
         27,
     )
     river_cells = river_centerline
@@ -241,7 +241,8 @@ def main() -> None:
         for dy in range(-1, 2)
         if 0 <= x + dx < WIDTH and 0 <= y + dy < HEIGHT
     }
-    farm_cells = ellipse_cells(96, 34, 17, 12, 31)
+    # Roughly twice the former cultivated area while retaining an organic edge.
+    farm_cells = ellipse_cells(96, 34, 24, 17, 31)
     farm_cells -= road_buffer | river_buffer
 
     map_image = Image.new("RGBA", (WIDTH * TILE, HEIGHT * TILE))
@@ -356,12 +357,27 @@ def main() -> None:
         road_sparse.append({"x": x, "y": y, "tile": tile_id, "atlas": "supplied-road", "connections": bits})
 
     # Sparse environmental overlays only occupy undecorated grass cells.
-    blocked = road_cells | river_cells | farm_cells
-    overlay_rates = (("weeds", 0.055), ("wildflowers", 0.022), ("pebbles", 0.018), ("forest-details", 0.015))
+    # Keep baked weeds/flowers out from under the western item shop and its
+    # storage house; these buildings and their front yard are Phaser objects.
+    commercial_building_clearance = {
+        (x, y)
+        for x in range(0, 29)
+        for y in range(46, 59)
+    }
+    pavilion_clearance = {
+        (x, y)
+        for x in range(31, 52)
+        for y in range(33, 52)
+    }
+    blocked = road_cells | river_cells | farm_cells | commercial_building_clearance | pavilion_clearance
+    river_bank_cells = river_buffer - river_cells
+    general_overlay_rates = (("weeds", 0.028), ("pebbles", 0.018), ("forest-details", 0.015))
+    riverbank_overlay_rates = (("wildflowers", 0.0225), ("weeds", 0.02), ("pebbles", 0.018), ("forest-details", 0.012))
     for y in range(HEIGHT):
         for x in range(WIDTH):
             if (x, y) in blocked:
                 continue
+            overlay_rates = riverbank_overlay_rates if (x, y) in river_bank_cells else general_overlay_rates
             roll = rng.random()
             running = 0.0
             for name, rate in overlay_rates:
@@ -393,7 +409,7 @@ def main() -> None:
         "pixelWidth": WIDTH * OUTPUT_TILE,
         "pixelHeight": HEIGHT * OUTPUT_TILE,
         "renderedImage": image_path.name,
-        "spawn": {"x": 7, "y": 20},
+        "spawn": {"x": 62, "y": 40},
         "camera": {"followPlayer": True, "viewport": {"width": 1280, "height": 720}},
         "zones": [
             {
@@ -431,7 +447,7 @@ def main() -> None:
         },
         "exits": {
             "road": {"west": None, "east": None, "north": None},
-            "river": {"west": [0, 58], "east": [127, 54]},
+            "river": {"west": [0, 68], "east": [127, 64]},
         },
         "reservedOpenAreas": [
             {"name": "northwest-residential", "x": 7, "y": 5, "width": 20, "height": 15},
