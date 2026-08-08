@@ -36,6 +36,15 @@ export class MainScene extends Phaser.Scene {
   private mapData!: TerrainMapData
   private chickenCoop!: Phaser.GameObjects.Image
   private chickens: Phaser.GameObjects.Image[] = []
+  private villageAnimals: Phaser.GameObjects.Image[] = []
+  private shadowPairs: Array<{ object: Phaser.GameObjects.Image; shadow: Phaser.GameObjects.Image }> = []
+  private riverShimmers: Array<{
+    object: Phaser.GameObjects.Ellipse
+    velocityX: number
+    phase: number
+    lane: number
+  }> = []
+  private opaqueBottomPadding = new Map<string, number>()
   private coopBroken = false
   private objectBlockers: Phaser.Geom.Rectangle[] = []
 
@@ -46,14 +55,10 @@ export class MainScene extends Phaser.Scene {
   preload() {
     this.load.image('terrainChunk', '/assets/world/maps/korean-countryside-chunk-01.png?v=no-road-expanded-field-v18')
     this.load.json('terrainMapData', '/assets/world/maps/korean-countryside-chunk-01.json?v=no-road-expanded-field-v18')
-    this.load.image('player-south', '/assets/characters/player-male/Idle/rotations/south.png')
-    this.load.image('player-south-east', '/assets/characters/player-male/Idle/rotations/south-east.png')
-    this.load.image('player-east', '/assets/characters/player-male/Idle/rotations/east.png')
-    this.load.image('player-north-east', '/assets/characters/player-male/Idle/rotations/north-east.png')
-    this.load.image('player-north', '/assets/characters/player-male/Idle/rotations/north.png')
-    this.load.image('player-north-west', '/assets/characters/player-male/Idle/rotations/north-west.png')
-    this.load.image('player-west', '/assets/characters/player-male/Idle/rotations/west.png')
-    this.load.image('player-south-west', '/assets/characters/player-male/Idle/rotations/south-west.png')
+    ;['south', 'south-east', 'east', 'north-east', 'north', 'north-west', 'west', 'south-west'].forEach((direction) => {
+      this.load.image(`player-${direction}`, `/assets/characters/player-boy-v2/Idle/rotations/${direction}.png`)
+      this.load.image(`player-girl-${direction}`, `/assets/characters/player-girl-v2/Idle/rotations/${direction}.png`)
+    })
     this.load.image('ruralBridge', '/assets/world/bridge-rural-small-v2.png')
     this.load.image('chickenCoopNormal', '/assets/world/facilities/chicken-coop-normal.png')
     this.load.image('chickenCoopBroken', '/assets/world/facilities/chicken-coop-broken.png')
@@ -69,24 +74,43 @@ export class MainScene extends Phaser.Scene {
     this.load.image('hyeonSudong', '/assets/characters/npcs/npc-01/Idle/rotations/south.png')
     this.load.image('stoneWell', '/assets/world/objects/stone-well.png')
     this.load.image('woodenPyeongsang', '/assets/world/objects/wooden-pyeongsang.png')
-    this.load.image('brokenFence', '/assets/world/objects/wood-fence-broken.png')
     this.load.image('zelkovaTree', '/assets/world/objects/zelkova-tree-v1.png')
     this.load.image('wildDeciduousTree', '/assets/world/objects/wild-deciduous-tree-v1.png')
     this.load.image('wildShrubCluster', '/assets/world/objects/wild-shrub-cluster-v1.png')
     this.load.image('wildGrassCluster', '/assets/world/objects/wild-grass-cluster-v1.png')
-    this.load.image('communalWaterStation', '/assets/world/objects/communal-water-station-v1.png')
     this.load.image('villageBicycle', '/assets/world/objects/village-bicycle-v1.png')
     this.load.image('villageNoticeBoard', '/assets/world/objects/village-notice-board-v1.png')
     this.load.image('stoneFlowerBed', '/assets/world/objects/stone-flower-bed-v1.png')
+    this.load.image('clothesline', '/assets/world/objects/clothesline-v1.png')
     this.load.image('largeGraniteBoulder', '/assets/world/objects/large-granite-boulder-v1.png')
+    this.load.image('villageCultivator', '/assets/world/objects/generated-v1/cultivator-v1.png')
+    this.load.image('newBroadcastSpeaker', '/assets/world/objects/generated-v1/broadcast-speaker-v1.png')
+    this.load.image('lowStoneWall', '/assets/world/objects/generated-v1/low-stone-wall-v1.png')
+    this.load.image('stonePile', '/assets/world/objects/generated-v1/stone-pile-v1.png')
+    ;[1, 2, 3].forEach((variant) =>
+      this.load.image(`ruralMailbox${variant}`, `/assets/world/objects/generated-v1/mailbox-${variant}-v1.png`),
+    )
+    ;[1, 2, 3, 4].forEach((variant) =>
+      this.load.image(`newWildflower${variant}`, `/assets/world/objects/generated-v1/wildflower-${variant}-v1.png`),
+    )
     this.load.image('broadcastSpeakerPole', '/assets/world/objects/broadcast-speaker-pole-v1.png')
-    this.load.image('villageDog', '/assets/world/objects/village-dog-v1.png')
+    ;['south', 'south-east', 'east', 'north-east', 'north', 'north-west', 'west', 'south-west'].forEach((direction) =>
+      this.load.image(`cat-01-${direction}`, `/assets/animals/cat-01/Idle/rotations/${direction}.png`),
+    )
+    ;['tuxedo-cat', 'white-dog'].forEach((animal) => {
+      ;['south', 'south-east', 'east', 'north-east', 'north', 'north-west', 'west', 'south-west'].forEach((direction) =>
+        this.load.image(`${animal}-${direction}`, `/assets/animals/${animal}/Idle/rotations/${direction}.png`),
+      )
+    })
     this.load.image('najubuHouse', '/assets/world/buildings/houses/house-2.png')
     this.load.image('produceShop', '/assets/world/buildings/public/produce-shop.png')
     this.load.image('najubu', '/assets/characters/npcs/npc-02/Idle/rotations/south.png')
-    this.load.image('gardenCarrot', '/assets/world/growth/crops/carrot-stage-3.png')
-    this.load.image('gardenPotato', '/assets/world/growth/crops/potato-stage-3.png')
     this.load.image('gardenAppleTree', '/assets/world/growth/fruit/apple-tree-stage-3.png')
+    ;[1, 2, 3].forEach((stage) => {
+      this.load.image(`farmCarrot${stage}`, `/assets/world/growth/crops/carrot-stage-${stage}.png`)
+      this.load.image(`farmStrawberry${stage}`, `/assets/world/growth/crops/strawberry-stage-${stage}.png`)
+      this.load.image(`farmCherry${stage}`, `/assets/world/growth/fruit/cherry-tree-stage-${stage}.png`)
+    })
     this.load.spritesheet('itemShop', '/assets/world/buildings/public/item-shop.png', {
       frameWidth: 600,
       frameHeight: 517,
@@ -102,6 +126,10 @@ export class MainScene extends Phaser.Scene {
     this.load.image('myeongJayu', '/assets/characters/npcs/npc-05/Idle/rotations/south.png')
     this.load.image('kimChijun', '/assets/characters/npcs/npc-06/Idle/rotations/south.png')
     this.load.image('naBaksu', '/assets/characters/npcs/npc-07/Idle/rotations/south.png')
+    ;[1, 2, 3].forEach((frame) =>
+      this.load.image(`sparrowFlockFrame${frame}`, `/assets/world/objects/generated-v1/sparrow-flock-frame-${frame}.png?v=wave-v2`),
+    )
+    this.load.audio('morningFieldsBgm', '/assets/audio/bgm-samples/01-morning-fields.wav?v=3min-loop-v2')
   }
 
   create() {
@@ -116,12 +144,22 @@ export class MainScene extends Phaser.Scene {
     const spawnX = (this.mapData.spawn.x + 0.5) * this.mapData.tileWidth
     const spawnY = (this.mapData.spawn.y + 0.5) * this.mapData.tileHeight
     this.createFarmAreaObjects()
+    this.createFarmCropRows()
     this.createZoneOne()
     this.createZoneTwo()
     this.createEnvironmentalDensity()
     this.createRemainingZones()
+    this.createVillageAnimals()
 
-    this.player = this.add.image(spawnX, spawnY, 'player-south').setDepth(spawnY).setScale(1.25)
+    // Keep a guaranteed walkable pocket around the initial spawn. Decorative
+    // collision rectangles must never trap the player before the first input.
+    const spawnSafetyArea = new Phaser.Geom.Rectangle(spawnX - 42, spawnY - 42, 84, 84)
+    this.objectBlockers = this.objectBlockers.filter(
+      (blocker) => !Phaser.Geom.Intersects.RectangleToRectangle(blocker, spawnSafetyArea),
+    )
+
+    this.player = this.add.image(spawnX, spawnY, 'player-south').setDepth(spawnY).setScale(1)
+    this.createWorldLighting()
 
     this.cursors = this.input.keyboard!.createCursorKeys()
     this.movementKeys = this.input.keyboard!.addKeys({
@@ -136,9 +174,14 @@ export class MainScene extends Phaser.Scene {
     camera.setZoom(1.35)
     camera.centerOn(this.player.x, this.player.y)
     camera.startFollow(this.player, true, 1, 1)
+    this.startMorningFieldsBgm()
+    this.startSparrowFlocks()
+    this.startRiverSparkles()
   }
 
   update(_time: number, delta: number) {
+    this.updateWorldShadows()
+    this.updateRiverShimmers(delta)
     const left = this.cursors.left.isDown || this.movementKeys.left.isDown
     const right = this.cursors.right.isDown || this.movementKeys.right.isDown
     const up = this.cursors.up.isDown || this.movementKeys.up.isDown
@@ -169,16 +212,17 @@ export class MainScene extends Phaser.Scene {
   private createFarmAreaObjects() {
     const tile = this.mapData.tileWidth
 
-    const fencePositions = [88, 94, 100]
+    // Keep the entire farm boundary to the right of the produce shop footprint.
+    const fencePositions = [90, 102, 114]
     fencePositions.forEach((tileX) => {
       const x = (tileX + 0.5) * tile
-      const y = 29 * tile
+      const y = 18.5 * tile
       this.add.image(x, y, 'woodFence').setOrigin(0.5, 1).setScale(0.22).setDepth(y)
       this.objectBlockers.push(new Phaser.Geom.Rectangle(x - 66, y - 18, 132, 20))
     })
 
-    const coopX = 104.5 * tile
-    const coopY = 34 * tile
+    const coopX = 115 * tile
+    const coopY = 25 * tile
     this.chickenCoop = this.add
       .image(coopX, coopY, 'chickenCoopNormal')
       .setOrigin(0.5, 1)
@@ -190,15 +234,17 @@ export class MainScene extends Phaser.Scene {
     this.chickenCoop.on('pointerdown', () => this.toggleChickenCoop())
     this.objectBlockers.push(new Phaser.Geom.Rectangle(coopX - 90, coopY - 72, 180, 72))
 
-    const chickenSpecs: Array<[number, number, string]> = [
-      [100.5, 34, 'chickenFront'],
-      [102.5, 36, 'chickenLeft'],
-      [105, 37, 'chickenRight'],
+    const chickenSpecs: Array<[number, number, string, number, number]> = [
+      [110.5, 26, 'chickenFront', 0, 0],
+      [114, 29, 'chickenLeft', 10, 3],
+      [118, 26.5, 'chickenRight', 20, -2],
     ]
-    this.chickens = chickenSpecs.map(([tileX, tileY, texture]) => {
+    this.chickens = chickenSpecs.map(([tileX, tileY, texture, offsetX, offsetY]) => {
       const x = tileX * tile
       const y = tileY * tile
-      return this.add.image(x, y, texture).setOrigin(0.5, 1).setScale(0.14).setDepth(y)
+      const chicken = this.add.image(x, y, texture).setOrigin(0.5, 1).setScale(0.14).setDepth(y)
+      this.startRandomWander(chicken, new Phaser.Geom.Rectangle(x - 24 + offsetX, y - 15 + offsetY, 48, 30), ['chickenFront', 'chickenLeft', 'chickenRight'], 8, undefined, true)
+      return chicken
     })
 
     const scarecrowX = 96 * tile
@@ -209,9 +255,23 @@ export class MainScene extends Phaser.Scene {
       .setScale(0.18)
       .setDepth(scarecrowY)
 
-    const jarsX = 108 * tile
-    const jarsY = 35 * tile
-    this.add.image(jarsX, jarsY, 'onggiJars').setOrigin(0.5, 1).setScale(0.16).setDepth(jarsY)
+  }
+
+  private createFarmCropRows() {
+    const tile = this.mapData.tileWidth
+    const rows: Array<{ y: number; prefix: string; scale: number }> = [
+      { y: 27, prefix: 'farmCarrot', scale: 0.058 },
+      { y: 32, prefix: 'farmCarrot', scale: 0.058 },
+      { y: 37, prefix: 'farmStrawberry', scale: 0.06 },
+      { y: 43, prefix: 'farmCherry', scale: 0.075 },
+    ]
+    rows.forEach(({ y, prefix, scale }, rowIndex) => {
+      for (let column = 0; column < 7; column += 1) {
+        const x = 78 + column * 5
+        const stage = ((column + rowIndex) % 3) + 1
+        this.add.image(x * tile, y * tile, `${prefix}${stage}`).setOrigin(0.5, 1).setScale(scale).setDepth(y * tile)
+      }
+    })
   }
 
   private createZoneOne() {
@@ -223,7 +283,7 @@ export class MainScene extends Phaser.Scene {
     this.add.image(hall.x, hall.y, 'villageHall').setOrigin(0.5, 1).setScale(0.22).setDepth(hall.y)
     this.objectBlockers.push(new Phaser.Geom.Rectangle(hall.x - 164, hall.y - 82, 328, 78))
 
-    const pavilion = at(38, 40)
+    const pavilion = at(40, 40)
     this.add
       .image(pavilion.x, pavilion.y, 'villagePavilion')
       .setOrigin(0.5, 1)
@@ -232,7 +292,7 @@ export class MainScene extends Phaser.Scene {
     this.objectBlockers.push(new Phaser.Geom.Rectangle(pavilion.x - 92, pavilion.y - 48, 184, 45))
 
     const treePositions: Array<[number, number, number]> = [
-      [5, 9, 0.105], [27, 8, 0.1], [39, 7, 0.11], [10, 29, 0.1],
+      [5, 11.5, 0.105], [27, 10.5, 0.1], [39, 9.5, 0.11], [10, 29, 0.1],
     ]
     treePositions.forEach(([tileX, tileY, scale]) => {
       const tree = at(tileX, tileY)
@@ -297,66 +357,53 @@ export class MainScene extends Phaser.Scene {
     // Village hall: a used civic yard, with an old well, resting platform,
     // irregular fence fragments, jars, shade trees and wild planting clusters.
     ;[
-      [8.2, 17.8, false], [29.3, 17.4, false],
+      [6.8, 22.8, false], [29.5, 22.6, false],
     ].forEach(([x, y, flipped]) => place('woodFence', x as number, y as number, 0.14, { width: 82, height: 16 }, flipped as boolean))
-    place('woodenPyeongsang', 30.7, 20.2, 0.14, { width: 60, height: 25 }, true)
-    place('wildDeciduousTree', 3.4, 13.5, 0.13, { width: 25, height: 22 }, true)
-    place('zelkovaTree', 33.2, 7.8, 0.085, { width: 28, height: 23 })
+    place('wildDeciduousTree', 3.4, 15.5, 0.13, { width: 25, height: 22 }, true)
 
     // Signature 1990s village props. The center line from the road to the hall
     // doors stays open while the objects form two uneven civic-yard clusters.
-    place('villageNoticeBoard', 10.2, 15.2, 0.075, { width: 62, height: 20 })
-    place('villageBicycle', 23.2, 18.7, 0.068, { width: 58, height: 20 }, true)
-    place('stoneFlowerBed', 13.5, 17.1, 0.065, { width: 72, height: 20 })
-    place('broadcastSpeakerPole', 4.7, 11.8, 0.14, { width: 24, height: 20 })
-    place('villageDog', 22.1, 20.4, 0.058)
+    place('villageNoticeBoard', 28, 21.5, 0.075, { width: 62, height: 20 })
+    place('stoneFlowerBed', 14.2, 26.2, 0.065, { width: 72, height: 20 })
+    place('newWildflower1', 9.5, 30.2, 0.028)
+    place('broadcastSpeakerPole', 4.7, 14, 0.14, { width: 24, height: 20 })
 
     ;[
-      [10.5, 18.6], [32.8, 17.7],
+      [5.8, 24.6], [34.2, 22.3],
     ].forEach(([x, y], index) => place('wildShrubCluster', x, y, 0.052 + (index % 2) * 0.006, undefined, index % 2 === 0))
     ;[
-      [14.1, 18.8], [36.7, 17.4],
+      [13.2, 24.8], [37, 22.8],
     ].forEach(([x, y], index) => place('wildGrassCluster', x, y, 0.038 + (index % 3) * 0.004, undefined, index % 2 === 0))
 
     // Pavilion: fills the open civic space below Hyeon Sudong and Najubu,
     // while preserving a clear grass buffer before the northern riverbank.
-    place('woodenPyeongsang', 42.2, 39.7, 0.12, { width: 52, height: 22 })
-    place('wildDeciduousTree', 33.5, 36.2, 0.135, { width: 25, height: 22 })
-    place('ordinaryTree', 43.4, 36.8, 0.095, { width: 35, height: 24 })
-    place('stoneFlowerBed', 40.9, 42.5, 0.05, { width: 54, height: 16 })
-    ;[[34.8, 41.3], [43, 41.8]].forEach(([x, y]) =>
-      place('wildShrubCluster', x, y, 0.05),
-    )
+    place('wildDeciduousTree', 35.5, 36.2, 0.135, { width: 25, height: 22 })
+    place('ordinaryTree', 45.4, 36.8, 0.095, { width: 35, height: 24 })
+    // Purpose-built wildflowers form loose, asymmetric edge clusters while the
+    // pavilion entrance and central walking lane stay open.
+    place('newWildflower1', 33.7, 38.5, 0.045)
+    place('newWildflower3', 34.8, 39.2, 0.026, undefined, true)
+    place('newWildflower4', 47.1, 38.1, 0.042, undefined, true)
+    place('newWildflower2', 48.2, 38.8, 0.025)
+
+    // One substantial farming object anchors the initial view. Stone features
+    // bridge the visual transition toward the field without reading as clutter.
+    place('villageCultivator', 73, 44.2, 0.115, { width: 92, height: 45 }, true)
 
     // Chicken farm: working clutter and shelter at the plot edges, leaving the
     // middle clear for NPC/chicken movement and the sabotage interaction.
-    place('stoneWell', 112.5, 35, 0.12, { width: 44, height: 30 })
-    place('onggiJars', 109.6, 32.7, 0.095)
-    place('woodenPyeongsang', 86.5, 34.5, 0.13, { width: 56, height: 23 }, true)
-    ;[[84, 30.5], [116, 36.5]].forEach(([x, y], index) =>
-      place(index % 2 === 0 ? 'wildDeciduousTree' : 'zelkovaTree', x, y, index % 2 === 0 ? 0.125 : 0.078, { width: 25, height: 21 }, index % 3 === 0),
-    )
-    ;[[87, 31], [110.8, 38.5], [116, 39]].forEach(([x, y]) =>
-      place('wildShrubCluster', x, y, 0.052),
-    )
-    ;[[86.5, 39], [108.5, 39.4], [114, 40]].forEach(([x, y], index) =>
-      place(index === 1 ? 'brokenFence' : 'woodFence', x, y, 0.13, { width: 76, height: 15 }, index % 2 === 0),
+    place('stoneWell', 120, 37, 0.24, { width: 88, height: 60 })
+    ;[[78.5, 47.5], [98, 48], [117, 47.5]].forEach(([x, y], index) =>
+      place('woodFence', x, y, 0.13, { width: 76, height: 15 }, index % 2 === 0),
     )
 
-    // Small, irregular groves break up the remaining grass without forming a
-    // wall. They sit well away from the main road, river banks and bridge route.
-    const grove: Array<[string, number, number, number]> = [
-      // Southwest grove: three related silhouettes with breathing room.
-      ['ordinaryTree', 8, 69, 0.095], ['wildDeciduousTree', 14, 73, 0.125],
-      ['wildShrubCluster', 11, 76, 0.052],
-      // Lower-east grove, separated from the pavilion walking yard.
-      ['zelkovaTree', 86, 70, 0.08], ['ordinaryTree', 92, 75, 0.1],
-      ['wildGrassCluster', 88, 78, 0.042],
-      // Far southeast boundary cluster.
-      ['ordinaryTree', 113, 70, 0.1], ['wildDeciduousTree', 120, 75, 0.125],
-      ['wildShrubCluster', 116, 79, 0.052],
-    ]
-    grove.forEach(([texture, x, y, scale]) => place(texture, x, y, scale, { width: 24, height: 21 }))
+    // Reeds and foxtail-like grass stay on the banks, never in the water channel.
+    ;[[5, 53], [18, 52], [34, 53], [50, 52], [91, 52], [111, 53]].forEach(([x, y], index) =>
+      place(index % 3 === 0 ? 'wildShrubCluster' : 'wildGrassCluster', x, y, index % 3 === 0 ? 0.04 : 0.046, undefined, index % 2 === 0),
+    )
+    ;[[8, 80], [24, 81], [42, 79], [70, 80], [96, 79], [121, 80]].forEach(([x, y], index) =>
+      place('wildGrassCluster', x, y, 0.043 + (index % 2) * 0.004, undefined, index % 2 === 1),
+    )
   }
 
   private createZoneTwo() {
@@ -387,42 +434,30 @@ export class MainScene extends Phaser.Scene {
 
     // Zone 2: Najubu's home garden occupies the quieter western half while the
     // produce shop faces the road to the east. Both retain clear front paths.
-    const home = at(55, 18)
+    const home = at(48, 18)
     this.add.image(home.x, home.y, 'najubuHouse').setOrigin(0.5, 1).setScale(0.4).setDepth(home.y)
     this.objectBlockers.push(new Phaser.Geom.Rectangle(home.x - 100, home.y - 64, 200, 62))
 
     const shop = at(76, 19)
     this.add.image(shop.x, shop.y, 'produceShop').setOrigin(0.5, 1).setScale(0.38).setDepth(shop.y)
     this.objectBlockers.push(new Phaser.Geom.Rectangle(shop.x - 104, shop.y - 64, 208, 62))
+    add('ruralMailbox1', 54.8, 19.2, 0.068, { width: 20, height: 14 })
 
     // Small cared-for vegetable plot left of the house.
-    ;[[45.5, 18], [49.1, 17.8]].forEach(([x, y], index) =>
-      add(index === 0 ? 'woodFence' : 'brokenFence', x, y, 0.125, { width: 72, height: 14 }, index === 1),
-    )
-    ;[[45.2, 16.4], [47.2, 16.8], [49, 15.8], [50.5, 17]].forEach(([x, y], index) =>
-      add(index % 2 === 0 ? 'gardenCarrot' : 'gardenPotato', x, y, 0.062 + (index % 2) * 0.005),
-    )
-    add('gardenAppleTree', 46, 11.5, 0.12, { width: 24, height: 21 })
-    add('stoneFlowerBed', 51.2, 17.4, 0.05, { width: 52, height: 16 })
 
     // Utility and resting cluster to the right; the front-door axis at x=55 is empty.
     add('onggiJars', 60.5, 16.7, 0.09, { width: 36, height: 23 })
-    add('communalWaterStation', 63.5, 16.6, 0.072, { width: 58, height: 31 })
-    add('woodenPyeongsang', 64.5, 19.5, 0.115, { width: 50, height: 21 }, true)
     add('villageBicycle', 72, 19.7, 0.055, { width: 47, height: 17 })
-    add('stoneFlowerBed', 58.5, 17.7, 0.043, { width: 46, height: 14 }, true)
-    add('wildShrubCluster', 61.8, 18.7, 0.046)
     add('wildGrassCluster', 66, 18.6, 0.037, undefined, true)
-    add('villageDog', 58.8, 20.4, 0.052)
 
     // Uneven garden boundary vegetation avoids an artificial row.
-    add('wildDeciduousTree', 43.8, 9.5, 0.125, { width: 24, height: 21 }, true)
-    add('ordinaryTree', 66.5, 10.7, 0.09, { width: 34, height: 23 })
-    ;[[44, 19.4], [47.8, 19], [62, 20.1], [68, 17.8], [80.5, 17.4]].forEach(([x, y], index) =>
+    add('ordinaryTree', 69, 12, 0.087, { width: 34, height: 23 })
+    ;[[62, 20.1], [68, 17.8]].forEach(([x, y], index) =>
       add(index % 2 === 0 ? 'wildShrubCluster' : 'wildGrassCluster', x, y, index % 2 === 0 ? 0.047 : 0.036, undefined, index % 3 === 0),
     )
+    add('newWildflower2', 39.5, 20.8, 0.026)
 
-    const npcLocation = at(55, 20.2)
+    const npcLocation = at(48, 20.2)
     const najubu = this.add
       .image(npcLocation.x, npcLocation.y, 'najubu')
       .setOrigin(0.5, 1)
@@ -452,9 +487,10 @@ export class MainScene extends Phaser.Scene {
       scale: number,
       blockerWidth: number,
       blockerHeight: number,
+      flipX = false,
     ) => {
       const { x, y } = at(tileX, tileY)
-      this.add.image(x, y, texture).setOrigin(0.5, 1).setScale(scale).setDepth(y)
+      this.add.image(x, y, texture).setOrigin(0.5, 1).setScale(scale).setFlipX(flipX).setDepth(y)
       this.objectBlockers.push(
         new Phaser.Geom.Rectangle(x - blockerWidth / 2, y - blockerHeight, blockerWidth, blockerHeight),
       )
@@ -470,6 +506,13 @@ export class MainScene extends Phaser.Scene {
       tileY: number,
       schedule: unknown,
     ) => {
+      if (texture === 'jeonJuin') {
+        tileX = 14
+        tileY = 57
+      } else if (texture === 'kimChijun') {
+        tileX = 76
+        tileY = 22.5
+      }
       const { x, y } = at(tileX, tileY)
       const character = this.add
         .image(x, y, texture)
@@ -491,42 +534,381 @@ export class MainScene extends Phaser.Scene {
 
     // Zone 3: the commercial corner. The item shop faces the northern road;
     // its small storage building sits farther east, leaving a service yard between.
-    building('itemShop', 96, 16, 0.34, 180, 55)
-    building('storageBuilding', 116, 29, 0.25, 130, 40)
-    prop('villageBicycle', 87.5, 19, 0.055, true)
-    prop('woodenPyeongsang', 108.5, 18.8, 0.1)
-    prop('onggiJars', 115, 27.5, 0.075)
-    npc('jeonJuin', '전주인', 93.5, 19.5, NPC_DAY_SCHEDULES.jeonJuin)
-    npc('kimChijun', '김치준', 99.5, 19.7, NPC_DAY_SCHEDULES.kimChijun)
+    building('itemShop', 14, 53, 0.34, 180, 55)
+    prop('villageBicycle', 3.5, 55.5, 0.055, true)
+    prop('newWildflower1', 24.2, 56.2, 0.027)
+    prop('newWildflower4', 22.9, 57, 0.019, true)
+    npc('jeonJuin', '전주인', 8, 57, NPC_DAY_SCHEDULES.jeonJuin)
+    npc('kimChijun', '김치준', 14, 57, NPC_DAY_SCHEDULES.kimChijun)
 
     // Zone 6: chicken-farm owner remains beside the interactive coop and chickens.
     // The lane toward the river remains open for the sabotage investigation route.
-    prop('stoneFlowerBed', 97, 37.6, 0.045)
-    prop('wildGrassCluster', 106.8, 39, 0.035)
     npc('parkYounggye', '박영계', 101, 38.6, NPC_DAY_SCHEDULES.parkYounggye)
 
     // Zone 7: Myeong Jayu's quiet home and small, maintained side garden.
     building('myeongHouse', 27, 84, 0.34, 160, 50)
     prop('woodFence', 17.5, 84.3, 0.12)
-    prop('stoneFlowerBed', 20.2, 82.5, 0.052)
+    prop('stoneFlowerBed', 14.8, 87.5, 0.052)
     prop('onggiJars', 34.5, 82.8, 0.08)
+    prop('clothesline', 40, 88, 0.105)
+    prop('ruralMailbox2', 32.8, 84.2, 0.062)
     prop('wildShrubCluster', 18.8, 86.2, 0.045)
+    prop('ordinaryTree', 6.5, 92, 0.09, true)
+    prop('wildGrassCluster', 12, 93, 0.042)
+    prop('newWildflower3', 11.5, 89.2, 0.026)
     npc('myeongJayu', '명자유', 27, 87, NPC_DAY_SCHEDULES.myeongJayu)
 
     // Zone 8: Kim's modest residence is deliberately quieter than his work area.
     // He is currently rendered at the item shop according to his 70% daytime route.
-    building('kimHouse', 77, 90, 0.29, 145, 44)
-    prop('villageBicycle', 68.5, 89.6, 0.05)
-    prop('wildShrubCluster', 84.5, 89, 0.046)
+    building('kimHouse', 77, 82, 0.29, 145, 44, true)
+    prop('ruralMailbox3', 82.2, 82.3, 0.064)
+    prop('villageBicycle', 68.5, 82.6, 0.05)
+    prop('wildDeciduousTree', 57, 94, 0.11)
+    prop('wildGrassCluster', 64, 94, 0.04, true)
+    prop('newWildflower4', 64, 85, 0.025)
 
     // Zone 9: a dedicated watermelon plot with the farmer's home on its east edge.
     building('watermelonFieldNormal', 104, 82, 0.28, 215, 65)
-    building('baksuHouse', 119, 91, 0.27, 145, 44)
     prop('scarecrow', 99, 79.5, 0.15)
     prop('woodFence', 94, 84.5, 0.13)
     prop('woodFence', 113.5, 84.4, 0.13, true)
     prop('wildGrassCluster', 116, 88.3, 0.036)
     npc('naBaksu', '나박수', 104, 85.2, NPC_DAY_SCHEDULES.naBaksu)
+  }
+
+  private createVillageAnimals() {
+    const tile = this.mapData.tileWidth
+    const animals = [
+      {
+        prefix: 'cat-01', id: 'f947bb98-6dc4-44eb-a116-077d7d52120b',
+        x: 46, y: 46, scale: 1.35,
+        bounds: new Phaser.Geom.Rectangle(42 * tile, 43 * tile, 10 * tile, 7 * tile),
+      },
+      {
+        prefix: 'tuxedo-cat', id: '65e29cec-105c-4730-8c51-910a84faeaeb',
+        x: 36, y: 91, scale: 0.675,
+        bounds: new Phaser.Geom.Rectangle(31 * tile, 88 * tile, 15 * tile, 7 * tile),
+      },
+      {
+        prefix: 'white-dog', id: 'd0334d96-89ff-4ee3-b830-ff742294508c',
+        x: 23, y: 29, scale: 1.35,
+        bounds: new Phaser.Geom.Rectangle(17 * tile, 25 * tile, 13 * tile, 8 * tile),
+      },
+    ]
+
+    animals.forEach(({ prefix, id, x, y, scale, bounds }) => {
+      const animal = this.add
+        .image(x * tile, y * tile, `${prefix}-south`)
+        .setOrigin(0.5, 1)
+        .setScale(scale)
+        .setDepth(y * tile)
+        .setData('animalId', id)
+      this.villageAnimals.push(animal)
+      this.startRandomWander(animal, bounds, [], 30, prefix)
+    })
+  }
+
+  private startRandomWander(
+    animal: Phaser.GameObjects.Image,
+    bounds: Phaser.Geom.Rectangle,
+    idleTextures: string[],
+    maxStep: number,
+    directionalPrefix?: string,
+    stepped = false,
+  ) {
+    const chooseNextStep = () => {
+      if (!animal.active) return
+      const angle = Phaser.Math.FloatBetween(0, Math.PI * 2)
+      const distance = Phaser.Math.Between(Math.round(maxStep * 0.35), maxStep)
+      const targetX = Phaser.Math.Clamp(animal.x + Math.cos(angle) * distance, bounds.left, bounds.right)
+      const targetY = Phaser.Math.Clamp(animal.y + Math.sin(angle) * distance, bounds.top, bounds.bottom)
+      const dx = targetX - animal.x
+      const dy = targetY - animal.y
+      if (directionalPrefix) {
+        const horizontal = dx < -3 ? 'west' : dx > 3 ? 'east' : ''
+        const vertical = dy < -3 ? 'north' : dy > 3 ? 'south' : ''
+        animal.setTexture(`${directionalPrefix}-${vertical && horizontal ? `${vertical}-${horizontal}` : vertical || horizontal || 'south'}`)
+      } else if (idleTextures.length) {
+        animal.setTexture(idleTextures[Phaser.Math.Between(0, idleTextures.length - 1)])
+      }
+      this.tweens.add({
+        targets: animal,
+        x: targetX,
+        y: targetY,
+        duration: stepped ? Phaser.Math.Between(360, 560) : Phaser.Math.Between(900, 1700),
+        ease: stepped ? 'Stepped' : 'Sine.easeInOut',
+        easeParams: stepped ? [4] : undefined,
+        onUpdate: (_tween, target) => {
+          animal.setDepth(animal.y)
+          if (stepped) target.y += Math.sin(Date.now() / 55) * 0.12
+        },
+        onComplete: () => this.time.delayedCall(stepped ? Phaser.Math.Between(700, 1600) : Phaser.Math.Between(900, 2600), chooseNextStep),
+      })
+    }
+    this.time.delayedCall(Phaser.Math.Between(500, 1600), chooseNextStep)
+  }
+
+  private startMorningFieldsBgm() {
+    this.sound.pauseOnBlur = false
+    const bgm = this.sound.add('morningFieldsBgm', { loop: true, volume: 0.26 })
+    const play = () => {
+      if (!bgm.isPlaying) bgm.play()
+    }
+    play()
+    this.input.once('pointerdown', play)
+    this.input.keyboard?.once('keydown', play)
+  }
+
+  private startSparrowFlocks() {
+    const launch = () => {
+      const fromLeft = Phaser.Math.Between(0, 1) === 0
+      const fromTop = Phaser.Math.Between(0, 1) === 0
+      const scale = Phaser.Math.FloatBetween(0.12, 0.16)
+      const startX = fromLeft ? -150 : this.scale.width + 150
+      const endX = fromLeft ? this.scale.width + 150 : -150
+      const startY = fromTop ? -120 : this.scale.height + 120
+      const endY = fromTop ? this.scale.height + 120 : -120
+      const flightAngle = Math.atan2(endY - startY, endX - startX)
+      const flock = this.add
+        .image(startX, startY, 'sparrowFlockFrame1')
+        .setScrollFactor(0)
+        .setScale(scale)
+        .setRotation(flightAngle + Math.PI / 2)
+        .setAlpha(0.82)
+        .setDepth(999990)
+      let frame = 1
+      const flapTimer = this.time.addEvent({
+        delay: 145,
+        loop: true,
+        callback: () => {
+          frame = frame % 3 + 1
+          if (flock.active) flock.setTexture(`sparrowFlockFrame${frame}`)
+        },
+      })
+      this.tweens.add({
+        targets: flock,
+        x: endX,
+        y: endY,
+        duration: Phaser.Math.Between(5200, 6800),
+        ease: 'Linear',
+        onComplete: () => {
+          flapTimer.remove()
+          flock.destroy()
+        },
+      })
+    }
+    this.time.delayedCall(1800, launch)
+    this.time.addEvent({ delay: 5000, loop: true, callback: launch })
+  }
+
+  private startRiverSparkles() {
+    for (let index = 0; index < 72; index += 1) {
+      const size = Phaser.Math.FloatBetween(1.1, 2.8)
+      const object = this.add
+        .ellipse(
+          0,
+          0,
+          size,
+          size * Phaser.Math.FloatBetween(0.65, 1),
+          0xbdefff,
+          Phaser.Math.FloatBetween(0.35, 0.85),
+        )
+        .setDepth(999998)
+        .setBlendMode(Phaser.BlendModes.ADD)
+      const shimmer = {
+        object,
+        velocityX: Phaser.Math.FloatBetween(7, 16),
+        phase: Phaser.Math.FloatBetween(0, Math.PI * 2),
+        lane: index % 12,
+      }
+      this.riverShimmers.push(shimmer)
+      this.resetRiverShimmer(shimmer)
+    }
+  }
+
+  private updateRiverShimmers(delta: number) {
+    this.riverShimmers.forEach((shimmer) => {
+      shimmer.object.x += shimmer.velocityX * (delta / 1000)
+      shimmer.object.y += Math.sin(this.time.now / 180 + shimmer.phase) * 0.025
+      const flicker = Math.pow(Math.abs(Math.sin(this.time.now / 135 + shimmer.phase)), 2.4)
+      shimmer.object.setAlpha(0.08 + flicker * 0.62)
+      shimmer.object.setScale(0.58 + flicker * 0.72)
+
+      const tileX = Math.floor(shimmer.object.x / this.mapData.tileWidth)
+      const tileY = Math.floor(shimmer.object.y / this.mapData.tileHeight)
+      const stillOnRiver = this.blockedTiles.has(`${tileX},${tileY}`)
+      const visible = Phaser.Geom.Rectangle.Overlaps(this.cameras.main.worldView, shimmer.object.getBounds())
+      if (!stillOnRiver || !visible) this.resetRiverShimmer(shimmer)
+    })
+  }
+
+  private resetRiverShimmer(shimmer: { object: Phaser.GameObjects.Ellipse; velocityX: number; phase: number; lane: number }) {
+    const view = this.cameras.main.worldView
+    const column = shimmer.lane % 4
+    const row = Math.floor(shimmer.lane / 4)
+    const allVisibleRiverTiles = this.mapData.collision.blockedTiles.filter(({ x, y }) => {
+      const worldX = (x + 0.5) * this.mapData.tileWidth
+      const worldY = (y + 0.5) * this.mapData.tileHeight
+      return view.contains(worldX, worldY)
+    })
+    if (!allVisibleRiverTiles.length) {
+      shimmer.object.setVisible(false)
+      return
+    }
+    const riverLeft = Math.min(...allVisibleRiverTiles.map(({ x }) => (x + 0.5) * this.mapData.tileWidth))
+    const riverRight = Math.max(...allVisibleRiverTiles.map(({ x }) => (x + 0.5) * this.mapData.tileWidth)) + this.mapData.tileWidth
+    const riverTop = Math.min(...allVisibleRiverTiles.map(({ y }) => (y + 0.5) * this.mapData.tileHeight))
+    const riverBottom = Math.max(...allVisibleRiverTiles.map(({ y }) => (y + 0.5) * this.mapData.tileHeight)) + this.mapData.tileHeight
+    const laneLeft = Phaser.Math.Linear(riverLeft, riverRight, column / 4)
+    const laneRight = Phaser.Math.Linear(riverLeft, riverRight, (column + 1) / 4)
+    const laneTop = Phaser.Math.Linear(riverTop, riverBottom, row / 3)
+    const laneBottom = Phaser.Math.Linear(riverTop, riverBottom, (row + 1) / 3)
+    let visibleRiverTiles = allVisibleRiverTiles.filter(({ x, y }) => {
+      const worldX = (x + 0.5) * this.mapData.tileWidth
+      const worldY = (y + 0.5) * this.mapData.tileHeight
+      return worldX >= laneLeft && worldX < laneRight && worldY >= laneTop && worldY < laneBottom
+    })
+    if (!visibleRiverTiles.length) {
+      visibleRiverTiles = allVisibleRiverTiles.filter(({ x }) => {
+        const worldX = (x + 0.5) * this.mapData.tileWidth
+        return worldX >= laneLeft && worldX < laneRight
+      })
+    }
+    if (!visibleRiverTiles.length) visibleRiverTiles = allVisibleRiverTiles
+    if (!visibleRiverTiles.length) {
+      shimmer.object.setVisible(false)
+      return
+    }
+    const tile = Phaser.Utils.Array.GetRandom(visibleRiverTiles)
+    shimmer.object
+      .setPosition(
+        (tile.x + Phaser.Math.FloatBetween(0.1, 0.7)) * this.mapData.tileWidth,
+        (tile.y + Phaser.Math.FloatBetween(0.2, 0.8)) * this.mapData.tileHeight,
+      )
+      .setVisible(true)
+    shimmer.velocityX = Phaser.Math.FloatBetween(7, 16)
+    shimmer.phase = Phaser.Math.FloatBetween(0, Math.PI * 2)
+  }
+
+  private createWorldLighting() {
+    const buildingTextures = new Set([
+      'villageHall', 'najubuHouse', 'produceShop', 'itemShop', 'storageBuilding',
+      'myeongHouse', 'kimHouse', 'baksuHouse', 'villagePavilion',
+      'chickenCoopNormal', 'chickenCoopBroken', 'villageNoticeBoard',
+    ])
+    const images = this.children.list.filter(
+      (child): child is Phaser.GameObjects.Image => child instanceof Phaser.GameObjects.Image,
+    )
+    images.forEach((object) => {
+      if (object.texture.key === 'terrainChunk') return
+      if (buildingTextures.has(object.texture.key)) {
+        if (object.texture.key === 'villageNoticeBoard') {
+          const bottomPadding = this.getOpaqueBottomPadding(object)
+          const visibleBottom =
+            object.y + (object.frame.cutHeight * (1 - object.originY) - bottomPadding) * Math.abs(object.scaleY)
+          this.add
+            .ellipse(object.x, visibleBottom - 1, object.displayWidth * 0.72, 5, 0x29342f, 0.15)
+            .setDepth(object.depth - 0.5)
+          return
+        }
+        this.add
+          .image(object.x + 3, object.y + 4, object.texture.key, object.frame.name)
+          .setOrigin(object.originX, object.originY)
+          .setScale(object.scaleX, object.scaleY)
+          .setFlipX(object.flipX)
+          .setTint(0x26312c)
+          .setAlpha(0.18)
+          .setDepth(object.depth - 0.6)
+        return
+      }
+      const shadow = this.add
+        .image(object.x, object.y, object.texture.key, object.frame.name)
+        .setOrigin(object.originX, 1)
+        .setScale(object.scaleX * 0.86, object.scaleY * 0.15)
+        .setFlipX(object.flipX)
+        .setTint(0x34463d)
+        .setAlpha(0.17)
+        .setDepth(object.depth - 0.5)
+      this.attachShadowToOpaqueBase(object, shadow)
+      this.shadowPairs.push({ object, shadow })
+    })
+
+    this.add
+      .rectangle(0, 0, this.scale.width, this.scale.height, 0xffd59a, 0.055)
+      .setOrigin(0)
+      .setScrollFactor(0)
+      .setDepth(999999)
+      .setBlendMode(Phaser.BlendModes.ADD)
+  }
+
+  private updateWorldShadows() {
+    this.shadowPairs.forEach(({ object, shadow }) => {
+      if (!object.active) return
+      if (shadow.texture.key !== object.texture.key || shadow.frame.name !== object.frame.name) {
+        shadow.setTexture(object.texture.key, object.frame.name)
+      }
+      shadow.setOrigin(object.originX, 1)
+      shadow.setScale(object.scaleX * 0.86, object.scaleY * 0.15)
+      this.attachShadowToOpaqueBase(object, shadow)
+      shadow.setFlipX(object.flipX)
+      shadow.setDepth(object.depth - 0.5)
+      shadow.setVisible(object.visible)
+    })
+  }
+
+  private attachShadowToOpaqueBase(object: Phaser.GameObjects.Image, shadow: Phaser.GameObjects.Image) {
+    const bottomPadding = this.getOpaqueBottomPadding(object)
+    const objectScaleY = Math.abs(object.scaleY)
+    const shadowScaleY = Math.abs(shadow.scaleY)
+    const visibleObjectBottom =
+      object.y + (object.frame.cutHeight * (1 - object.originY) - bottomPadding) * objectScaleY
+
+    // Align the last visible shadow pixel with the last visible object pixel.
+    // This deliberately ignores transparent PNG padding, which differs per asset.
+    shadow.setPosition(object.x, visibleObjectBottom + bottomPadding * shadowScaleY)
+  }
+
+  private getOpaqueBottomPadding(object: Phaser.GameObjects.Image) {
+    const frame = object.frame
+    const cacheKey = `${object.texture.key}:${String(frame.name)}`
+    const cached = this.opaqueBottomPadding.get(cacheKey)
+    if (cached !== undefined) return cached
+
+    const canvas = document.createElement('canvas')
+    canvas.width = frame.cutWidth
+    canvas.height = frame.cutHeight
+    const context = canvas.getContext('2d', { willReadFrequently: true })
+    if (!context) return 0
+
+    try {
+      context.drawImage(
+        frame.source.image as CanvasImageSource,
+        frame.cutX,
+        frame.cutY,
+        frame.cutWidth,
+        frame.cutHeight,
+        0,
+        0,
+        frame.cutWidth,
+        frame.cutHeight,
+      )
+      const pixels = context.getImageData(0, 0, frame.cutWidth, frame.cutHeight).data
+      let lastOpaqueRow = frame.cutHeight - 1
+      rowSearch: for (let y = frame.cutHeight - 1; y >= 0; y -= 1) {
+        for (let x = 0; x < frame.cutWidth; x += 1) {
+          if (pixels[(y * frame.cutWidth + x) * 4 + 3] > 12) {
+            lastOpaqueRow = y
+            break rowSearch
+          }
+        }
+      }
+      const padding = frame.cutHeight - 1 - lastOpaqueRow
+      this.opaqueBottomPadding.set(cacheKey, padding)
+      return padding
+    } catch {
+      this.opaqueBottomPadding.set(cacheKey, 0)
+      return 0
+    }
   }
 
   private createBridge() {

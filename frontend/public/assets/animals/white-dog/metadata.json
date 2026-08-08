@@ -1,0 +1,36 @@
+{
+  "group_id": "6956b288-5b3c-4392-ab39-afa231faf2fb",
+  "states": [
+    {
+      "character": {
+        "id": "d0334d96-89ff-4ee3-b830-ff742294508c",
+        "name": "Idle",
+        "prompt": "A friendly Korean countryside white dog with clean ivory-white short fur, a slightly cream-colored muzzle and ears, dark brown eyes and a black nose. Medium-small Korean mixed-breed dog with upright triangular ears, sturdy legs and a naturally curled fluffy tail. Friendly and gentle expression.\n\nRustic Korean rural village life-simulation game aesthetic. Charming clean pixel art, simple readable shapes, limited natural color palette, subtle pixel shading and crisp edges. Keep subtle light-gray and cream shading so the white fur remains clearly visible. Designed as a small NPC animal wandering around houses, farms and village roads. No collar, no accessories, no clothes.",
+        "size": {
+          "width": 48,
+          "height": 48
+        },
+        "template_id": "dog",
+        "directions": 8,
+        "view": "low top-down",
+        "created_at": "2026-08-08T09:40:39.181963+00:00"
+      },
+      "folder": "Idle",
+      "frames": {
+        "rotations": {
+          "south": "Idle/rotations/south.png",
+          "south-east": "Idle/rotations/south-east.png",
+          "east": "Idle/rotations/east.png",
+          "north-east": "Idle/rotations/north-east.png",
+          "north": "Idle/rotations/north.png",
+          "north-west": "Idle/rotations/north-west.png",
+          "west": "Idle/rotations/west.png",
+          "south-west": "Idle/rotations/south-west.png"
+        },
+        "animations": {}
+      }
+    }
+  ],
+  "export_version": "3.1",
+  "export_date": "2026-08-08T09:42:00.319576"
+}
