@@ -1,0 +1,767 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<title>마을 사보타주 추리 게임 — 기획 관리 대시보드</title>
+<style>
+  :root{
+    --bg:#f5f6fb;
+    --panel:#ffffff;
+    --panel-2:#f8f9fd;
+    --border:#e7e9f2;
+    --text:#1a1d2b;
+    --sub:#70758d;
+    --accent:#ee5d3c;
+    --accent-soft:#fff0eb;
+    --accent-2:#4f6df5;
+    --accent-2-soft:#eef1ff;
+    --green:#17a672;
+    --green-soft:#e6f8f0;
+    --yellow:#c8850a;
+    --yellow-soft:#fdf3df;
+    --red:#e0405f;
+    --red-soft:#fdeaee;
+    --gray:#6b7086;
+    --gray-soft:#eef0f5;
+    --shadow:0 1px 2px rgba(20,20,50,.04), 0 6px 20px rgba(20,20,50,.05);
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--bg);color:var(--text);font-family:'Malgun Gothic','Noto Sans KR',-apple-system,sans-serif;line-height:1.6;}
+  a{color:var(--accent-2);text-decoration:none;}
+  .layout{display:flex;min-height:100vh;}
+  nav.sidebar{width:224px;flex:0 0 224px;background:var(--panel);border-right:1px solid var(--border);padding:30px 18px;position:sticky;top:0;height:100vh;overflow-y:auto;}
+  nav.sidebar .brand{font-size:12px;color:var(--sub);letter-spacing:.06em;margin-bottom:6px;font-weight:700;}
+  nav.sidebar .title{font-size:19px;font-weight:800;margin-bottom:22px;line-height:1.35;color:var(--text);}
+  nav.sidebar a{display:block;color:var(--sub);font-size:13px;font-weight:600;padding:8px 12px;border-radius:10px;margin-bottom:2px;transition:background .15s, color .15s;}
+  nav.sidebar a:hover{background:var(--accent-soft);color:var(--accent);}
+  .sidebar-tools{margin-top:22px;border-top:1px solid var(--border);padding-top:16px;}
+  .sidebar-tools button{display:block;width:100%;text-align:left;background:none;border:none;color:var(--sub);font-size:12.5px;font-weight:600;padding:7px 10px;border-radius:8px;cursor:pointer;margin-bottom:2px;}
+  .sidebar-tools button:hover{background:var(--gray-soft);color:var(--text);}
+  #saveStatus{font-size:11px;color:var(--sub);padding:8px 10px 2px;}
+  #saveStatus.show{color:var(--green);}
+
+  main{flex:1;padding:44px 48px 90px;max-width:1180px;}
+  header.hero{margin-bottom:30px;}
+  header.hero .tag{display:inline-block;background:var(--accent-soft);color:var(--accent);font-size:12px;font-weight:800;padding:5px 12px;border-radius:20px;margin-bottom:16px;}
+  header.hero p{color:var(--sub);margin:0;font-size:14px;}
+  .editable-banner{background:var(--accent-2-soft);border:1px solid #c9d4ff;border-radius:12px;color:#2d3f9e;font-size:12.5px;padding:11px 15px;margin-top:16px;}
+  section{margin-bottom:54px;scroll-margin-top:24px;}
+  section h2{font-size:19px;margin:0 0 4px;display:flex;align-items:center;gap:10px;font-weight:800;}
+  section .desc{color:var(--sub);font-size:13px;margin:0 0 18px;}
+  .card{background:var(--panel);border:1px solid var(--border);border-radius:16px;padding:22px 24px;box-shadow:var(--shadow);}
+  .grid{display:grid;gap:14px;}
+  .grid.cols-2{grid-template-columns:repeat(2,1fr);}
+  .grid.cols-3{grid-template-columns:repeat(3,1fr);}
+  table{width:100%;border-collapse:collapse;font-size:13.5px;}
+  th,td{padding:11px 10px;border-bottom:1px solid var(--border);text-align:left;vertical-align:top;}
+  th{color:var(--sub);font-weight:700;font-size:11px;text-transform:uppercase;letter-spacing:.04em;}
+  tbody tr:last-child td{border-bottom:none;}
+  tbody tr:hover td{background:var(--panel-2);}
+  td.del-cell{width:34px;text-align:center;}
+
+  [contenteditable="true"]{border-radius:6px;padding:2px 4px;margin:-2px -4px;}
+  [contenteditable="true"]:hover{outline:1px dashed #c7cbe0;background:var(--panel-2);}
+  [contenteditable="true"]:focus{outline:2px solid var(--accent-2);background:#fff;}
+
+  select.status-select{border:none;border-radius:20px;font-size:12px;font-weight:700;padding:5px 10px 5px 12px;cursor:pointer;appearance:none;-webkit-appearance:none;padding-right:20px;}
+  select.status-select.st-done{background-color:var(--green-soft);color:var(--green);}
+  select.status-select.st-progress{background-color:var(--accent-2-soft);color:var(--accent-2);}
+  select.status-select.st-todo{background-color:var(--yellow-soft);color:var(--yellow);}
+  select.status-select.st-hold{background-color:var(--gray-soft);color:var(--gray);}
+  select.status-select.st-excluded{background-color:var(--gray-soft);color:var(--gray);}
+
+  .del-btn{background:none;border:none;color:var(--sub);font-size:13px;cursor:pointer;border-radius:6px;padding:3px 6px;opacity:.35;transition:opacity .15s, color .15s, background .15s;}
+  .del-btn:hover{opacity:1;color:var(--red);background:var(--red-soft);}
+  .del-btn.inline{margin-left:8px;}
+
+  .add-row{margin-top:12px;}
+  .add-btn{background:var(--panel-2);border:1px dashed #c7cbe0;color:var(--sub);font-size:12.5px;font-weight:700;padding:8px 14px;border-radius:10px;cursor:pointer;}
+  .add-btn:hover{border-color:var(--accent);color:var(--accent);background:var(--accent-soft);}
+
+  .chk-list{list-style:none;margin:0;padding:0;}
+  .chk-row{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 4px;border-bottom:1px solid var(--border);}
+  .chk-row:last-child{border-bottom:none;}
+  .chk-row label{display:flex;align-items:center;gap:10px;font-size:13.5px;flex:1;}
+  .chk-row input[type="checkbox"]{width:17px;height:17px;accent-color:var(--accent);cursor:pointer;flex:0 0 auto;}
+  .chk-row span[contenteditable]{flex:1;}
+
+  .intro-title{font-size:26px;font-weight:800;margin:0 0 10px;letter-spacing:-.01em;}
+  .intro-meta{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:16px;}
+  .intro-meta .m-item{background:var(--panel-2);border:1px solid var(--border);border-radius:12px;padding:12px 14px;}
+  .intro-meta .m-label{font-size:11px;color:var(--sub);font-weight:700;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px;}
+  .intro-meta .m-value{font-size:13.5px;font-weight:600;}
+  .intro-logline{font-size:14px;background:var(--accent-soft);border-radius:12px;padding:14px 16px;margin-bottom:14px;color:#7a331b;}
+  .intro-features{margin:0;padding-left:18px;font-size:13.5px;}
+  .intro-features li{margin-bottom:6px;}
+
+  .npc-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:16px;}
+  .npc-card{background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:18px 20px;box-shadow:var(--shadow);}
+  .npc-card .npc-top{display:flex;align-items:center;gap:12px;margin-bottom:12px;}
+  .npc-card img{width:52px;height:52px;image-rendering:pixelated;flex:0 0 auto;}
+  .npc-card .name{font-weight:800;font-size:15.5px;}
+  .npc-card .role{color:var(--accent-2);font-size:12px;font-weight:600;}
+  .npc-field{margin-bottom:8px;}
+  .npc-field .f-label{font-size:10.5px;color:var(--sub);font-weight:700;text-transform:uppercase;letter-spacing:.03em;margin-bottom:2px;}
+  .npc-field .f-value{font-size:12.8px;}
+  .npc-field .f-value.placeholder{color:#b7bad0;font-style:italic;}
+  .npc-refrow{display:flex;gap:10px;margin-top:10px;padding-top:10px;border-top:1px dashed var(--border);}
+  .npc-refrow .npc-field{flex:1;margin-bottom:0;}
+
+  .timeline{display:flex;gap:8px;overflow-x:auto;padding-bottom:6px;align-items:stretch;}
+  .tl-day{flex:0 0 140px;background:var(--panel-2);border:1px solid var(--border);border-radius:12px;padding:13px;font-size:12px;position:relative;}
+  .tl-day .d{font-weight:800;color:var(--accent);font-size:13px;margin-bottom:6px;}
+
+  .stat-row{display:flex;gap:14px;margin-bottom:30px;flex-wrap:wrap;}
+  .stat{background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:18px 20px;flex:1;min-width:150px;box-shadow:var(--shadow);}
+  .stat .num{font-size:27px;font-weight:800;color:var(--accent);}
+  .stat .label{color:var(--sub);font-size:12px;margin-top:4px;font-weight:600;}
+
+  .note{background:var(--accent-soft);border:1px solid #ffd9c8;border-radius:12px;padding:13px 16px;font-size:13px;color:#9a3a1f;margin-top:16px;}
+  .footer{color:var(--sub);font-size:12px;margin-top:64px;border-top:1px solid var(--border);padding-top:20px;}
+  code{background:var(--panel-2);border:1px solid var(--border);padding:2px 6px;border-radius:6px;font-size:12.5px;color:var(--text);}
+
+  .memo-pad{min-height:160px;background:repeating-linear-gradient(var(--panel-2) 0px, var(--panel-2) 30px, var(--panel) 31px, var(--panel) 31px);
+    border:1px solid var(--border);border-radius:12px;padding:14px 16px;font-size:13.5px;line-height:31px;margin-top:16px;}
+  .memo-pad:empty:before{content:attr(data-placeholder);color:#b0b3c6;}
+</style>
+</head>
+<body>
+<div class="layout">
+  <nav class="sidebar">
+    <div class="brand">AI_Hakathon_NAN_2026</div>
+    <div class="title">마을 사보타주<br/>추리 게임<br/>기획 대시보드</div>
+    <a href="#intro">게임 소개</a>
+    <a href="#submission">① 사전과제 제출 현황</a>
+    <a href="#features">② 기능 구현 현황</a>
+    <a href="#gaps">③ 기획서 vs 구현 체크</a>
+    <a href="#schedule">④ 게임 진행 일정</a>
+    <a href="#npcs">⑤ NPC 정보 및 관리</a>
+    <a href="#systems">⑥ 핵심 시스템</a>
+    <a href="#ai">⑦ AI 활용</a>
+    <a href="#memo">⑧ 메모 · 챙길 것</a>
+    <div class="sidebar-tools">
+      <button id="exportBtn">⬇ 백업 내보내기</button>
+      <button id="importBtn">⬆ 백업 불러오기</button>
+      <button id="resetBtn">↺ 처음 상태로 초기화</button>
+      <input type="file" id="importFile" accept="application/json" hidden/>
+      <div id="saveStatus">아직 수정된 내용 없음</div>
+    </div>
+  </nav>
+  <main>
+    <header class="hero">
+      <span class="tag">기획 관리 대시보드 · 직접 수정 가능</span>
+      <p>Repo: hoitman297/AI_Hakathon_NAN_2026 · Git 공유 중 · 작성: 류수정(기획)</p>
+      <div class="editable-banner">✏️ 텍스트를 클릭하면 바로 수정되고, 체크박스·상태 표시도 클릭해서 바꿀 수 있어요. 수정 내용은 이 브라우저에 자동 저장됩니다. 다른 컴퓨터에서도 이어서 보려면 왼쪽 "백업 내보내기"로 파일을 받아두세요.</div>
+    </header>
+
+    <div class="stat-row">
+      <div class="stat"><div class="num">7일</div><div class="label">최소 클리어 소요일 (최대 9일)</div></div>
+      <div class="stat"><div class="num">7명</div><div class="label">NPC 등장인물</div></div>
+      <div class="stat"><div class="num">8종</div><div class="label">LLM 실시간 생성 콘텐츠 종류</div></div>
+      <div class="stat"><div class="num">3개</div><div class="label">서비스 (frontend/backend/llm-proxy)</div></div>
+    </div>
+
+    <section id="intro">
+      <h2>게임 소개</h2>
+      <p class="desc">게임명과 한줄 소개, 기본 정보를 여기서 관리하세요.</p>
+      <div class="card" data-store="intro">
+        <div class="intro-title" contenteditable="true">마을 사보타주 추리 게임 (게임명 미정)</div>
+        <div class="intro-meta">
+          <div class="m-item"><div class="m-label">장르</div><div class="m-value" contenteditable="true">마을 노동 시뮬레이션 + 추리</div></div>
+          <div class="m-item"><div class="m-label">배경</div><div class="m-value" contenteditable="true">1990년대 한국 농촌 마을</div></div>
+          <div class="m-item"><div class="m-label">플레이타임</div><div class="m-value" contenteditable="true">1~3시간</div></div>
+          <div class="m-item"><div class="m-label">재플레이성</div><div class="m-value" contenteditable="true">매 판 범인 랜덤 배정</div></div>
+        </div>
+        <div class="intro-logline" contenteditable="true">최근 이 마을로 이사 온 플레이어는 낮에는 밭일과 채집으로 생계를 꾸리며 7명의 주민과 대화하고, 밤마다 벌어지는 사보타주 사건의 단서를 모은다. 7일차부터 진범을 고발할 수 있으며, 오답 시 8·9일차까지 재도전할 수 있다.</div>
+        <ul class="intro-features">
+          <li contenteditable="true">실시간 LLM 대화 — 정해진 대화 트리 없이 7명의 주민과 자유롭게 대화하며 단서 탐색</li>
+          <li contenteditable="true">호감도 시스템 — 평소 태도에 따라 주민이 단서를 먼저 알려주거나 경계함</li>
+          <li contenteditable="true">매 판 달라지는 사건 — 범인·단서 문구·사보타주 대상이 매 판 LLM으로 새로 생성</li>
+          <li contenteditable="true">체력 기반 낮 활동 — 이동·대화·농사·채집이 체력을 소모, 회복은 직접 기른 작물로만 가능</li>
+        </ul>
+      </div>
+    </section>
+
+    <section id="submission">
+      <h2>① 사전과제 제출 현황</h2>
+      <p class="desc">Git 공유 및 배포가 진행된 상태를 반영했습니다. 상태를 클릭해서 바꾸고, 칸을 클릭해서 내용을 직접 고치세요.</p>
+      <div class="card">
+        <table>
+          <thead><tr><th style="width:26px">#</th><th>제출물</th><th>제출 형태</th><th>상태</th><th>비고</th><th></th></tr></thead>
+          <tbody data-store="submission">
+            <tr>
+              <td contenteditable="true">1</td>
+              <td contenteditable="true"><b>플레이 가능한 빌드 및 소스 코드</b></td>
+              <td contenteditable="true">웹(브라우저) 또는 APK + 전체 소스 / GitHub Pages 링크</td>
+              <td><select class="status-select"><option value="완료" selected>완료</option><option value="진행중">진행중</option><option value="확인/결정 필요">확인/결정 필요</option><option value="보류">보류</option><option value="제외">제외</option></select></td>
+              <td contenteditable="true">Git 공유 중 · 배포 완료. 배포 URL: <i>(여기에 적어주세요)</i></td>
+              <td class="del-cell"><button class="del-btn" data-del="tr" title="삭제">✕</button></td>
+            </tr>
+            <tr>
+              <td contenteditable="true">2</td>
+              <td contenteditable="true">플레이 동영상</td>
+              <td contenteditable="true">30~60초, YouTube 링크</td>
+              <td><select class="status-select"><option value="완료">완료</option><option value="진행중">진행중</option><option value="확인/결정 필요">확인/결정 필요</option><option value="보류">보류</option><option value="제외" selected>제외</option></select></td>
+              <td contenteditable="true">이번 준비 범위 제외</td>
+              <td class="del-cell"><button class="del-btn" data-del="tr" title="삭제">✕</button></td>
+            </tr>
+            <tr>
+              <td contenteditable="true">3</td>
+              <td contenteditable="true"><b>게임 소개 및 설명 문서</b></td>
+              <td contenteditable="true">PDF</td>
+              <td><select class="status-select"><option value="완료" selected>완료</option><option value="진행중">진행중</option><option value="확인/결정 필요">확인/결정 필요</option><option value="보류">보류</option><option value="제외">제외</option></select></td>
+              <td contenteditable="true"><code>게임_소개_및_설명_문서.pdf</code> — 검토 후 확정 필요</td>
+              <td class="del-cell"><button class="del-btn" data-del="tr" title="삭제">✕</button></td>
+            </tr>
+            <tr>
+              <td contenteditable="true">4</td>
+              <td contenteditable="true"><b>AI 활용 기술 문서</b></td>
+              <td contenteditable="true">PDF</td>
+              <td><select class="status-select"><option value="완료" selected>완료</option><option value="진행중">진행중</option><option value="확인/결정 필요">확인/결정 필요</option><option value="보류">보류</option><option value="제외">제외</option></select></td>
+              <td contenteditable="true"><code>AI_활용_기술_문서.pdf</code> — 코드에 사용한 AI 코딩 도구명 팀 확인 필요</td>
+              <td class="del-cell"><button class="del-btn" data-del="tr" title="삭제">✕</button></td>
+            </tr>
+            <tr>
+              <td contenteditable="true">5</td>
+              <td contenteditable="true">팀원 롤 기술서</td>
+              <td contenteditable="true">PDF (개인 참여 시 생략)</td>
+              <td><select class="status-select"><option value="완료">완료</option><option value="진행중">진행중</option><option value="확인/결정 필요">확인/결정 필요</option><option value="보류" selected>보류</option><option value="제외">제외</option></select></td>
+              <td contenteditable="true">git 커밋 기준 4인 이상(류수정, 명지원 추정, hoitman297, hyeju0223) — 각자 역할 확인 후 작성</td>
+              <td class="del-cell"><button class="del-btn" data-del="tr" title="삭제">✕</button></td>
+            </tr>
+          </tbody>
+        </table>
+        <div class="add-row"><button class="add-btn" data-add="submission-row" data-target="submission">+ 항목 추가</button></div>
+      </div>
+    </section>
+
+    <section id="features">
+      <h2>② 기능 구현 현황</h2>
+      <p class="desc">체크박스로 완료 여부 표시. 텍스트는 클릭해서 수정, 새 기능은 아래 버튼으로 추가.</p>
+      <div class="grid cols-2">
+        <div class="card">
+          <h3 style="margin-top:0;font-size:14px;">화면 / 프론트 기능</h3>
+          <ul class="chk-list" data-store="features-front">
+            <li class="chk-row"><label><input type="checkbox" checked/> <span contenteditable="true">타이틀 · 로그인 · 로그아웃</span></label><button class="del-btn" data-del="li" title="삭제">✕</button></li>
+            <li class="chk-row"><label><input type="checkbox" checked/> <span contenteditable="true">캐릭터 생성(닉네임/성별)</span></label><button class="del-btn" data-del="li" title="삭제">✕</button></li>
+            <li class="chk-row"><label><input type="checkbox" checked/> <span contenteditable="true">이어하기(세이브 슬롯)</span></label><button class="del-btn" data-del="li" title="삭제">✕</button></li>
+            <li class="chk-row"><label><input type="checkbox" checked/> <span contenteditable="true">낮 화면 — 맵 이동(Phaser)</span></label><button class="del-btn" data-del="li" title="삭제">✕</button></li>
+            <li class="chk-row"><label><input type="checkbox" checked/> <span contenteditable="true">대화창(NPC LLM 대화)</span></label><button class="del-btn" data-del="li" title="삭제">✕</button></li>
+            <li class="chk-row"><label><input type="checkbox" checked/> <span contenteditable="true">농사(파종/수확) · 채집</span></label><button class="del-btn" data-del="li" title="삭제">✕</button></li>
+            <li class="chk-row"><label><input type="checkbox" checked/> <span contenteditable="true">상점(구매/판매)</span></label><button class="del-btn" data-del="li" title="삭제">✕</button></li>
+            <li class="chk-row"><label><input type="checkbox" checked/> <span contenteditable="true">인벤토리(아이템/단서카드/호감도)</span></label><button class="del-btn" data-del="li" title="삭제">✕</button></li>
+            <li class="chk-row"><label><input type="checkbox" checked/> <span contenteditable="true">밤 전환 연출</span></label><button class="del-btn" data-del="li" title="삭제">✕</button></li>
+            <li class="chk-row"><label><input type="checkbox" checked/> <span contenteditable="true">고발(추리 지목) 화면</span></label><button class="del-btn" data-del="li" title="삭제">✕</button></li>
+            <li class="chk-row"><label><input type="checkbox" checked/> <span contenteditable="true">엔딩 화면(성공/배드엔딩)</span></label><button class="del-btn" data-del="li" title="삭제">✕</button></li>
+            <li class="chk-row"><label><input type="checkbox" checked/> <span contenteditable="true">백엔드 없이 보는 마을 프리뷰 모드</span></label><button class="del-btn" data-del="li" title="삭제">✕</button></li>
+            <li class="chk-row"><label><input type="checkbox" checked/> <span contenteditable="true">자동 저장(일차 전환 시)</span></label><button class="del-btn" data-del="li" title="삭제">✕</button></li>
+          </ul>
+          <div class="add-row"><button class="add-btn" data-add="checklist-row" data-target="features-front">+ 기능 추가</button></div>
+        </div>
+        <div class="card">
+          <h3 style="margin-top:0;font-size:14px;">백엔드 / LLM 시스템</h3>
+          <ul class="chk-list" data-store="features-back">
+            <li class="chk-row"><label><input type="checkbox" checked/> <span contenteditable="true">세션 생성 · 일차 진행 · 종료 판정</span></label><button class="del-btn" data-del="li" title="삭제">✕</button></li>
+            <li class="chk-row"><label><input type="checkbox" checked/> <span contenteditable="true">범인 랜덤 배정(주+보조 유형)</span></label><button class="del-btn" data-del="li" title="삭제">✕</button></li>
+            <li class="chk-row"><label><input type="checkbox" checked/> <span contenteditable="true">이동 체력 소모(초당 소모 모델)</span></label><button class="del-btn" data-del="li" title="삭제">✕</button></li>
+            <li class="chk-row"><label><input type="checkbox" checked/> <span contenteditable="true">NPC 페르소나 생성(구조화 출력)</span></label><button class="del-btn" data-del="li" title="삭제">✕</button></li>
+            <li class="chk-row"><label><input type="checkbox" checked/> <span contenteditable="true">실시간 대화 + 호감도 등급별 태도</span></label><button class="del-btn" data-del="li" title="삭제">✕</button></li>
+            <li class="chk-row"><label><input type="checkbox" checked/> <span contenteditable="true">7일차 이후 추리 대화 제한</span></label><button class="del-btn" data-del="li" title="삭제">✕</button></li>
+            <li class="chk-row"><label><input type="checkbox" checked/> <span contenteditable="true">단서 카드 생성/명확화(외형 기반 LLM)</span></label><button class="del-btn" data-del="li" title="삭제">✕</button></li>
+            <li class="chk-row"><label><input type="checkbox" checked/> <span contenteditable="true">랜덤 이벤트 · 엔딩 스토리 생성(LLM)</span></label><button class="del-btn" data-del="li" title="삭제">✕</button></li>
+            <li class="chk-row"><label><input type="checkbox" checked/> <span contenteditable="true">인증/세션 소유권 검증, 낙관적 락</span></label><button class="del-btn" data-del="li" title="삭제">✕</button></li>
+            <li class="chk-row"><label><input type="checkbox" checked/> <span contenteditable="true">LLM 레이트리밋 · 고발 1일 1회 제한</span></label><button class="del-btn" data-del="li" title="삭제">✕</button></li>
+            <li class="chk-row"><label><input type="checkbox" checked/> <span contenteditable="true">게임 세이브/로드 · ending_state 동기화</span></label><button class="del-btn" data-del="li" title="삭제">✕</button></li>
+            <li class="chk-row"><label><input type="checkbox" checked/> <span contenteditable="true">NPC 페르소나 관리자 편집기</span></label><button class="del-btn" data-del="li" title="삭제">✕</button></li>
+            <li class="chk-row"><label><input type="checkbox"/> <span contenteditable="true">DB 마이그레이션 도구 (의도적 보류 — ddl-auto 의존)</span></label><button class="del-btn" data-del="li" title="삭제">✕</button></li>
+          </ul>
+          <div class="add-row"><button class="add-btn" data-add="checklist-row" data-target="features-back">+ 기능 추가</button></div>
+        </div>
+      </div>
+    </section>
+
+    <section id="gaps">
+      <h2>③ 기획서 vs 구현 체크</h2>
+      <p class="desc">상태를 클릭해서 바꾸고, 내용은 클릭해서 직접 수정하세요.</p>
+      <div class="card">
+        <table>
+          <thead><tr><th>항목</th><th>내용</th><th>상태</th><th></th></tr></thead>
+          <tbody data-store="gaps">
+            <tr>
+              <td contenteditable="true">고발 가능 시점</td>
+              <td contenteditable="true">기획서 구버전(3일차)과 최신본(7일차) 충돌 → 최신본(7~9일차 순차 재도전) 기준으로 반영됨</td>
+              <td><select class="status-select"><option value="완료" selected>완료</option><option value="진행중">진행중</option><option value="확인/결정 필요">확인/결정 필요</option><option value="보류">보류</option><option value="제외">제외</option></select></td>
+              <td class="del-cell"><button class="del-btn" data-del="tr" title="삭제">✕</button></td>
+            </tr>
+            <tr>
+              <td contenteditable="true">이동 체력 소모 단위</td>
+              <td contenteditable="true">"이동 1회=체력5" 이산 모델 → "초당 0.15 소모(운동화 0.12)" 연속 모델로 개정 반영</td>
+              <td><select class="status-select"><option value="완료" selected>완료</option><option value="진행중">진행중</option><option value="확인/결정 필요">확인/결정 필요</option><option value="보류">보류</option><option value="제외">제외</option></select></td>
+              <td class="del-cell"><button class="del-btn" data-del="tr" title="삭제">✕</button></td>
+            </tr>
+            <tr>
+              <td contenteditable="true">보조 사보타주 유형</td>
+              <td contenteditable="true">주 유형만으론 범인이 특정되는 문제 → 주 80%/보조 20% 가중 랜덤으로 해결</td>
+              <td><select class="status-select"><option value="완료" selected>완료</option><option value="진행중">진행중</option><option value="확인/결정 필요">확인/결정 필요</option><option value="보류">보류</option><option value="제외">제외</option></select></td>
+              <td class="del-cell"><button class="del-btn" data-del="tr" title="삭제">✕</button></td>
+            </tr>
+            <tr>
+              <td contenteditable="true">PDF 내부 모순(운동화 효과)</td>
+              <td contenteditable="true">기획서 6p(초당 0.15→0.12)와 9p(5→4)가 서로 다른 문구로 남아있음</td>
+              <td><select class="status-select"><option value="완료">완료</option><option value="진행중">진행중</option><option value="확인/결정 필요" selected>확인/결정 필요</option><option value="보류">보류</option><option value="제외">제외</option></select></td>
+              <td class="del-cell"><button class="del-btn" data-del="tr" title="삭제">✕</button></td>
+            </tr>
+            <tr>
+              <td contenteditable="true">체력 최대치 / 일일 시작치</td>
+              <td contenteditable="true">기절 후 리스폰 값(70)만 명시 — 최대치인지 일부 회복치인지 불명확</td>
+              <td><select class="status-select"><option value="완료">완료</option><option value="진행중">진행중</option><option value="확인/결정 필요" selected>확인/결정 필요</option><option value="보류">보류</option><option value="제외">제외</option></select></td>
+              <td class="del-cell"><button class="del-btn" data-del="tr" title="삭제">✕</button></td>
+            </tr>
+            <tr>
+              <td contenteditable="true">기절 페널티</td>
+              <td contenteditable="true">"다음날 70으로 시작" 외 추가 페널티 여부 미정</td>
+              <td><select class="status-select"><option value="완료">완료</option><option value="진행중">진행중</option><option value="확인/결정 필요" selected>확인/결정 필요</option><option value="보류">보류</option><option value="제외">제외</option></select></td>
+              <td class="del-cell"><button class="del-btn" data-del="tr" title="삭제">✕</button></td>
+            </tr>
+            <tr>
+              <td contenteditable="true">농사/채집 가격표</td>
+              <td contenteditable="true">작물4종·과일4종 수치표는 존재하나 "제안" 단계, 최종 확정 아님</td>
+              <td><select class="status-select"><option value="완료">완료</option><option value="진행중">진행중</option><option value="확인/결정 필요" selected>확인/결정 필요</option><option value="보류">보류</option><option value="제외">제외</option></select></td>
+              <td class="del-cell"><button class="del-btn" data-del="tr" title="삭제">✕</button></td>
+            </tr>
+          </tbody>
+        </table>
+        <div class="add-row"><button class="add-btn" data-add="gaps-row" data-target="gaps">+ 항목 추가</button></div>
+      </div>
+    </section>
+
+    <section id="schedule">
+      <h2>④ 게임 진행 일정</h2>
+      <p class="desc">빠르게 훑어보는 타임라인 + 일차별 상세표. 칩·표 모두 클릭해서 수정, + 로 추가.</p>
+      <div class="card">
+        <div class="timeline" data-store="timeline">
+          <div class="tl-day"><div class="d" contenteditable="true">1일차</div><span contenteditable="true">조사 시작</span><button class="del-btn inline" data-del=".tl-day" title="삭제">✕</button></div>
+          <div class="tl-day"><div class="d" contenteditable="true">1~5일차 밤</div><span contenteditable="true">매일 밤 사보타주 발생 (총 5회)</span><button class="del-btn inline" data-del=".tl-day" title="삭제">✕</button></div>
+          <div class="tl-day"><div class="d" contenteditable="true">2~6일차</div><span contenteditable="true">전날 밤 장소에서 단서 카드 습득 (총 5장)</span><button class="del-btn inline" data-del=".tl-day" title="삭제">✕</button></div>
+          <div class="tl-day"><div class="d" contenteditable="true">6일차 밤</div><span contenteditable="true">사보타주·단서 없음</span><button class="del-btn inline" data-del=".tl-day" title="삭제">✕</button></div>
+          <div class="tl-day"><div class="d" contenteditable="true">7일차</div><span contenteditable="true"><b style="color:#c8850a">첫 고발 가능일.</b> 추리 대화 제한</span><button class="del-btn inline" data-del=".tl-day" title="삭제">✕</button></div>
+          <div class="tl-day"><div class="d" contenteditable="true">7→8일차 밤</div><span contenteditable="true">(오답 시) 마을 대상 랜덤 이벤트</span><button class="del-btn inline" data-del=".tl-day" title="삭제">✕</button></div>
+          <div class="tl-day"><div class="d" contenteditable="true">8일차</div><span contenteditable="true">재시도 가능, 분위기 무거워짐</span><button class="del-btn inline" data-del=".tl-day" title="삭제">✕</button></div>
+          <div class="tl-day"><div class="d" contenteditable="true">8→9일차 밤</div><span contenteditable="true">(오답 시) 플레이어 대상 랜덤 이벤트</span><button class="del-btn inline" data-del=".tl-day" title="삭제">✕</button></div>
+          <div class="tl-day"><div class="d" contenteditable="true">9일차</div><span contenteditable="true">마지막 재시도. 실패 시 배드엔딩</span><button class="del-btn inline" data-del=".tl-day" title="삭제">✕</button></div>
+        </div>
+        <div class="add-row" style="margin-bottom:20px;"><button class="add-btn" data-add="timeline-chip" data-target="timeline">+ 칩 추가</button></div>
+
+        <table>
+          <thead><tr><th style="width:70px">일차</th><th>낮 활동</th><th>밤 사건</th><th>단서 카드</th><th>고발</th><th>비고</th><th></th></tr></thead>
+          <tbody data-store="schedule-detail">
+            <tr><td contenteditable="true">1일차</td><td contenteditable="true">조사 시작, 자유 탐색·농사·채집·대화</td><td contenteditable="true">사보타주 1회차 발생</td><td contenteditable="true">-</td><td contenteditable="true">불가</td><td contenteditable="true">-</td><td class="del-cell"><button class="del-btn" data-del="tr" title="삭제">✕</button></td></tr>
+            <tr><td contenteditable="true">2일차</td><td contenteditable="true">농사·채집·대화, 전날 밤 장소에서 단서 탐색</td><td contenteditable="true">사보타주 2회차 발생</td><td contenteditable="true">1번째 습득 가능</td><td contenteditable="true">불가</td><td contenteditable="true">-</td><td class="del-cell"><button class="del-btn" data-del="tr" title="삭제">✕</button></td></tr>
+            <tr><td contenteditable="true">3일차</td><td contenteditable="true">동일 루틴 반복</td><td contenteditable="true">사보타주 3회차 발생</td><td contenteditable="true">2번째 습득 가능</td><td contenteditable="true">불가</td><td contenteditable="true">-</td><td class="del-cell"><button class="del-btn" data-del="tr" title="삭제">✕</button></td></tr>
+            <tr><td contenteditable="true">4일차</td><td contenteditable="true">동일 루틴 반복</td><td contenteditable="true">사보타주 4회차 발생</td><td contenteditable="true">3번째 습득 가능</td><td contenteditable="true">불가</td><td contenteditable="true">-</td><td class="del-cell"><button class="del-btn" data-del="tr" title="삭제">✕</button></td></tr>
+            <tr><td contenteditable="true">5일차</td><td contenteditable="true">동일 루틴 반복</td><td contenteditable="true">사보타주 5회차(마지막) 발생</td><td contenteditable="true">4번째 습득 가능</td><td contenteditable="true">불가</td><td contenteditable="true">-</td><td class="del-cell"><button class="del-btn" data-del="tr" title="삭제">✕</button></td></tr>
+            <tr><td contenteditable="true">6일차</td><td contenteditable="true">5일차 밤 몫 단서 탐색, 자유 활동</td><td contenteditable="true">사보타주 없음</td><td contenteditable="true">5번째(마지막) 습득 가능</td><td contenteditable="true">불가</td><td contenteditable="true">단서 없는 유일한 밤</td><td class="del-cell"><button class="del-btn" data-del="tr" title="삭제">✕</button></td></tr>
+            <tr><td contenteditable="true">7일차</td><td contenteditable="true">농사·채집만 가능, 주민과는 간단 대화만(추리 대화 제한)</td><td contenteditable="true">오답 시 마을 대상 랜덤 이벤트</td><td contenteditable="true">신규 없음(기존 열람만)</td><td contenteditable="true"><b>가능(첫 고발일)</b></td><td contenteditable="true">오답 시 호감도 하락(본인 -30 등)</td><td class="del-cell"><button class="del-btn" data-del="tr" title="삭제">✕</button></td></tr>
+            <tr><td contenteditable="true">8일차</td><td contenteditable="true">동일, 마을 분위기 무거워짐</td><td contenteditable="true">오답 시 플레이어 대상 랜덤 이벤트</td><td contenteditable="true">-</td><td contenteditable="true">가능(재도전)</td><td contenteditable="true">-</td><td class="del-cell"><button class="del-btn" data-del="tr" title="삭제">✕</button></td></tr>
+            <tr><td contenteditable="true">9일차</td><td contenteditable="true">동일</td><td contenteditable="true">-</td><td contenteditable="true">-</td><td contenteditable="true">가능(마지막 재도전)</td><td contenteditable="true">실패 시 배드엔딩 / 성공 시 즉시 개별 엔딩</td><td class="del-cell"><button class="del-btn" data-del="tr" title="삭제">✕</button></td></tr>
+          </tbody>
+        </table>
+        <div class="add-row"><button class="add-btn" data-add="schedule-row" data-target="schedule-detail">+ 일차 추가</button></div>
+      </div>
+    </section>
+
+    <section id="npcs">
+      <h2>⑤ NPC 정보 및 관리</h2>
+      <p class="desc">모든 항목을 클릭해서 수정할 수 있어요. 주 사보타주 유형·동기는 코드(CulpritProfileRegistry) 기준 참고용입니다.</p>
+      <div class="npc-grid" data-store="npcs2">
+
+        <div class="npc-card">
+          <div class="npc-top"><img src="../2. 에셋/NPC/1. 현수동 — 이장 할아버지.gif"/><div><div class="name" contenteditable="true">현수동</div><div class="role" contenteditable="true">이장 · 70대</div></div></div>
+          <div class="npc-field"><div class="f-label">성격</div><div class="f-value" contenteditable="true">마을 최고령, 변화 싫어함, 퉁명·잔소리, 고집 셈</div></div>
+          <div class="npc-field"><div class="f-label">말투</div><div class="f-value" contenteditable="true">반말 섞인 명령조, 옛날식 표현, 짧고 직설적</div></div>
+          <div class="npc-field"><div class="f-label">예시 대사</div><div class="f-value placeholder" contenteditable="true">(예시 대사를 적어주세요)</div></div>
+          <div class="npc-field"><div class="f-label">외형 특징</div><div class="f-value placeholder" contenteditable="true">(외형 특징을 적어주세요)</div></div>
+          <div class="npc-refrow">
+            <div class="npc-field"><div class="f-label">주 사보타주 유형</div><div class="f-value" contenteditable="true">파손형</div></div>
+            <div class="npc-field"><div class="f-label">동기(초안)</div><div class="f-value" contenteditable="true">마을 개발에 대한 반감</div></div>
+          </div>
+        </div>
+
+        <div class="npc-card">
+          <div class="npc-top"><img src="../2. 에셋/NPC/2. 나주부 — 농산물 상점 아내.gif"/><div><div class="name" contenteditable="true">나주부</div><div class="role" contenteditable="true">농산물 상점 아내 · 30대 초</div></div></div>
+          <div class="npc-field"><div class="f-label">성격</div><div class="f-value" contenteditable="true">상냥·사교적이나 낯선 사람에겐 거리감, 남편에게 다정</div></div>
+          <div class="npc-field"><div class="f-label">말투</div><div class="f-value" contenteditable="true">존댓말 기본, 부드럽고 다정한 어조</div></div>
+          <div class="npc-field"><div class="f-label">예시 대사</div><div class="f-value placeholder" contenteditable="true">(예시 대사를 적어주세요)</div></div>
+          <div class="npc-field"><div class="f-label">외형 특징</div><div class="f-value placeholder" contenteditable="true">(외형 특징을 적어주세요)</div></div>
+          <div class="npc-refrow">
+            <div class="npc-field"><div class="f-label">주 사보타주 유형</div><div class="f-value" contenteditable="true">절도형</div></div>
+            <div class="npc-field"><div class="f-label">동기(초안)</div><div class="f-value" contenteditable="true">막연한 질투·소외감(어릴 적 상처)</div></div>
+          </div>
+        </div>
+
+        <div class="npc-card">
+          <div class="npc-top"><img src="../2. 에셋/NPC/3. 전주인 — 아이템 상점 남편.gif"/><div><div class="name" contenteditable="true">전주인</div><div class="role" contenteditable="true">아이템 상점 남편 · 30대 중</div></div></div>
+          <div class="npc-field"><div class="f-label">성격</div><div class="f-value" contenteditable="true">친절·계산적, 눈치 빠름, 은근한 승부욕, 신혼부부 느낌</div></div>
+          <div class="npc-field"><div class="f-label">말투</div><div class="f-value" contenteditable="true">상냥한 존댓말 + 장사꾼 멘트</div></div>
+          <div class="npc-field"><div class="f-label">예시 대사</div><div class="f-value placeholder" contenteditable="true">(예시 대사를 적어주세요)</div></div>
+          <div class="npc-field"><div class="f-label">외형 특징</div><div class="f-value placeholder" contenteditable="true">(외형 특징을 적어주세요)</div></div>
+          <div class="npc-refrow">
+            <div class="npc-field"><div class="f-label">주 사보타주 유형</div><div class="f-value" contenteditable="true">방해공작형</div></div>
+            <div class="npc-field"><div class="f-label">동기(초안)</div><div class="f-value" contenteditable="true">은근한 승부욕(장터 경쟁 집착)</div></div>
+          </div>
+        </div>
+
+        <div class="npc-card">
+          <div class="npc-top"><img src="../2. 에셋/NPC/4. 박영계 — 양계장 주인.gif"/><div><div class="name" contenteditable="true">박영계</div><div class="role" contenteditable="true">양계장 주인 · 41세</div></div></div>
+          <div class="npc-field"><div class="f-label">성격</div><div class="f-value" contenteditable="true">활발·사교적, 마을 소식통, 오지랖·정 많음</div></div>
+          <div class="npc-field"><div class="f-label">말투</div><div class="f-value" contenteditable="true">친근한 반말 섞인 존댓말, 빠른 말투</div></div>
+          <div class="npc-field"><div class="f-label">예시 대사</div><div class="f-value placeholder" contenteditable="true">(예시 대사를 적어주세요)</div></div>
+          <div class="npc-field"><div class="f-label">외형 특징</div><div class="f-value placeholder" contenteditable="true">(외형 특징을 적어주세요)</div></div>
+          <div class="npc-refrow">
+            <div class="npc-field"><div class="f-label">주 사보타주 유형</div><div class="f-value" contenteditable="true">절도형</div></div>
+            <div class="npc-field"><div class="f-label">동기(초안)</div><div class="f-value" contenteditable="true">오지랖(소문 진위 확인)</div></div>
+          </div>
+        </div>
+
+        <div class="npc-card">
+          <div class="npc-top"><img src="../2. 에셋/NPC/5. 명자유 — 프리랜서.gif"/><div><div class="name" contenteditable="true">명자유</div><div class="role" contenteditable="true">프리랜서 · 25세</div></div></div>
+          <div class="npc-field"><div class="f-label">성격</div><div class="f-value" contenteditable="true">내향적, 히키코모리에 가까움, 겁 많고 예민하나 악의 없음</div></div>
+          <div class="npc-field"><div class="f-label">말투</div><div class="f-value" contenteditable="true">짧고 단답형, 형식적 존댓말</div></div>
+          <div class="npc-field"><div class="f-label">예시 대사</div><div class="f-value placeholder" contenteditable="true">(예시 대사를 적어주세요)</div></div>
+          <div class="npc-field"><div class="f-label">외형 특징</div><div class="f-value placeholder" contenteditable="true">어깨 아래까지 오는 길고 곧은 검은 머리, 눈 한쪽을 가리는 무거운 앞머리</div></div>
+          <div class="npc-refrow">
+            <div class="npc-field"><div class="f-label">주 사보타주 유형</div><div class="f-value" contenteditable="true">절도형</div></div>
+            <div class="npc-field"><div class="f-label">동기(초안)</div><div class="f-value" contenteditable="true">불안정한 수입</div></div>
+          </div>
+        </div>
+
+        <div class="npc-card">
+          <div class="npc-top"><img src="../2. 에셋/NPC/6. 김치준 — 취준생·상점 직원.gif"/><div><div class="name" contenteditable="true">김치준</div><div class="role" contenteditable="true">취준생 · 상점 직원 · 28세</div></div></div>
+          <div class="npc-field"><div class="f-label">성격</div><div class="f-value" contenteditable="true">차분·예의 바름, 감정 표현 적음, 뒤끝 있음 (나박수와 앙숙)</div></div>
+          <div class="npc-field"><div class="f-label">말투</div><div class="f-value" contenteditable="true">정중한 존댓말, 담담한 어조</div></div>
+          <div class="npc-field"><div class="f-label">예시 대사</div><div class="f-value placeholder" contenteditable="true">(예시 대사를 적어주세요)</div></div>
+          <div class="npc-field"><div class="f-label">외형 특징</div><div class="f-value placeholder" contenteditable="true">(외형 특징을 적어주세요)</div></div>
+          <div class="npc-refrow">
+            <div class="npc-field"><div class="f-label">주 사보타주 유형</div><div class="f-value" contenteditable="true">방해공작형</div></div>
+            <div class="npc-field"><div class="f-label">동기(초안)</div><div class="f-value" contenteditable="true">나박수와의 앙숙 관계 + 취준 스트레스</div></div>
+          </div>
+        </div>
+
+        <div class="npc-card">
+          <div class="npc-top"><img src="../2. 에셋/NPC/7. 나박수 — 수박밭 주인.gif"/><div><div class="name" contenteditable="true">나박수</div><div class="role" contenteditable="true">수박밭 주인 · 32세</div></div></div>
+          <div class="npc-field"><div class="f-label">성격</div><div class="f-value" contenteditable="true">열정파, 화끈·직설적, 감정 못 숨김 (김치준과 앙숙)</div></div>
+          <div class="npc-field"><div class="f-label">말투</div><div class="f-value" contenteditable="true">사투리 섞인 거친 말투, 큰 목소리</div></div>
+          <div class="npc-field"><div class="f-label">예시 대사</div><div class="f-value placeholder" contenteditable="true">(예시 대사를 적어주세요)</div></div>
+          <div class="npc-field"><div class="f-label">외형 특징</div><div class="f-value placeholder" contenteditable="true">몸무게가 꽤 실린 다부진 체구, 넓은 어깨와 강한 팔</div></div>
+          <div class="npc-refrow">
+            <div class="npc-field"><div class="f-label">주 사보타주 유형</div><div class="f-value" contenteditable="true">파손형</div></div>
+            <div class="npc-field"><div class="f-label">동기(초안)</div><div class="f-value" contenteditable="true">다혈질 + 김치준에 대한 반감</div></div>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    <section id="systems">
+      <h2>⑥ 핵심 시스템</h2>
+      <p class="desc">각 카드의 항목을 클릭해서 수정하고, "+ 항목"으로 줄을 추가하세요.</p>
+      <div class="grid cols-3">
+        <div class="card" data-store="sys-sabotage">
+          <h3 style="margin-top:0;font-size:15px;" contenteditable="true">사보타주 (3유형)</h3>
+          <ul class="clean" style="margin:0;padding-left:18px;font-size:13.5px;">
+            <li contenteditable="true">절도형 — 작물/과일 서리, 상점 물건</li>
+            <li contenteditable="true">파손형 — 울타리·벤치·조각상·화분</li>
+            <li contenteditable="true">방해공작형 — 동물 방생, 작물 훼손</li>
+          </ul>
+          <div class="add-row"><button class="add-btn" data-add="plain-li" data-target="sys-sabotage">+ 항목</button></div>
+        </div>
+        <div class="card" data-store="sys-affinity">
+          <h3 style="margin-top:0;font-size:15px;" contenteditable="true">호감도 (0~100, 시작 50)</h3>
+          <ul class="clean" style="margin:0;padding-left:18px;font-size:13.5px;">
+            <li contenteditable="true">70+ — 우호적, 단서 먼저 제공</li>
+            <li contenteditable="true">30~70 — 기본 대화만</li>
+            <li contenteditable="true">30미만 — 회피·단답 (완전 차단 아님)</li>
+            <li contenteditable="true">오답 지목 시 본인 -30 / 근접 -10~15 / 무관 -5</li>
+          </ul>
+          <div class="add-row"><button class="add-btn" data-add="plain-li" data-target="sys-affinity">+ 항목</button></div>
+        </div>
+        <div class="card" data-store="sys-shop">
+          <h3 style="margin-top:0;font-size:15px;" contenteditable="true">상점 아이템 (4종)</h3>
+          <ul class="clean" style="margin:0;padding-left:18px;font-size:13.5px;">
+            <li contenteditable="true">운동화 50원 — 이동 소모 20%↓ (영구)</li>
+            <li contenteditable="true">거짓말탐지기 60원 — 정직모드 1턴 (1일1회)</li>
+            <li contenteditable="true">돋보기 30원 — 단서 명확화 (1일1회)</li>
+            <li contenteditable="true">선물세트 40원 — 호감도 +10~15</li>
+          </ul>
+          <div class="add-row"><button class="add-btn" data-add="plain-li" data-target="sys-shop">+ 항목</button></div>
+        </div>
+        <div class="card" data-store="sys-stamina">
+          <h3 style="margin-top:0;font-size:15px;" contenteditable="true">체력 소모표</h3>
+          <ul class="clean" style="margin:0;padding-left:18px;font-size:13.5px;">
+            <li contenteditable="true">이동 — 초당 0.15 (운동화 0.12)</li>
+            <li contenteditable="true">대화 1세션 — 8</li>
+            <li contenteditable="true">파종/수확 1회 — 각 5</li>
+            <li contenteditable="true">채집 1회 — 3 (재생주기 전 재채집 불가)</li>
+          </ul>
+          <div class="add-row"><button class="add-btn" data-add="plain-li" data-target="sys-stamina">+ 항목</button></div>
+        </div>
+        <div class="card" data-store="sys-clue">
+          <h3 style="margin-top:0;font-size:15px;" contenteditable="true">단서 카드 (5장·5주제)</h3>
+          <ul class="clean" style="margin:0;padding-left:18px;font-size:13.5px;">
+            <li contenteditable="true">머리카락 · 소지품 · 발자국 · 혈흔(1회성) · 자국</li>
+            <li contenteditable="true">사보타주 발생 장소에서 습득, 놓쳐도 계속 남음</li>
+            <li contenteditable="true">가짜 카드 없음 — 문구만 애매하게 설계</li>
+          </ul>
+          <div class="add-row"><button class="add-btn" data-add="plain-li" data-target="sys-clue">+ 항목</button></div>
+        </div>
+        <div class="card" data-store="sys-inventory">
+          <h3 style="margin-top:0;font-size:15px;" contenteditable="true">인벤토리 / 경제</h3>
+          <ul class="clean" style="margin:0;padding-left:18px;font-size:13.5px;">
+            <li contenteditable="true">슬롯 7칸 (확정)</li>
+            <li contenteditable="true">체력 회복은 직접 기른 작물·채집 과일만 가능</li>
+            <li contenteditable="true">과일 4종 중 매일 1~2종 랜덤 등장</li>
+            <li contenteditable="true">남는 작물은 상점 판매로 환전</li>
+          </ul>
+          <div class="add-row"><button class="add-btn" data-add="plain-li" data-target="sys-inventory">+ 항목</button></div>
+        </div>
+      </div>
+    </section>
+
+    <section id="ai">
+      <h2>⑦ AI 활용</h2>
+      <p class="desc">자세한 내용은 <code>AI_활용_기술_문서.pdf</code> 참고. 아래는 대시보드용 요약 — 클릭해서 수정 가능.</p>
+      <div class="card">
+        <table>
+          <thead><tr><th>기능</th><th>모델</th><th>핵심 설계</th><th></th></tr></thead>
+          <tbody data-store="ai">
+            <tr>
+              <td contenteditable="true">NPC 페르소나 생성</td>
+              <td contenteditable="true">Claude Opus 5</td>
+              <td contenteditable="true">구조화 출력(JSON Schema)으로 배경서사·예시대사 확장, 세션당 1회 캐시</td>
+              <td class="del-cell"><button class="del-btn" data-del="tr" title="삭제">✕</button></td>
+            </tr>
+            <tr>
+              <td contenteditable="true">실시간 대화</td>
+              <td contenteditable="true">Claude Sonnet 5</td>
+              <td contenteditable="true">호감도 3구간별 톤 지시, 목격담/최근 이벤트 반영, 프롬프트 캐싱, thinking 비활성화(속도)</td>
+              <td class="del-cell"><button class="del-btn" data-del="tr" title="삭제">✕</button></td>
+            </tr>
+            <tr>
+              <td contenteditable="true">단서 카드 생성/명확화</td>
+              <td contenteditable="true">Claude Opus 5</td>
+              <td contenteditable="true">NPC 외형 묘사 기반 5주제 가이드, 범인 이름 절대 미언급</td>
+              <td class="del-cell"><button class="del-btn" data-del="tr" title="삭제">✕</button></td>
+            </tr>
+            <tr>
+              <td contenteditable="true">랜덤 이벤트 / 오답 반응 / 엔딩 스토리</td>
+              <td contenteditable="true">Claude Opus 5</td>
+              <td contenteditable="true">범인 정보 비전달로 스포일러 방지, 엔딩은 세션당 1회 캐시</td>
+              <td class="del-cell"><button class="del-btn" data-del="tr" title="삭제">✕</button></td>
+            </tr>
+          </tbody>
+        </table>
+        <div class="add-row"><button class="add-btn" data-add="ai-row" data-target="ai">+ 항목 추가</button></div>
+        <div class="note" contenteditable="true">안전장치: Claude 응답 거부(refusal) 감지 후 폴백 문구 전환 · 계정별 분당 호출 제한 · 고발 API 일 1회 제한 · read timeout 45초(실측 지연 20~24초 대비 여유)</div>
+      </div>
+    </section>
+
+    <section id="memo">
+      <h2>⑧ 메모 · 챙길 것</h2>
+      <p class="desc">완료한 항목은 체크, 텍스트는 클릭해서 수정. 아래 메모장에는 형식 없이 자유롭게 적으세요.</p>
+      <div class="card">
+        <ul class="chk-list" data-store="actions">
+          <li class="chk-row"><label><input type="checkbox" checked/> <span contenteditable="true"><b>배포</b> — Git 공유 및 배포 완료. 배포 URL은 위 ① 제출 현황 표에 기록.</span></label><button class="del-btn" data-del="li" title="삭제">✕</button></li>
+          <li class="chk-row"><label><input type="checkbox"/> <span contenteditable="true"><b>팀원 롤 기술서 작성</b> — git 기여자 기준 최소 4인 확인됨. 각자 실제 담당 영역 확인 후 문서화.</span></label><button class="del-btn" data-del="li" title="삭제">✕</button></li>
+          <li class="chk-row"><label><input type="checkbox"/> <span contenteditable="true"><b>밸런스 수치 확정</b> — 체력 최대치/일일 시작치, 기절 추가 페널티, 농사·채집 가격표.</span></label><button class="del-btn" data-del="li" title="삭제">✕</button></li>
+          <li class="chk-row"><label><input type="checkbox"/> <span contenteditable="true"><b>기획서 PDF 자체 모순 정리</b> — 운동화 효과 수치 6p/9p 불일치, 최신 기준으로 통일.</span></label><button class="del-btn" data-del="li" title="삭제">✕</button></li>
+          <li class="chk-row"><label><input type="checkbox"/> <span contenteditable="true"><b>AI 활용 문서 1개 항목 확인</b> — 코드 작성에 사용한 AI 코딩 도구명(codex 브랜치 흔적 있음) 팀 확인.</span></label><button class="del-btn" data-del="li" title="삭제">✕</button></li>
+          <li class="chk-row"><label><input type="checkbox"/> <span contenteditable="true"><b>NPC 예시 대사·외형 특징 채워넣기</b> — ⑤ NPC 카드에 placeholder로 남겨둔 항목 보완.</span></label><button class="del-btn" data-del="li" title="삭제">✕</button></li>
+        </ul>
+        <div class="add-row"><button class="add-btn" data-add="todo-row" data-target="actions">+ 액션 추가</button></div>
+        <div class="memo-pad" contenteditable="true" data-placeholder="여기에 자유롭게 메모하세요 — 회의 내용, 아이디어, 확인할 것 등 형식 없이 적어도 됩니다." data-store="memo-notes"></div>
+      </div>
+    </section>
+
+    <div class="footer">
+      이 페이지는 저장소 코드(TODO.md, 개발 로그, 기획서 분석, 소스 구조)를 바탕으로 만들어졌고, 이후로는 이 페이지 안에서 직접 수정하며 관리할 수 있어요. 수정 내용은 지금 열려 있는 브라우저에 저장되니, 다른 기기·다른 브라우저에서 이어서 보려면 왼쪽의 "백업 내보내기"로 받은 파일을 그 쪽에서 "백업 불러오기"로 열어주세요.
+    </div>
+  </main>
+</div>
+
+<script>
+(function(){
+  const PREFIX = 'dashStore_';
+  const STATUS_CLASS = {'완료':'done','진행중':'progress','확인/결정 필요':'todo','보류':'hold','제외':'excluded'};
+
+  function applyStatusClass(sel){
+    Object.values(STATUS_CLASS).forEach(c => sel.classList.remove('st-' + c));
+    sel.classList.add('st-' + (STATUS_CLASS[sel.value] || 'todo'));
+  }
+  function initStatusSelects(){
+    document.querySelectorAll('select.status-select').forEach(applyStatusClass);
+  }
+
+  function keyFor(store){ return PREFIX + store; }
+
+  function syncFormAttributes(container){
+    container.querySelectorAll('input[type="checkbox"]').forEach(cb => {
+      if (cb.checked) cb.setAttribute('checked',''); else cb.removeAttribute('checked');
+    });
+    container.querySelectorAll('select').forEach(sel => {
+      Array.from(sel.options).forEach(opt => {
+        if (opt.value === sel.value) opt.setAttribute('selected',''); else opt.removeAttribute('selected');
+      });
+    });
+  }
+
+  function flashSaved(){
+    const el = document.getElementById('saveStatus');
+    if (!el) return;
+    const t = new Date().toLocaleTimeString('ko-KR', {hour:'2-digit', minute:'2-digit', second:'2-digit'});
+    el.textContent = '저장됨 · ' + t;
+    el.classList.add('show');
+    clearTimeout(el._t);
+    el._t = setTimeout(() => el.classList.remove('show'), 2000);
+  }
+
+  function saveContainer(container){
+    if (!container) return;
+    const store = container.getAttribute('data-store');
+    if (!store) return;
+    syncFormAttributes(container);
+    localStorage.setItem(keyFor(store), container.innerHTML);
+    flashSaved();
+  }
+
+  let saveTimer = null;
+  function scheduleSave(container){
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(() => saveContainer(container), 400);
+  }
+
+  function loadAll(){
+    document.querySelectorAll('[data-store]').forEach(container => {
+      const saved = localStorage.getItem(keyFor(container.getAttribute('data-store')));
+      if (saved !== null) container.innerHTML = saved;
+    });
+    initStatusSelects();
+  }
+
+  function statusOptionsHtml(current){
+    return Object.keys(STATUS_CLASS).map(o =>
+      `<option value="${o}"${o === current ? ' selected' : ''}>${o}</option>`).join('');
+  }
+
+  const TEMPLATES = {
+    'submission-row': () => `<tr>
+        <td contenteditable="true">#</td>
+        <td contenteditable="true">새 제출물</td>
+        <td contenteditable="true">-</td>
+        <td><select class="status-select">${statusOptionsHtml('확인/결정 필요')}</select></td>
+        <td contenteditable="true">-</td>
+        <td class="del-cell"><button class="del-btn" data-del="tr" title="삭제">✕</button></td>
+      </tr>`,
+    'gaps-row': () => `<tr>
+        <td contenteditable="true">새 항목</td>
+        <td contenteditable="true">내용을 입력하세요</td>
+        <td><select class="status-select">${statusOptionsHtml('확인/결정 필요')}</select></td>
+        <td class="del-cell"><button class="del-btn" data-del="tr" title="삭제">✕</button></td>
+      </tr>`,
+    'ai-row': () => `<tr>
+        <td contenteditable="true">새 기능</td>
+        <td contenteditable="true">모델명</td>
+        <td contenteditable="true">설계 포인트</td>
+        <td class="del-cell"><button class="del-btn" data-del="tr" title="삭제">✕</button></td>
+      </tr>`,
+    'schedule-row': () => `<tr>
+        <td contenteditable="true">n일차</td>
+        <td contenteditable="true">낮 활동</td>
+        <td contenteditable="true">밤 사건</td>
+        <td contenteditable="true">-</td>
+        <td contenteditable="true">-</td>
+        <td contenteditable="true">-</td>
+        <td class="del-cell"><button class="del-btn" data-del="tr" title="삭제">✕</button></td>
+      </tr>`,
+    'checklist-row': () => `<li class="chk-row"><label><input type="checkbox"/> <span contenteditable="true">새 기능</span></label><button class="del-btn" data-del="li" title="삭제">✕</button></li>`,
+    'todo-row': () => `<li class="chk-row"><label><input type="checkbox"/> <span contenteditable="true">새 액션</span></label><button class="del-btn" data-del="li" title="삭제">✕</button></li>`,
+    'plain-li': () => `<li contenteditable="true">새 항목</li>`,
+    'timeline-chip': () => `<div class="tl-day"><div class="d" contenteditable="true">n일차</div><span contenteditable="true">내용을 입력하세요</span><button class="del-btn inline" data-del=".tl-day" title="삭제">✕</button></div>`,
+  };
+
+  function addRow(container, type){
+    const fn = TEMPLATES[type];
+    if (!fn || !container) return;
+    container.insertAdjacentHTML('beforeend', fn());
+  }
+
+  document.addEventListener('input', (e) => {
+    const container = e.target.closest('[data-store]');
+    if (container) scheduleSave(container);
+  });
+
+  document.addEventListener('change', (e) => {
+    const container = e.target.closest('[data-store]');
+    if (!container) return;
+    if (e.target.matches('select.status-select')) applyStatusClass(e.target);
+    saveContainer(container);
+  });
+
+  document.addEventListener('click', (e) => {
+    const addBtn = e.target.closest('[data-add]');
+    if (addBtn) {
+      const container = document.querySelector(`[data-store="${addBtn.getAttribute('data-target')}"]`);
+      addRow(container, addBtn.getAttribute('data-add'));
+      saveContainer(container);
+      return;
+    }
+    const delBtn = e.target.closest('[data-del]');
+    if (delBtn) {
+      const container = delBtn.closest('[data-store]');
+      const target = delBtn.closest(delBtn.getAttribute('data-del'));
+      if (target) target.remove();
+      if (container) saveContainer(container);
+    }
+  });
+
+  document.getElementById('resetBtn').addEventListener('click', () => {
+    if (!confirm('지금까지 수정한 내용을 전부 지우고 처음 상태로 되돌릴까요?')) return;
+    Object.keys(localStorage).filter(k => k.startsWith(PREFIX)).forEach(k => localStorage.removeItem(k));
+    location.reload();
+  });
+
+  document.getElementById('exportBtn').addEventListener('click', () => {
+    const data = {};
+    Object.keys(localStorage).filter(k => k.startsWith(PREFIX)).forEach(k => data[k] = localStorage.getItem(k));
+    const blob = new Blob([JSON.stringify(data, null, 2)], {type:'application/json'});
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    const now = new Date();
+    const stamp = now.getFullYear() + String(now.getMonth()+1).padStart(2,'0') + String(now.getDate()).padStart(2,'0');
+    a.download = `기획대시보드_백업_${stamp}.json`;
+    a.click();
+  });
+
+  document.getElementById('importBtn').addEventListener('click', () => {
+    document.getElementById('importFile').click();
+  });
+  document.getElementById('importFile').addEventListener('change', (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const data = JSON.parse(reader.result);
+        Object.keys(data).forEach(k => localStorage.setItem(k, data[k]));
+        location.reload();
+      } catch (err) {
+        alert('백업 파일을 읽지 못했습니다: ' + err.message);
+      }
+    };
+    reader.readAsText(file);
+  });
+
+  loadAll();
+})();
+</script>
+</body>
+</html>

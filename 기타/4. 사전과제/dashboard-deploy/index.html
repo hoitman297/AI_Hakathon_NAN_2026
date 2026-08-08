@@ -1,0 +1,413 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<title>마을 사보타주 추리 게임 — 기획 관리 대시보드</title>
+<style>
+  :root{
+    --bg:#f5f6fb;
+    --panel:#ffffff;
+    --panel-2:#f8f9fd;
+    --border:#e7e9f2;
+    --text:#1a1d2b;
+    --sub:#70758d;
+    --accent:#ee5d3c;
+    --accent-soft:#fff0eb;
+    --accent-2:#4f6df5;
+    --accent-2-soft:#eef1ff;
+    --green:#17a672;
+    --green-soft:#e6f8f0;
+    --yellow:#c8850a;
+    --yellow-soft:#fdf3df;
+    --red:#e0405f;
+    --red-soft:#fdeaee;
+    --shadow:0 1px 2px rgba(20,20,50,.04), 0 6px 20px rgba(20,20,50,.05);
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    background:var(--bg);
+    color:var(--text);
+    font-family:'Malgun Gothic','Noto Sans KR',-apple-system,sans-serif;
+    line-height:1.6;
+  }
+  a{color:var(--accent-2);text-decoration:none;}
+  .layout{display:flex;min-height:100vh;}
+  nav.sidebar{
+    width:224px;flex:0 0 224px;
+    background:var(--panel);
+    border-right:1px solid var(--border);
+    padding:30px 18px;
+    position:sticky;top:0;height:100vh;
+    overflow-y:auto;
+  }
+  nav.sidebar .brand{
+    font-size:12px;color:var(--sub);letter-spacing:.06em;margin-bottom:6px;font-weight:700;
+  }
+  nav.sidebar .title{
+    font-size:19px;font-weight:800;margin-bottom:28px;line-height:1.35;color:var(--text);
+  }
+  nav.sidebar a{
+    display:block;color:var(--sub);font-size:13.5px;font-weight:600;padding:9px 12px;border-radius:10px;margin-bottom:2px;
+    transition:background .15s, color .15s;
+  }
+  nav.sidebar a:hover{background:var(--accent-soft);color:var(--accent);}
+  main{flex:1;padding:44px 48px 90px;max-width:1180px;}
+  header.hero{margin-bottom:36px;}
+  header.hero .tag{
+    display:inline-block;background:var(--accent-soft);color:var(--accent);
+    font-size:12px;font-weight:800;padding:5px 12px;border-radius:20px;margin-bottom:16px;
+  }
+  header.hero h1{font-size:30px;margin:0 0 8px;font-weight:800;letter-spacing:-.01em;}
+  header.hero p{color:var(--sub);margin:0;font-size:14px;}
+  section{margin-bottom:54px;scroll-margin-top:24px;}
+  section h2{
+    font-size:19px;margin:0 0 4px;display:flex;align-items:center;gap:10px;font-weight:800;
+  }
+  section .desc{color:var(--sub);font-size:13px;margin:0 0 18px;}
+  .card{
+    background:var(--panel);border:1px solid var(--border);border-radius:16px;padding:22px 24px;
+    box-shadow:var(--shadow);
+  }
+  .grid{display:grid;gap:14px;}
+  .grid.cols-2{grid-template-columns:repeat(2,1fr);}
+  .grid.cols-3{grid-template-columns:repeat(3,1fr);}
+  table{width:100%;border-collapse:collapse;font-size:13.5px;}
+  th,td{padding:12px 12px;border-bottom:1px solid var(--border);text-align:left;vertical-align:top;}
+  th{color:var(--sub);font-weight:700;font-size:11.5px;text-transform:uppercase;letter-spacing:.04em;}
+  tr:last-child td{border-bottom:none;}
+  tr:hover td{background:var(--panel-2);}
+  .pill{
+    display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:700;
+    padding:4px 11px;border-radius:20px;white-space:nowrap;
+  }
+  .pill.done{background:var(--green-soft);color:var(--green);}
+  .pill.progress{background:var(--accent-2-soft);color:var(--accent-2);}
+  .pill.todo{background:var(--yellow-soft);color:var(--yellow);}
+  .pill.excluded{background:#eef0f5;color:var(--sub);}
+  .pill.risk{background:var(--red-soft);color:var(--red);}
+  .npc-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;}
+  .npc-card{background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:16px;
+    text-align:center;box-shadow:var(--shadow);}
+  .npc-card img{width:64px;height:64px;image-rendering:pixelated;margin-bottom:8px;}
+  .npc-card .name{font-weight:800;font-size:14px;}
+  .npc-card .role{color:var(--accent-2);font-size:11.5px;margin-bottom:6px;font-weight:600;}
+  .npc-card .desc{font-size:11.5px;color:var(--sub);}
+  .timeline{display:flex;gap:8px;overflow-x:auto;padding-bottom:6px;}
+  .tl-day{
+    flex:0 0 132px;background:var(--panel-2);border:1px solid var(--border);border-radius:12px;
+    padding:13px;font-size:12px;
+  }
+  .tl-day .d{font-weight:800;color:var(--accent);font-size:13px;margin-bottom:6px;}
+  .stat-row{display:flex;gap:14px;margin-bottom:30px;flex-wrap:wrap;}
+  .stat{
+    background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:18px 20px;flex:1;min-width:150px;
+    box-shadow:var(--shadow);
+  }
+  .stat .num{font-size:27px;font-weight:800;color:var(--accent);}
+  .stat .label{color:var(--sub);font-size:12px;margin-top:4px;font-weight:600;}
+  ul.clean{margin:0;padding-left:18px;font-size:13.5px;}
+  ul.clean li{margin-bottom:7px;}
+  .note{
+    background:var(--accent-soft);border:1px solid #ffd9c8;border-radius:12px;
+    padding:13px 16px;font-size:13px;color:#9a3a1f;margin-top:16px;
+  }
+  .footer{color:var(--sub);font-size:12px;margin-top:64px;border-top:1px solid var(--border);padding-top:20px;}
+  code{background:var(--panel-2);border:1px solid var(--border);padding:2px 6px;border-radius:6px;font-size:12.5px;color:var(--text);}
+</style>
+</head>
+<body>
+<div class="layout">
+  <nav class="sidebar">
+    <div class="brand">AI_Hakathon_NAN_2026</div>
+    <div class="title">마을 사보타주<br/>추리 게임<br/>기획 대시보드</div>
+    <a href="#submission">① 사전과제 제출 현황</a>
+    <a href="#features">② 기능 구현 현황</a>
+    <a href="#gaps">③ 기획서 vs 구현 체크</a>
+    <a href="#schedule">④ 9일 진행 일정</a>
+    <a href="#npcs">⑤ NPC 7명</a>
+    <a href="#systems">⑥ 핵심 시스템</a>
+    <a href="#ai">⑦ AI 활용 요약</a>
+    <a href="#actions">⑧ 다음 액션</a>
+  </nav>
+  <main>
+    <header class="hero">
+      <span class="tag">기획 관리 대시보드 · 2026-08-08 기준</span>
+      <h1>마을 사보타주 추리 게임 — 기획/개발 현황판</h1>
+      <p>게임명 미정 (임시: game-project) · Repo: hoitman297/AI_Hakathon_NAN_2026 · 작성: 류수정(기획)</p>
+    </header>
+
+    <div class="stat-row">
+      <div class="stat"><div class="num">7일</div><div class="label">최소 클리어 소요일 (최대 9일)</div></div>
+      <div class="stat"><div class="num">7명</div><div class="label">NPC 등장인물</div></div>
+      <div class="stat"><div class="num">8종</div><div class="label">LLM 실시간 생성 콘텐츠 종류</div></div>
+      <div class="stat"><div class="num">3개</div><div class="label">서비스 (frontend/backend/llm-proxy)</div></div>
+    </div>
+
+    <section id="submission">
+      <h2>① 사전과제 제출 현황</h2>
+      <p class="desc">플레이 동영상(2번)은 이번 대시보드/자료 준비 범위에서 제외했습니다(요청 반영).</p>
+      <div class="card">
+        <table>
+          <thead><tr><th style="width:26px">#</th><th>제출물</th><th>제출 형태</th><th>상태</th><th>비고</th></tr></thead>
+          <tbody>
+            <tr>
+              <td>1</td>
+              <td><b>플레이 가능한 빌드 및 소스 코드</b></td>
+              <td>웹(브라우저) 또는 APK + 전체 소스<br/>GitHub Pages 링크</td>
+              <td><span class="pill todo">배포 설정 필요</span></td>
+              <td>프론트엔드 플레이 루프(로그인→캐릭터생성→낮/밤→고발→엔딩)는 코드상 구현 완료. 다만 백엔드(Spring)+MySQL이 있어야 실제 플레이가 되는 구조라, GitHub Pages(정적 호스팅)만으로는 부족함 — 아래 ⑧ 참고.</td>
+            </tr>
+            <tr>
+              <td>2</td>
+              <td>플레이 동영상</td>
+              <td>30~60초, YouTube 링크</td>
+              <td><span class="pill excluded">이번 준비 범위 제외</span></td>
+              <td>요청에 따라 제외</td>
+            </tr>
+            <tr>
+              <td>3</td>
+              <td><b>게임 소개 및 설명 문서</b></td>
+              <td>PDF</td>
+              <td><span class="pill progress">초안 작성 완료</span></td>
+              <td><code>게임_소개_및_설명_문서.pdf</code> — 검토 후 확정 필요</td>
+            </tr>
+            <tr>
+              <td>4</td>
+              <td><b>AI 활용 기술 문서</b></td>
+              <td>PDF</td>
+              <td><span class="pill progress">초안 작성 완료</span></td>
+              <td><code>AI_활용_기술_문서.pdf</code> — 코드에 사용한 AI 코딩 도구명(1개 항목)은 팀 확인 필요로 표시해둠</td>
+            </tr>
+            <tr>
+              <td>5</td>
+              <td>팀원 롤 기술서</td>
+              <td>PDF (개인 참여 시 생략)</td>
+              <td><span class="pill todo">보류</span></td>
+              <td>git 커밋 기준 4인 이상 참여 확인(류수정, 명지원 추정, hoitman297, hyeju0223) — 각자 역할 확인 후 별도 작성 예정</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="features">
+      <h2>② 기능 구현 현황</h2>
+      <p class="desc">TODO.md·개발 로그(2026-08-03~08-05)와 실제 소스 구조 기준. "완료"는 코드 레벨 구현 기준으로, 실 기기 테스트/밸런스 검증까지 끝난 상태를 뜻하지는 않습니다.</p>
+      <div class="grid cols-2">
+        <div class="card">
+          <table>
+            <thead><tr><th>화면 / 프론트 기능</th><th>상태</th></tr></thead>
+            <tbody>
+              <tr><td>타이틀 · 로그인 · 로그아웃</td><td><span class="pill done">완료</span></td></tr>
+              <tr><td>캐릭터 생성(닉네임/성별)</td><td><span class="pill done">완료</span></td></tr>
+              <tr><td>이어하기(세이브 슬롯)</td><td><span class="pill done">완료</span></td></tr>
+              <tr><td>낮 화면 — 맵 이동(Phaser)</td><td><span class="pill done">완료</span></td></tr>
+              <tr><td>대화창(NPC LLM 대화)</td><td><span class="pill done">완료</span></td></tr>
+              <tr><td>농사(파종/수확) · 채집</td><td><span class="pill done">완료</span></td></tr>
+              <tr><td>상점(구매/판매)</td><td><span class="pill done">완료</span></td></tr>
+              <tr><td>인벤토리(아이템/단서카드/호감도)</td><td><span class="pill done">완료</span></td></tr>
+              <tr><td>밤 전환 연출</td><td><span class="pill done">완료</span></td></tr>
+              <tr><td>고발(추리 지목) 화면</td><td><span class="pill done">완료</span></td></tr>
+              <tr><td>엔딩 화면(성공/배드엔딩)</td><td><span class="pill done">완료</span></td></tr>
+              <tr><td>백엔드 없이 보는 마을 프리뷰 모드</td><td><span class="pill done">완료</span></td></tr>
+              <tr><td>자동 저장(일차 전환 시)</td><td><span class="pill done">완료</span></td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="card">
+          <table>
+            <thead><tr><th>백엔드 / LLM 시스템</th><th>상태</th></tr></thead>
+            <tbody>
+              <tr><td>세션 생성 · 일차 진행 · 종료 판정</td><td><span class="pill done">완료</span></td></tr>
+              <tr><td>범인 랜덤 배정(주+보조 유형)</td><td><span class="pill done">완료</span></td></tr>
+              <tr><td>이동 체력 소모(초당 소모 모델)</td><td><span class="pill done">완료</span></td></tr>
+              <tr><td>NPC 페르소나 생성(구조화 출력)</td><td><span class="pill done">완료</span></td></tr>
+              <tr><td>실시간 대화 + 호감도 등급별 태도</td><td><span class="pill done">완료</span></td></tr>
+              <tr><td>7일차 이후 추리 대화 제한</td><td><span class="pill done">완료</span></td></tr>
+              <tr><td>단서 카드 생성/명확화(외형 기반 LLM)</td><td><span class="pill done">완료</span></td></tr>
+              <tr><td>랜덤 이벤트 · 엔딩 스토리 생성(LLM)</td><td><span class="pill done">완료</span></td></tr>
+              <tr><td>인증/세션 소유권 검증, 낙관적 락</td><td><span class="pill done">완료</span></td></tr>
+              <tr><td>LLM 레이트리밋 · 고발 1일 1회 제한</td><td><span class="pill done">완료</span></td></tr>
+              <tr><td>게임 세이브/로드 · ending_state 동기화</td><td><span class="pill done">완료</span></td></tr>
+              <tr><td>NPC 페르소나 관리자 편집기(신규)</td><td><span class="pill done">완료</span></td></tr>
+              <tr><td>DB 마이그레이션 도구(ddl-auto 의존)</td><td><span class="pill risk">트레이드오프로 유지</span></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <div class="note">전체적으로 <b>게임 플레이 루프(핵심 기능)는 이미 처음부터 끝까지 코드상 연결되어 있는 상태</b>입니다. 남은 리스크는 기능 누락보다는 ①실제 기기 다중 플레이 테스트, ②밸런스 수치 확정, ③배포(아래 ⑧) 쪽에 있습니다.</div>
+    </section>
+
+    <section id="gaps">
+      <h2>③ 기획서 vs 구현 체크 — 기획자가 확인할 항목</h2>
+      <p class="desc"><code>기획서_분석.md</code>에서 지적된 불일치 중, 개발 로그 기준으로 이미 해결된 것과 여전히 기획자 판단이 필요한 것을 구분했습니다.</p>
+      <div class="card">
+        <table>
+          <thead><tr><th>항목</th><th>내용</th><th>상태</th></tr></thead>
+          <tbody>
+            <tr>
+              <td>고발 가능 시점</td>
+              <td>기획서 구버전(3일차)과 최신본(7일차) 충돌 → 최신본(7~9일차 순차 재도전) 기준으로 반영됨</td>
+              <td><span class="pill done">해결됨</span></td>
+            </tr>
+            <tr>
+              <td>이동 체력 소모 단위</td>
+              <td>"이동 1회=체력5" 이산 모델 → "이동 중 초당 0.15 소모(운동화 시 0.12)" 연속 모델로 개정 반영</td>
+              <td><span class="pill done">해결됨</span></td>
+            </tr>
+            <tr>
+              <td>보조 사보타주 유형</td>
+              <td>주 유형만으론 범인이 특정되는 문제 → 주 80%/보조 20% 가중 랜덤으로 해결</td>
+              <td><span class="pill done">해결됨</span></td>
+            </tr>
+            <tr>
+              <td>PDF 내부 모순(운동화 효과)</td>
+              <td>기획서 6p(초당 0.15→0.12)와 9p(5→4)가 서로 다른 문구로 남아있음</td>
+              <td><span class="pill risk">기획팀 확인 필요</span></td>
+            </tr>
+            <tr>
+              <td>체력 최대치 / 일일 시작치</td>
+              <td>기절 후 리스폰 값(70)만 명시 — 이게 최대치인지 일부 회복치인지 불명확</td>
+              <td><span class="pill todo">기획자 수치 확정 필요</span></td>
+            </tr>
+            <tr>
+              <td>기절 페널티</td>
+              <td>"다음날 70으로 시작" 외 추가 페널티(시간손실/아이템손실/호감도 등) 여부 미정</td>
+              <td><span class="pill todo">기획자 결정 필요</span></td>
+            </tr>
+            <tr>
+              <td>농사/채집 가격표</td>
+              <td>작물4종·과일4종 수치표는 존재하나 "제안" 단계, 최종 확정 아님</td>
+              <td><span class="pill todo">기획자 확정 필요</span></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="schedule">
+      <h2>④ 9일 진행 일정</h2>
+      <div class="card">
+        <div class="timeline">
+          <div class="tl-day"><div class="d">1일차</div>조사 시작</div>
+          <div class="tl-day"><div class="d">1~5일차 밤</div>매일 밤 사보타주 발생 (총 5회)</div>
+          <div class="tl-day"><div class="d">2~6일차</div>전날 밤 장소에서 단서 카드 습득 (총 5장)</div>
+          <div class="tl-day"><div class="d">6일차 밤</div>사보타주·단서 없음</div>
+          <div class="tl-day"><div class="d">7일차</div><b style="color:#c8850a">첫 고발 가능일</b>. 추리 대화 제한</div>
+          <div class="tl-day"><div class="d">7→8일차 밤</div>(오답 시) 마을 대상 랜덤 이벤트</div>
+          <div class="tl-day"><div class="d">8일차</div>재시도 가능, 분위기 무거워짐</div>
+          <div class="tl-day"><div class="d">8→9일차 밤</div>(오답 시) 플레이어 대상 랜덤 이벤트</div>
+          <div class="tl-day"><div class="d">9일차</div>마지막 재시도. 실패 시 배드엔딩</div>
+        </div>
+      </div>
+    </section>
+
+    <section id="npcs">
+      <h2>⑤ NPC 7명</h2>
+      <div class="npc-grid">
+        <div class="npc-card"><img src="assets/npc/npc1-hyunsudong.gif"/><div class="name">현수동</div><div class="role">이장 · 70대</div><div class="desc">변화 싫어함, 퉁명·고집</div></div>
+        <div class="npc-card"><img src="assets/npc/npc2-najubu.gif"/><div class="name">나주부</div><div class="role">상점 아내 · 30대초</div><div class="desc">상냥·사교적</div></div>
+        <div class="npc-card"><img src="assets/npc/npc3-jeonjuin.gif"/><div class="name">전주인</div><div class="role">상점 주인 · 30대중</div><div class="desc">친절·계산적, 눈치빠름</div></div>
+        <div class="npc-card"><img src="assets/npc/npc4-parkyounggye.gif"/><div class="name">박영계</div><div class="role">양계장 주인 · 41세</div><div class="desc">마을 소식통, 오지랖</div></div>
+        <div class="npc-card"><img src="assets/npc/npc5-myungjayu.gif"/><div class="name">명자유</div><div class="role">프리랜서 · 25세</div><div class="desc">내향적, 겁 많음</div></div>
+        <div class="npc-card"><img src="assets/npc/npc6-kimchijoon.gif"/><div class="name">김치준</div><div class="role">취준생 · 28세</div><div class="desc">차분, 뒤끝 있음 (7과 앙숙)</div></div>
+        <div class="npc-card"><img src="assets/npc/npc7-nabaksoo.gif"/><div class="name">나박수</div><div class="role">수박밭 주인 · 32세</div><div class="desc">열정파, 직설적 (6과 앙숙)</div></div>
+      </div>
+    </section>
+
+    <section id="systems">
+      <h2>⑥ 핵심 시스템 요약</h2>
+      <div class="grid cols-3">
+        <div class="card">
+          <h3 style="margin-top:0;font-size:15px;">사보타주 (3유형)</h3>
+          <ul class="clean">
+            <li>절도형 — 작물/과일 서리, 상점 물건</li>
+            <li>파손형 — 울타리·벤치·조각상·화분</li>
+            <li>방해공작형 — 동물 방생, 작물 훼손</li>
+          </ul>
+        </div>
+        <div class="card">
+          <h3 style="margin-top:0;font-size:15px;">호감도 (0~100, 시작 50)</h3>
+          <ul class="clean">
+            <li>70+ — 우호적, 단서 먼저 제공</li>
+            <li>30~70 — 기본 대화만</li>
+            <li>30미만 — 회피·단답 (완전 차단 아님)</li>
+            <li>오답 지목 시 본인 -30 / 근접 -10~15 / 무관 -5</li>
+          </ul>
+        </div>
+        <div class="card">
+          <h3 style="margin-top:0;font-size:15px;">상점 아이템 (4종)</h3>
+          <ul class="clean">
+            <li>운동화 50원 — 이동 소모 20%↓ (영구)</li>
+            <li>거짓말탐지기 60원 — 정직모드 1턴 (1일1회)</li>
+            <li>돋보기 30원 — 단서 명확화 (1일1회)</li>
+            <li>선물세트 40원 — 호감도 +10~15</li>
+          </ul>
+        </div>
+        <div class="card">
+          <h3 style="margin-top:0;font-size:15px;">체력 소모표</h3>
+          <ul class="clean">
+            <li>이동 — 초당 0.15 (운동화 0.12)</li>
+            <li>대화 1세션 — 8</li>
+            <li>파종/수확 1회 — 각 5</li>
+            <li>채집 1회 — 3 (재생주기 전 재채집 불가)</li>
+          </ul>
+        </div>
+        <div class="card">
+          <h3 style="margin-top:0;font-size:15px;">단서 카드 (5장·5주제)</h3>
+          <ul class="clean">
+            <li>머리카락 · 소지품 · 발자국 · 혈흔(1회성) · 자국</li>
+            <li>사보타주 장소에서 습득, 놓쳐도 계속 남음</li>
+            <li>가짜 카드 없음 — 문구만 애매하게 설계</li>
+          </ul>
+        </div>
+        <div class="card">
+          <h3 style="margin-top:0;font-size:15px;">인벤토리 / 경제</h3>
+          <ul class="clean">
+            <li>슬롯 7칸 (확정)</li>
+            <li>체력 회복은 직접 기른 작물·채집 과일만 가능</li>
+            <li>과일 4종 중 매일 1~2종 랜덤 등장</li>
+            <li>남는 작물은 상점 판매로 환전</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <section id="ai">
+      <h2>⑦ AI 활용 요약</h2>
+      <p class="desc">자세한 내용은 <code>AI_활용_기술_문서.pdf</code> 참고. 아래는 대시보드용 요약.</p>
+      <div class="card">
+        <table>
+          <thead><tr><th>기능</th><th>모델</th><th>핵심 설계</th></tr></thead>
+          <tbody>
+            <tr><td>NPC 페르소나 생성</td><td>Claude Opus 5</td><td>구조화 출력(JSON Schema)으로 배경서사·예시대사 확장, 세션당 1회 캐시</td></tr>
+            <tr><td>실시간 대화</td><td>Claude Sonnet 5</td><td>호감도 3구간별 톤 지시, 목격담/최근 이벤트 반영, 프롬프트 캐싱, thinking 비활성화(속도)</td></tr>
+            <tr><td>단서 카드 생성/명확화</td><td>Claude Opus 5</td><td>NPC 외형 묘사 기반 5주제 가이드, 범인 이름 절대 미언급</td></tr>
+            <tr><td>랜덤 이벤트 / 오답 반응 / 엔딩 스토리</td><td>Claude Opus 5</td><td>범인 정보 비전달로 스포일러 방지, 엔딩은 세션당 1회 캐시</td></tr>
+          </tbody>
+        </table>
+        <div class="note">안전장치: Claude 응답 거부(refusal) 감지 후 폴백 문구 전환 · 계정별 분당 호출 제한 · 고발 API 일 1회 제한 · read timeout 45초(실측 지연 20~24초 대비 여유)</div>
+      </div>
+    </section>
+
+    <section id="actions">
+      <h2>⑧ 다음 액션 — 기획자가 챙길 것</h2>
+      <div class="card">
+        <ul class="clean">
+          <li><b>배포 방안 결정 (1번 제출물 관련)</b> — 현재 GitHub Actions 배포 워크플로우 없음. 프론트만 GitHub Pages에 올리면 백엔드(Spring)·DB 연결이 안 돼 실제 플레이가 불가능함. 팀 개발자와 함께 ⓐ백엔드를 Render 등에 별도 배포 + 프론트에서 그 주소를 바라보게 하고 프론트만 GitHub Pages/Vercel에 배포, ⓑ또는 백엔드 없이도 보이는 "마을 프리뷰 모드"만 우선 배포 중 방향을 정해야 함.</li>
+          <li><b>팀원 롤 기술서(5번) 작성</b> — git 기여자 기준 최소 4인(류수정, 명지원 추정, hoitman297, hyeju0223) 확인됨. 각자 실제 담당 영역(기획/프론트/백엔드/LLM 등) 확인 후 문서화 필요.</li>
+          <li><b>밸런스 수치 확정</b> — 체력 최대치/일일 시작치, 기절 추가 페널티, 농사·채집 가격표 최종 확정.</li>
+          <li><b>기획서 PDF 자체 모순 정리</b> — 운동화 효과 수치가 문서 내 6p/9p에서 다르게 적혀 있음, 최신 기준(초당 0.15→0.12)으로 통일 필요.</li>
+          <li><b>AI 활용 문서 1개 항목 확인</b> — 코드 작성 자체에 사용한 AI 코딩 도구(브랜치명 <code>codex</code>가 보여 Codex 계열 도구 사용 추정)를 팀에 확인 후 문서에 반영.</li>
+        </ul>
+      </div>
+    </section>
+
+    <div class="footer">
+      이 대시보드는 2026-08-08 기준 저장소 코드(TODO.md, 개발 로그, 기획서 분석, 소스 구조)를 바탕으로 자동 정리되었습니다. 코드가 바뀌면 다시 요청해서 갱신할 수 있습니다.
+    </div>
+  </main>
+</div>
+</body>
+</html>
