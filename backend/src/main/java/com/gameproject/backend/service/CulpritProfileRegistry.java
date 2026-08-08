@@ -33,11 +33,22 @@ public class CulpritProfileRegistry {
                     .orElse("");
         }
 
-        /** 오늘 밤 실제 대상 하나를 랜덤 선택. 대상 풀이 2개 이상이면 직전 밤과는 다른 걸 뽑는다. */
+        /**
+         * 오늘 밤 실제 대상 하나를 랜덤 선택. 대상 풀에 직전 밤과 "장소"가 다른 후보가 하나라도
+         * 있으면 그중에서 뽑는다 — location만 비교해야 한다(Target 전체(location+subTarget)로
+         * 비교하면 같은 장소의 다른 하위 대상(예: 상점-화분 → 상점-진열대)이 걸러지지 않고 이틀
+         * 연속 같은 장소가 뽑히는 문제가 있었다). 후보 풀이 전부 같은 장소뿐이면(전체 풀에 다른
+         * 장소가 없음) 어쩔 수 없이 그대로 전체 풀에서 뽑는다.
+         */
         public Target pickTonight(Random random, Target excludePrevious) {
             List<Target> candidates = targetPool;
-            if (excludePrevious != null && targetPool.size() > 1) {
-                candidates = targetPool.stream().filter(t -> !t.equals(excludePrevious)).toList();
+            if (excludePrevious != null) {
+                List<Target> differentLocation = targetPool.stream()
+                        .filter(t -> !t.location().equals(excludePrevious.location()))
+                        .toList();
+                if (!differentLocation.isEmpty()) {
+                    candidates = differentLocation;
+                }
             }
             return candidates.get(random.nextInt(candidates.size()));
         }

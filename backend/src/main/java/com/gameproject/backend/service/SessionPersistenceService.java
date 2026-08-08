@@ -186,16 +186,31 @@ class SessionPersistenceService {
         return useSecondary ? assignment.getSecondaryType() : assignment.getPrimaryType();
     }
 
-    /** 사보타주 발생 장소에 그 시간 실제로 있었을 법한(낮 동선상 그 장소인) 범인 외 NPC를 찾는다. 없으면 null. */
+    /**
+     * 사보타주 발생 장소에 그 시간 실제로 있었을 법한(낮 동선상 그 장소인) 범인 외 NPC를 찾는다. 없으면 null.
+     *
+     * <p>장소는 "상점"/"상점(근무)"/"상점(납품)"처럼 같은 물리적 공간이라도 NPC마다 스케줄
+     * 문자열이 다르게 붙어있다(괄호는 "왜 거기 있는지"를 나타내는 서술일 뿐, 실제로는 같은
+     * 장소). 예전에는 이 문자열을 완전 일치로만 비교해서, 예를 들어 상점 주인(전주인)의 낮
+     * 동선은 항상 "상점"으로만 기록되므로 "상점(근무)"/"상점(납품)"으로 표기된 자기 가게
+     * 사보타주에는 절대 목격자로 뽑힐 수 없었다 — 본인 상점이 털려도 본인은 그 사실을 알 방법이
+     * 아예 없는 버그였다. 괄호 앞부분만으로("기본 장소") 비교하도록 완화한다.
+     */
     private Npc findWitness(GameSession session, Npc culprit, String sabotageLocation) {
+        String baseLocation = baseLocation(sabotageLocation);
         List<Npc> candidates = npcRepository.findAll().stream()
                 .filter(npc -> !npc.getNpcId().equals(culprit.getNpcId()))
-                .filter(npc -> sabotageLocation.equals(locationResolver.resolveToday(session, npc)))
+                .filter(npc -> baseLocation.equals(baseLocation(locationResolver.resolveToday(session, npc))))
                 .toList();
         if (candidates.isEmpty()) {
             return null;
         }
         return candidates.get(random.nextInt(candidates.size()));
+    }
+
+    private String baseLocation(String location) {
+        int parenIndex = location.indexOf('(');
+        return parenIndex >= 0 ? location.substring(0, parenIndex).trim() : location;
     }
 
     private GameSession findSession(Long sessionId) {
