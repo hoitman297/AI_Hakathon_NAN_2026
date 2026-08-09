@@ -388,7 +388,11 @@ export class MainScene extends Phaser.Scene {
 
     if (this.hasWalkCycle) {
       const animKey = `walk-${direction}`
-      if (this.player.anims.currentAnim?.key !== animKey) {
+      // isPlaying도 같이 봐야 한다 — stopWalking()이 애니메이션을 멈추고 정지 이미지로 텍스처만
+      // 바꿔도 currentAnim.key 자체는 마지막 애니메이션 키로 남아있다. key만 비교하면, 걷다가
+      // 멈췄다가 같은 방향으로 다시 걸을 때 "키가 그대로니 이미 재생 중"이라고 착각해서
+      // play()를 다시 안 불러 정지 이미지에서 멈춰버리는 문제가 있었다.
+      if (!this.player.anims.isPlaying || this.player.anims.currentAnim?.key !== animKey) {
         this.player.play(animKey)
         this.player.setDisplaySize(PLAYER_IDLE_DISPLAY_SIZE, PLAYER_IDLE_DISPLAY_SIZE)
       }

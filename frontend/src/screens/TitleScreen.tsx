@@ -1,7 +1,8 @@
 import { useEffect, useRef } from 'react'
-import Phaser from 'phaser'
-import { MainScene } from '../game/MainScene'
+import { villageAssets } from '../assets/asset-manifest'
 import './TitleScreen.css'
+
+const BGM_SRC = '/assets/audio/bgm-samples/01-morning-fields.wav'
 
 interface TitleScreenProps {
   isLoggedIn: boolean
@@ -20,43 +21,31 @@ export function TitleScreen({
   onStartNewGame,
   onContinue,
 }: TitleScreenProps) {
-  const containerRef = useRef<HTMLDivElement>(null)
-  const gameRef = useRef<Phaser.Game | null>(null)
+  const audioRef = useRef<HTMLAudioElement>(null)
 
-  // 로그인 없이도 걸어다닐 수 있는 마을 맵을 타이틀 화면 배경으로 그대로 띄운다
-  // (initData 없이 시작하므로 MainScene은 자유 이동만 되는 미리보기 모드로 동작한다).
+  // 브라우저 자동재생 정책 때문에 사용자 입력 없이는 재생이 막힐 수 있다 — 마운트 시
+  // 한 번 시도하고, 막히면 첫 클릭/키 입력에 이어서 재생한다(MainScene의 BGM 처리와 동일한 패턴).
   useEffect(() => {
-    if (!containerRef.current || gameRef.current) return
+    const audio = audioRef.current
+    if (!audio) return
 
-    gameRef.current = new Phaser.Game({
-      type: Phaser.AUTO,
-      parent: containerRef.current,
-      width: 1280,
-      height: 720,
-      backgroundColor: '#17201a',
-      pixelArt: true,
-      roundPixels: true,
-      scale: {
-        mode: Phaser.Scale.RESIZE,
-        autoCenter: Phaser.Scale.CENTER_BOTH,
-      },
-      render: {
-        antialias: false,
-        pixelArt: true,
-        roundPixels: true,
-      },
-      scene: [MainScene],
-    })
+    const play = () => {
+      // jsdom(테스트 환경)의 play()는 Promise를 반환하지 않으므로 옵셔널 체이닝으로 방어한다.
+      audio.play()?.catch(() => undefined)
+    }
+    play()
+    window.addEventListener('pointerdown', play, { once: true })
+    window.addEventListener('keydown', play, { once: true })
 
     return () => {
-      gameRef.current?.destroy(true)
-      gameRef.current = null
+      window.removeEventListener('pointerdown', play)
+      window.removeEventListener('keydown', play)
     }
   }, [])
 
   return (
-    <div className="title-screen">
-      <div ref={containerRef} className="title-canvas" />
+    <div className="title-screen" style={{ backgroundImage: `url(${villageAssets.concept})` }}>
+      <audio ref={audioRef} src={BGM_SRC} loop />
       <div className="title-overlay" />
       <div className="title-content">
         <h1 className="title-logo">마을 사보타주 추리 게임</h1>
@@ -90,8 +79,6 @@ export function TitleScreen({
           </div>
         )}
       </div>
-
-      <p className="title-help">WASD / 방향키로 마을을 둘러볼 수 있어요</p>
     </div>
   )
 }
