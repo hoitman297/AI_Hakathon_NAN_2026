@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { getNightSummary, type NightSummary } from '../api/sabotageApi'
 import './NightTransitionScreen.css'
 
@@ -48,7 +48,6 @@ export function NightTransitionScreen({ sessionId, day, nextDay, onContinue }: N
   const [summary, setSummary] = useState<NightSummary | null>(null)
   const [phase, setPhase] = useState<Phase>('loading')
   const [confirmed, setConfirmed] = useState(false)
-  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => {
     getNightSummary(sessionId, day)
@@ -59,14 +58,10 @@ export function NightTransitionScreen({ sessionId, day, nextDay, onContinue }: N
         }
         setSummary(data)
         setPhase('scene')
-        timerRef.current = setTimeout(() => setPhase('popup'), 8000)
       })
       .catch(() => {
         setPhase('popup')
       })
-    return () => {
-      if (timerRef.current) clearTimeout(timerRef.current)
-    }
   }, [sessionId, day])
 
   const handleConfirm = () => {
@@ -148,7 +143,7 @@ export function NightTransitionScreen({ sessionId, day, nextDay, onContinue }: N
       <div className="ns-stage-wrapper">
         <div className="ns-day-badge">{day}일차 · 깊은 밤</div>
 
-        <div className="ns-stage" onClick={() => { if (timerRef.current) clearTimeout(timerRef.current); setPhase('popup') }}>
+        <div className="ns-stage">
           <div className="ns-bg" style={{ backgroundImage: `url('${bgSrc}')` }} />
 
           <div className="ns-stage-tag">{location}</div>
@@ -189,9 +184,11 @@ export function NightTransitionScreen({ sessionId, day, nextDay, onContinue }: N
           <div className="ns-fog-ground" aria-hidden />
 
           <div className="ns-stamp">사건 발생</div>
-
-          <div className="ns-click-hint">클릭하여 계속</div>
         </div>
+
+        <button className="pixel-button pixel-button--accent ns-skip-button" onClick={() => setPhase('popup')}>
+          넘기기
+        </button>
       </div>
     </div>
   )
