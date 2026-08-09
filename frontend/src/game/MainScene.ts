@@ -36,15 +36,12 @@ export interface MainSceneInitData {
   onNpcClick: (npcName: string, npcRole: string) => void
   /** 지도 위 장소(마을회관/상점/양계장 등)를 플레이어가 가까이서 클릭했을 때 spot.key를 보고한다. */
   onLocationClick: (spotKey: string) => void
-<<<<<<< HEAD
   /** 농장 밭 타일(0..FARM_PLOT_POSITIONS.length-1)을 가까이서 클릭했을 때 보고한다. */
   onFarmTileClick: (slotIndex: number) => void
   /** 채집 가능한 나무/덤불(과일 키)을 가까이서 클릭했을 때 보고한다. */
   onForageTreeClick: (fruitKey: string) => void
-=======
   /** 지금 미습득 단서가 있는 장소 스팟 키 목록(clueLocations.spotsWithPendingClue 결과). */
   clueSpots?: string[]
->>>>>>> master
 }
 
 const PLAYER_SPEED = 145
@@ -113,11 +110,7 @@ export class MainScene extends Phaser.Scene {
   private blockedTiles = new Set<string>()
   private mapData!: TerrainMapData
   private chickenCoop!: Phaser.GameObjects.Image
-<<<<<<< HEAD
   private watermelonField?: Phaser.GameObjects.Image
-=======
-  private watermelonField!: Phaser.GameObjects.Image
->>>>>>> master
   private chickens: Phaser.GameObjects.Image[] = []
   private clueMarkersBySpot = new Map<string, Phaser.GameObjects.Text>()
   private activeClueSpots = new Set<string>()
@@ -1336,12 +1329,12 @@ export class MainScene extends Phaser.Scene {
       .setDepth(10)
   }
 
-<<<<<<< HEAD
   /**
    * DayScreen이 "지금까지 사보타주가 발생한 장소" 목록을 넘겨줄 때 호출한다. 예전엔 양계장을
    * 클릭할 때마다(실제 피해 여부와 무관하게) 정상/파손 텍스처가 그냥 토글돼서, 실제로 사보타주가
    * 일어났는지와 화면에 보이는 상태가 서로 무관했다 — 이제 실제 SabotageEvent 발생 장소를
-   * 기준으로만 파손 상태를 반영한다.
+   * 기준으로만 파손 상태를 반영한다. setClueSpots()의 "❗ 단서 있음" 표시와는 별개 개념이라
+   * (이쪽은 단서를 습득해도 안 사라지는 영구 기록) 텍스처 갱신은 이 메서드가 전담한다.
    */
   syncSabotageDamage(damagedLocations: string[]) {
     // create()가 아직 끝나지 않은 시점(React 쪽 데이터가 이미지 로딩보다 먼저 도착한 경우)에
@@ -1353,7 +1346,8 @@ export class MainScene extends Phaser.Scene {
     this.chickenCoop.setTexture(coopDamaged ? 'chickenCoopBroken' : 'chickenCoopNormal')
     this.chickens.forEach((chicken) => chicken.setVisible(!coopDamaged))
     this.watermelonField?.setTexture(damaged.has('수박밭') ? 'watermelonFieldDamaged' : 'watermelonFieldNormal')
-=======
+  }
+
   /** 장소 스팟 위에 "미습득 단서 있음" 표시를 달아둔다 — 기본은 숨김, setClueSpots가 켠다. */
   private registerClueMarker(spotKey: string, x: number, y: number) {
     const marker = this.add
@@ -1374,22 +1368,12 @@ export class MainScene extends Phaser.Scene {
     this.clueMarkersBySpot.set(spotKey, marker)
   }
 
-  /**
-   * 지금 미습득 단서가 있는 장소 스팟 목록으로 지도 상태를 동기화한다 — 장소마다 "❗" 표시를
-   * 켜고, 전용 파손 텍스처가 있는 양계장/수박밭은 실제 파손 이미지로 바꾼다(예전엔 클릭할
-   * 때마다 로컬 상태만 토글하는 장식용이라 실제 사보타주 여부와 무관했다).
-   */
+  /** 지금 미습득 단서가 있는 장소 스팟 목록으로 "❗" 표시만 갱신한다(파손 텍스처는
+   *  syncSabotageDamage가 별도로 관리 — 단서를 습득해도 파손 흔적은 그대로 남아야 하므로 여기서
+   *  같이 건드리면 단서를 집는 순간 수박밭/양계장이 멀쩡해 보이는 퇴행이 생긴다). */
   setClueSpots(spotKeys: string[]) {
     this.activeClueSpots = new Set(spotKeys)
     this.clueMarkersBySpot.forEach((marker, spotKey) => marker.setVisible(this.activeClueSpots.has(spotKey)))
-
-    const coopBroken = this.activeClueSpots.has('chicken-coop')
-    this.chickenCoop?.setTexture(coopBroken ? 'chickenCoopBroken' : 'chickenCoopNormal')
-    this.chickens.forEach((chicken) => chicken.setVisible(!coopBroken))
-
-    const fieldDamaged = this.activeClueSpots.has('watermelon-field')
-    this.watermelonField?.setTexture(fieldDamaged ? 'watermelonFieldDamaged' : 'watermelonFieldNormal')
->>>>>>> master
   }
 
   private tryMove(nextX: number, nextY: number) {

@@ -13,8 +13,7 @@ import { NightLoadingOverlay } from '../components/NightLoadingOverlay'
 import { moveSession, getSabotageLocations, type SessionResponse } from '../api/sessionApi'
 import { listNpcsToday } from '../api/npcApi'
 import { listUnacquiredClues, acquireClue, topicLabel, type UnacquiredClue } from '../api/clueApi'
-<<<<<<< HEAD
-import { matchesLocationSpot } from '../game/clueLocations'
+import { matchesLocationSpot, spotsWithPendingClue } from '../game/clueLocations'
 import {
   listFarmPlots,
   plantCrop,
@@ -27,9 +26,6 @@ import {
 } from '../api/farmApi'
 import { listInventory, type InventorySlot } from '../api/inventoryApi'
 import { cropTextureKey, computeCropStage, FRUIT_NAME_TO_KEY } from '../game/farmVisuals'
-=======
-import { matchesLocationSpot, spotsWithPendingClue } from '../game/clueLocations'
->>>>>>> master
 import { villageAssets } from '../assets/asset-manifest'
 import './DayScreen.css'
 
@@ -361,12 +357,9 @@ export function DayScreen({
           .catch(() => {})
       },
       onLocationClick: handleLocationClick,
-<<<<<<< HEAD
       onFarmTileClick: handleFarmTileClick,
       onForageTreeClick: handleForageTreeClick,
-=======
       clueSpots: spotsWithPendingClue((unacquiredCluesRef.current ?? []).map((c) => c.location)),
->>>>>>> master
     }
     game.scene.start('MainScene', initData)
 
@@ -397,6 +390,7 @@ export function DayScreen({
       scene.syncFarmPlots(plotView)
       scene.syncForageTrees(availableFruitKeysRef.current)
       scene.syncSabotageDamage(sabotageLocationsRef.current)
+      scene.setClueSpots(spotsWithPendingClue((unacquiredCluesRef.current ?? []).map((c) => c.location)))
     }
     rafId = requestAnimationFrame(pushOnceReady)
 

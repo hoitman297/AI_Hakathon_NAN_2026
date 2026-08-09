@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { TitleScreen } from './screens/TitleScreen'
 import { LoginModal } from './screens/LoginModal'
 import { CharacterCreateScreen } from './screens/CharacterCreateScreen'
+import { ArrivalScreen } from './screens/ArrivalScreen'
 import { SaveSlotPicker } from './screens/SaveSlotPicker'
 import { DayScreen } from './screens/DayScreen'
 import { NightTransitionScreen } from './screens/NightTransitionScreen'
@@ -12,9 +13,9 @@ import { createSession, advanceDay, type SessionResponse } from './api/sessionAp
 import type { AccuseResult } from './api/accusationApi'
 import { getAuthToken, clearAuthToken } from './api/authToken'
 import { createDayChangeAutoSave } from './game/autoSave'
-import { setPlayerProfile, type CharacterGender } from './state/playerProfile'
+import { getPlayerProfile, setPlayerProfile, type CharacterGender } from './state/playerProfile'
 
-type Screen = 'title' | 'character-create' | 'save-select' | 'day' | 'night' | 'accusation' | 'ending'
+type Screen = 'title' | 'character-create' | 'arrival' | 'save-select' | 'day' | 'night' | 'accusation' | 'ending'
 
 function App() {
   const [screen, setScreen] = useState<Screen>('title')
@@ -89,7 +90,9 @@ function App() {
       const newSession = await createSession(nickname)
       setSession(newSession)
       autoSaveFnRef.current?.(newSession.currentDay)
-      setScreen('day')
+      // 새 게임을 막 시작했을 때만 오프닝 컷씬(마을 도착 장면)을 한 번 보여준다 — "이어서하기"로
+      // 기존 세이브를 불러올 때는 이미 마을에 있는 상태이므로 여기를 거치지 않고 바로 day로 간다.
+      setScreen('arrival')
     } catch (err) {
       setCreateError(err instanceof Error ? err.message : '게임 시작에 실패했습니다.')
     } finally {
@@ -165,6 +168,13 @@ function App() {
           onBack={() => setScreen('title')}
           submitting={creatingSession}
           error={createError}
+        />
+      )}
+
+      {screen === 'arrival' && session && (
+        <ArrivalScreen
+          nickname={getPlayerProfile()?.nickname ?? '당신'}
+          onContinue={() => setScreen('day')}
         />
       )}
 
