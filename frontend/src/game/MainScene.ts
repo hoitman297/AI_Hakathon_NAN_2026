@@ -838,6 +838,13 @@ export class MainScene extends Phaser.Scene {
     shopImage.on('pointerout', () => shopImage.clearTint())
     shopImage.on('pointerdown', () => this.handleLocationInteract('produce-shop', shop.x, shop.y))
     this.registerClueMarker('produce-shop', shop.x, shop.y)
+    this.add
+      .text(shop.x, shop.y - shopImage.displayHeight - 8, '씨앗 상점', {
+        fontFamily: 'sans-serif', fontSize: '15px', fontStyle: 'bold', color: '#fff5d6',
+        backgroundColor: '#5b3a1edd', padding: { x: 8, y: 4 },
+      })
+      .setOrigin(0.5, 1)
+      .setDepth(shop.y + 1)
     add('ruralMailbox1', 54.8, 19.2, 0.068, { width: 20, height: 14 })
 
     // Small cared-for vegetable plot left of the house.
@@ -942,7 +949,14 @@ export class MainScene extends Phaser.Scene {
 
     // Zone 3: the commercial corner. The item shop faces the northern road;
     // its small storage building sits farther east, leaving a service yard between.
-    building('itemShop', 14, 53, 0.34, 180, 55, false, 'item-shop')
+    const itemShopImage = building('itemShop', 14, 53, 0.34, 180, 55, false, 'item-shop')
+    this.add
+      .text(itemShopImage.x, itemShopImage.y - itemShopImage.displayHeight - 8, '아이템 상점', {
+        fontFamily: 'sans-serif', fontSize: '15px', fontStyle: 'bold', color: '#fff5d6',
+        backgroundColor: '#5b3a1edd', padding: { x: 8, y: 4 },
+      })
+      .setOrigin(0.5, 1)
+      .setDepth(itemShopImage.y + 1)
     prop('villageBicycle', 3.5, 55.5, 0.055, true)
     prop('newWildflower1', 24.2, 56.2, 0.027)
     prop('newWildflower4', 22.9, 57, 0.019, true)

@@ -22,6 +22,14 @@
   animation: arrival-fade-in 1.1s ease-out both;
 }
 
+.arrival-image-wrap {
+  position: relative;
+  display: inline-block;
+  max-width: 100vw;
+  max-height: 82vh;
+  line-height: 0;
+}
+
 .arrival-image {
   display: block;
   max-width: 100vw;
@@ -29,6 +37,37 @@
   width: auto;
   height: auto;
   image-rendering: pixelated;
+}
+
+/* 09-opening-arrival.png의 아래쪽 레터박스(전체 높이의 약 81~100%) 자리에 맞춰
+   캡션을 얹는다 — 이미지 안에 캡션을 직접 그려 넣으면 확대 시 글씨가 뭉개지므로
+   실제 텍스트로 그 위치에 겹쳐서 항상 선명하게 보이도록 한다. */
+.arrival-caption {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 81%;
+  bottom: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 0 5%;
+  text-align: center;
+  color: #fff8ec;
+}
+
+.arrival-caption-line1 {
+  margin: 0;
+  font-size: clamp(1rem, 2.1vw, 1.5rem);
+  font-weight: 700;
+}
+
+.arrival-caption-line2 {
+  margin: 0;
+  font-size: clamp(.8rem, 1.5vw, 1.1rem);
+  color: #e8ddc8;
 }
 
 .arrival-content {

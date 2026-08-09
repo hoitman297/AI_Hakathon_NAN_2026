@@ -10,6 +10,8 @@ import { ProduceShopPanel } from '../components/ProduceShopPanel'
 import { ItemShopPanel } from '../components/ItemShopPanel'
 import { SeedPickerPopup } from '../components/SeedPickerPopup'
 import { NightLoadingOverlay } from '../components/NightLoadingOverlay'
+import { Modal } from '../components/Modal'
+import { hasSeenSabotageGuide, markSabotageGuideSeen } from '../state/guideFlags'
 import { moveSession, getSabotageLocations, type SessionResponse } from '../api/sessionApi'
 import { listNpcsToday } from '../api/npcApi'
 import { listUnacquiredClues, acquireClue, topicLabel, type UnacquiredClue } from '../api/clueApi'
@@ -58,6 +60,9 @@ interface DayScreenProps {
   onAdvanceDay: () => void
   onOpenAccusation: () => void
   onQuitToTitle: () => void
+  /** 새 게임의 오프닝 컷씬 직후(1일차 진입 시)에만 true로 내려온다 — 1일차 가이드 창을 띄운다. */
+  showOpeningGuide?: boolean
+  onOpeningGuideShown?: () => void
 }
 
 export function DayScreen({
@@ -67,7 +72,11 @@ export function DayScreen({
   onAdvanceDay,
   onOpenAccusation,
   onQuitToTitle,
+  showOpeningGuide = false,
+  onOpeningGuideShown,
 }: DayScreenProps) {
+  const [day1GuideOpen, setDay1GuideOpen] = useState(showOpeningGuide)
+  const [sabotageGuideDismissed, setSabotageGuideDismissed] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
   const gameRef = useRef<Phaser.Game | null>(null)
   const [stamina, setStamina] = useState(() => session.staminaCurrent)
@@ -142,6 +151,12 @@ export function DayScreen({
       .catch((err: unknown) => console.error('미습득 단서 목록을 불러오지 못했습니다.', err))
   }
   useEffect(reloadUnacquiredClues, [session.sessionId])
+
+  // 첫 사보타주가 발생한 다음날(맵 위에 ❗ 단서 표시가 처음 뜨는 날) 딱 한 번, 그 사용법을
+  // 안내하는 가이드 창을 띄운다. 실제로 몇 일차에 뜨는지는 사보타주 발생 여부에 달려 있어
+  // 고정된 날짜 대신 "미습득 단서가 처음 생긴 시점"을 기준으로 삼는다.
+  const showSabotageGuide =
+    !sabotageGuideDismissed && !hasSeenSabotageGuide(session.sessionId) && (unacquiredClues?.length ?? 0) > 0
 
   function reloadFarmPlots() {
     listFarmPlots(session.sessionId)
@@ -576,6 +591,47 @@ export function DayScreen({
       {escOpen && <EscMenu onResume={() => setEscOpen(false)} onQuit={onQuitToTitle} />}
 
       {advancing && <NightLoadingOverlay />}
+
+      {day1GuideOpen && (
+        <Modal
+          title="마을 생활 안내"
+          actions={
+            <button
+              className="pixel-button pixel-button--accent"
+              onClick={() => {
+                setDay1GuideOpen(false)
+                onOpeningGuideShown?.()
+              }}
+            >
+              확인
+            </button>
+          }
+        >
+          <p>씨앗을 심어 농사를 지어보세요. 채집을 통해 과일을 얻을 수도 있습니다.</p>
+          <p>농사와 채집으로 얻은 음식은 체력 유지에 쓰거나, 상점에서 사고팔 수 있습니다.</p>
+          <p>음식을 팔고 얻은 골드로는 아이템 구매도 가능합니다.</p>
+        </Modal>
+      )}
+
+      {showSabotageGuide && (
+        <Modal
+          title="사건 발생"
+          actions={
+            <button
+              className="pixel-button pixel-button--accent"
+              onClick={() => {
+                markSabotageGuideSeen(session.sessionId)
+                setSabotageGuideDismissed(true)
+              }}
+            >
+              확인
+            </button>
+          }
+        >
+          <p>어젯밤, 마을에 사건이 발생했습니다. ❗ 표시가 있는 장소를 찾아가 보세요.</p>
+          <p>해당 장소에서 단서 카드를 발견할 수 있습니다.</p>
+        </Modal>
+      )}
     </div>
   )
 }
