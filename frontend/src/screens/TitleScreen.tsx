@@ -10,8 +10,7 @@ interface TitleScreenProps {
   onLogoutClick: () => void
   onStartNewGame: () => void
   onContinue: () => void
-  /** Older development branches still pass this prop. The deployed title menu does not render it. */
-  onVillagePreview?: () => void
+  onVillagePreview: () => void
 }
 
 export function TitleScreen({
@@ -21,6 +20,7 @@ export function TitleScreen({
   onLogoutClick,
   onStartNewGame,
   onContinue,
+  onVillagePreview,
 }: TitleScreenProps) {
   const audioRef = useRef<HTMLAudioElement>(null)
 
@@ -62,6 +62,10 @@ export function TitleScreen({
             </>
           )}
         </div>
+
+        <button className="pixel-button title-preview-button" type="button" onClick={onVillagePreview}>
+          로그인 없이 마을 화면 보기
+        </button>
 
         {isLoggedIn && (
           <div className="title-account">
