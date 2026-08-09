@@ -33,6 +33,12 @@ export interface MainSceneInitData {
 
 const PLAYER_SPEED = 145
 const WORLD_OBJECT_SCALE = 1
+const WALK_DIRECTIONS = ['south', 'south-east', 'east', 'north-east', 'north', 'north-west', 'west', 'south-west'] as const
+// player-boy-v2/player-girl-v2 Idle 이미지는 48x48로 만들어져 있고, 새로 추가된 player-male
+// 걷기 애니메이션 프레임은 92x92라 그대로 섞어 쓰면 걷기 시작/정지할 때마다 캐릭터 크기가
+// 튀어 보인다 — 항상 48px로 보이도록 걷기 텍스처 쪽만 이 비율로 축소한다.
+const PLAYER_IDLE_DISPLAY_SIZE = 48
+const PLAYER_WALK_FRAME_SIZE = 92
 // 기획서 체력 세부 수치(✅ 확정): 이동 초당 0.15 소모, 운동화 착용 시 초당 0.12(20% 감소).
 // 백엔드 GameConstants.MOVE_STAMINA_PER_SECOND(_WITH_SNEAKERS)와 값이 일치해야 한다.
 const MOVE_STAMINA_PER_SECOND = 0.15
@@ -51,7 +57,7 @@ const NPC_DAY_SCHEDULES = {
 } as const
 
 export class MainScene extends Phaser.Scene {
-  private player!: Phaser.GameObjects.Image
+  private player!: Phaser.GameObjects.Sprite
   private cursors!: Phaser.Types.Input.Keyboard.CursorKeys
   private movementKeys!: Record<'up' | 'down' | 'left' | 'right', Phaser.Input.Keyboard.Key>
   private blockedTiles = new Set<string>()
@@ -79,6 +85,10 @@ export class MainScene extends Phaser.Scene {
   private playerTexturePrefix: 'player' | 'player-girl' = 'player'
   private npcInteractRange = 0
   private locationInteractRange = 0
+  // player-male 걷기 애니메이션이 있는 캐릭터(현재는 남성 전용)인지 — 없으면 예전처럼
+  // 방향별 정지 이미지를 그대로 교체하는 식으로 표현한다.
+  private hasWalkCycle = false
+  private lastDirection: (typeof WALK_DIRECTIONS)[number] = 'south'
 
   constructor() {
     super('MainScene')
@@ -97,9 +107,15 @@ export class MainScene extends Phaser.Scene {
   preload() {
     this.load.image('terrainChunk', '/assets/world/maps/korean-countryside-chunk-01.png?v=no-road-expanded-field-v18')
     this.load.json('terrainMapData', '/assets/world/maps/korean-countryside-chunk-01.json?v=no-road-expanded-field-v18')
-    ;['south', 'south-east', 'east', 'north-east', 'north', 'north-west', 'west', 'south-west'].forEach((direction) => {
+    WALK_DIRECTIONS.forEach((direction) => {
       this.load.image(`player-${direction}`, `/assets/characters/player-boy-v2/Idle/rotations/${direction}.png`)
       this.load.image(`player-girl-${direction}`, `/assets/characters/player-girl-v2/Idle/rotations/${direction}.png`)
+      // 남성 캐릭터 전용 4프레임 걷기 애니메이션(여성용은 아직 원본 에셋이 없어 정지 이미지만 씀).
+      this.load.spritesheet(
+        `player-walk-${direction}`,
+        `/assets/characters/player-male/walk_cycle_all_directions/${direction}/${direction}_walk_sheet.png`,
+        { frameWidth: PLAYER_WALK_FRAME_SIZE, frameHeight: PLAYER_WALK_FRAME_SIZE },
+      )
     })
     this.load.image('ruralBridge', '/assets/world/bridge-rural-small-v2.png')
     this.load.image('chickenCoopNormal', '/assets/world/facilities/chicken-coop-normal.png')
@@ -182,6 +198,8 @@ export class MainScene extends Phaser.Scene {
     this.npcInteractRange = this.mapData.tileWidth * 2
     this.locationInteractRange = this.mapData.tileWidth * 2.5
     this.playerTexturePrefix = getPlayerProfile()?.gender === 'female' ? 'player-girl' : 'player'
+    this.hasWalkCycle = this.playerTexturePrefix === 'player'
+    this.registerPlayerWalkAnimations()
 
     this.add.image(0, 0, 'terrainChunk').setOrigin(0, 0)
     this.createBridge()
@@ -204,9 +222,9 @@ export class MainScene extends Phaser.Scene {
     )
 
     this.player = this.add
-      .image(spawnX, spawnY, `${this.playerTexturePrefix}-south`)
+      .sprite(spawnX, spawnY, `${this.playerTexturePrefix}-south`)
       .setDepth(spawnY)
-      .setScale(1)
+      .setDisplaySize(PLAYER_IDLE_DISPLAY_SIZE, PLAYER_IDLE_DISPLAY_SIZE)
     this.createWorldLighting()
 
     this.cursors = this.input.keyboard!.createCursorKeys()
@@ -253,7 +271,10 @@ export class MainScene extends Phaser.Scene {
     this.updateWorldShadows()
     this.updateRiverShimmers(delta)
     if (this.inputLocked) return
-    if (this.initData && this.stamina <= 0) return
+    if (this.initData && this.stamina <= 0) {
+      this.stopWalking()
+      return
+    }
 
     const left = this.cursors.left.isDown || this.movementKeys.left.isDown
     const right = this.cursors.right.isDown || this.movementKeys.right.isDown
@@ -262,7 +283,10 @@ export class MainScene extends Phaser.Scene {
 
     let dx = Number(right) - Number(left)
     let dy = Number(down) - Number(up)
-    if (dx === 0 && dy === 0) return
+    if (dx === 0 && dy === 0) {
+      this.stopWalking()
+      return
+    }
 
     const length = Math.hypot(dx, dy)
     dx /= length
@@ -341,11 +365,44 @@ export class MainScene extends Phaser.Scene {
     }
   }
 
+  /** 8방향 걷기 애니메이션(player-walk-*)을 씬 시작 시 한 번만 등록한다. */
+  private registerPlayerWalkAnimations() {
+    WALK_DIRECTIONS.forEach((direction) => {
+      const key = `walk-${direction}`
+      if (this.anims.exists(key)) return
+      this.anims.create({
+        key,
+        frames: this.anims.generateFrameNumbers(`player-walk-${direction}`, { start: 0, end: 3 }),
+        frameRate: 10,
+        repeat: -1,
+      })
+    })
+  }
+
   private setPlayerDirection(dx: number, dy: number) {
     const horizontal = dx < -0.35 ? 'west' : dx > 0.35 ? 'east' : ''
     const vertical = dy < -0.35 ? 'north' : dy > 0.35 ? 'south' : ''
     const direction = vertical && horizontal ? `${vertical}-${horizontal}` : vertical || horizontal
-    if (direction) this.player.setTexture(`${this.playerTexturePrefix}-${direction}`)
+    if (!direction) return
+    this.lastDirection = direction as (typeof WALK_DIRECTIONS)[number]
+
+    if (this.hasWalkCycle) {
+      const animKey = `walk-${direction}`
+      if (this.player.anims.currentAnim?.key !== animKey) {
+        this.player.play(animKey)
+        this.player.setDisplaySize(PLAYER_IDLE_DISPLAY_SIZE, PLAYER_IDLE_DISPLAY_SIZE)
+      }
+    } else {
+      this.player.setTexture(`${this.playerTexturePrefix}-${direction}`)
+    }
+  }
+
+  /** 이동을 멈추면 걷기 애니메이션을 정지하고, 마지막으로 보던 방향의 정지 이미지로 되돌린다. */
+  private stopWalking() {
+    if (!this.hasWalkCycle || !this.player.anims.isPlaying) return
+    this.player.anims.stop()
+    this.player.setTexture(`${this.playerTexturePrefix}-${this.lastDirection}`)
+    this.player.setDisplaySize(PLAYER_IDLE_DISPLAY_SIZE, PLAYER_IDLE_DISPLAY_SIZE)
   }
 
   private createFarmAreaObjects() {
