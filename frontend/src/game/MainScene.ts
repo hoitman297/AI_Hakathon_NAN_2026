@@ -47,22 +47,15 @@ export interface MainSceneInitData {
 const PLAYER_SPEED = 145
 const WORLD_OBJECT_SCALE = 1
 const WALK_DIRECTIONS = ['south', 'south-east', 'east', 'north-east', 'north', 'north-west', 'west', 'south-west'] as const
-// player-boy-v2/player-girl-v2 Idle 이미지는 48x48로 만들어져 있고, 새로 추가된 player-male
-// 걷기 애니메이션 프레임은 92x92라 그대로 섞어 쓰면 걷기 시작/정지할 때마다 캐릭터 크기가
-// 튀어 보인다 — 항상 48px로 보이도록 걷기 텍스처 쪽만 이 비율로 축소한다.
+// player-male 걷기 애니메이션 프레임은 92x92라, 항상 48px로 보이도록 걷기 텍스처 쪽만
+// 이 비율로 축소한다.
 const PLAYER_IDLE_DISPLAY_SIZE = 48
 const PLAYER_WALK_FRAME_SIZE = 92
-// 여성 정지 이미지는 48x48 캔버스에 남캐 걷기 프레임(92x92, 24% 정도 여백)보다 여백 없이
-// 꽉 차게 그려져 있어, 같은 48px로 맞추면 상대적으로 작고 밋밋해 보인다는 피드백이 있었다
-// — 남캐와 체감 크기를 맞추기 위해 여성만 살짝 더 크게 표시한다.
+// 여성(walk_cycle_character2) 걷기 프레임은 48x48 원본이라 남캐(92x92, 24% 정도 여백)보다
+// 여백 없이 꽉 차게 그려져 있어, 같은 48px로 맞추면 상대적으로 작고 밋밋해 보인다는 피드백이
+// 있었다 — 남캐와 체감 크기를 맞추기 위해 여성만 살짝 더 크게 표시한다.
 const FEMALE_IDLE_DISPLAY_SIZE = 54
-// 여성 캐릭터는 아직 걷기 프레임 원본 에셋이 없어서, 정지 이미지(player-girl-v2)를 방향별로
-// 그대로 쓰면서 걷는 동안만 통통 튀는 스쿼시&스트레치 트윈으로 움직임을 표현한다. 스케일
-// 변화폭이 너무 크면(과거 0.88/1.06) 걷는 동안 순간적으로 쪼그라드는 것처럼 보여 어색하다는
-// 피드백을 받아 폭을 줄였다.
-const FEMALE_WALK_BOUNCE_DURATION = 220
-const FEMALE_WALK_BOUNCE_SCALE_Y = 0.95
-const FEMALE_WALK_BOUNCE_SCALE_X = 1.03
+const FEMALE_WALK_FRAME_SIZE = 48
 // 기획서 체력 세부 수치(✅ 확정): 이동 초당 0.15 소모, 운동화 착용 시 초당 0.12(20% 감소).
 // 백엔드 GameConstants.MOVE_STAMINA_PER_SECOND(_WITH_SNEAKERS)와 값이 일치해야 한다.
 const MOVE_STAMINA_PER_SECOND = 0.15
@@ -142,15 +135,9 @@ export class MainScene extends Phaser.Scene {
   private npcInteractRange = 0
   private locationInteractRange = 0
   private lastDirection: (typeof WALK_DIRECTIONS)[number] = 'south'
-  // 남성은 player-male 걷기 스프라이트시트로 실제 프레임 애니메이션을 재생하고, 여성은
-  // 아직 걷기 프레임 에셋이 없어 정지 이미지 + 스쿼시&스트레치 트윈으로 움직임을 표현한다.
+  // 남성은 player-male, 여성은 walk_cycle_character2 걷기 스프라이트시트로 각각 실제
+  // 프레임 애니메이션을 재생한다(둘 다 8방향 4프레임, registerPlayerWalkAnimations 참고).
   private isFemalePlayer = false
-  private femaleWalkTween?: Phaser.Tweens.Tween
-  // setDisplaySize(FEMALE_IDLE_DISPLAY_SIZE)가 48x48 원본 텍스처에 실제로 적용한 배율.
-  // startFemaleWalkBounce()의 scaleX/scaleY 트윈이 이 배율을 무시하고 절대값(0.95/1.03 등)을
-  // 그대로 넣으면, setDisplaySize가 이미 키워둔 배율을 트윈이 덮어써서 걷는 동안 오히려
-  // 작아 보이는 역효과가 난다 — 이 배율을 곱해서 상대적으로만 통통 튀게 한다.
-  private femaleBaseScale = 1
 
   constructor() {
     super('MainScene')
@@ -170,15 +157,18 @@ export class MainScene extends Phaser.Scene {
     this.load.image('terrainChunk', '/assets/world/maps/korean-countryside-chunk-01.png?v=no-road-expanded-field-v18')
     this.load.json('terrainMapData', '/assets/world/maps/korean-countryside-chunk-01.json?v=no-road-expanded-field-v18')
     WALK_DIRECTIONS.forEach((direction) => {
-      this.load.image(`player-girl-${direction}`, `/assets/characters/player-girl-v2/Idle/rotations/${direction}.png`)
-      // 남성 전용 4프레임 걷기 애니메이션(여성용은 아직 원본 에셋이 없어 정지 이미지 + 트윈으로 대체).
-      // 정지 포즈도 이 스프라이트시트의 0번 프레임을 그대로 쓴다(따로 정지 이미지 에셋을 안 씀) —
-      // 예전엔 정지 상태만 다른 화풍의 player-boy-v2 이미지를 써서 걷기 시작/정지할 때마다
-      // 캐릭터 생김새가 바뀌어 보이는 문제가 있었다.
+      // 남녀 각각 8방향 4프레임 걷기 애니메이션. 정지 포즈도 이 스프라이트시트의 0번
+      // 프레임을 그대로 쓴다(따로 정지 이미지 에셋을 안 씀) — 예전엔 정지 상태만 다른
+      // 화풍의 이미지를 써서 걷기 시작/정지할 때마다 캐릭터 생김새가 바뀌어 보이는 문제가 있었다.
       this.load.spritesheet(
         `player-walk-${direction}`,
         `/assets/characters/player-male/walk_cycle_all_directions/${direction}/${direction}_walk_sheet.png`,
         { frameWidth: PLAYER_WALK_FRAME_SIZE, frameHeight: PLAYER_WALK_FRAME_SIZE },
+      )
+      this.load.spritesheet(
+        `player-walk-girl-${direction}`,
+        `/assets/characters/walk_cycle_character2_all_directions/${direction}/${direction}_walk_sheet.png`,
+        { frameWidth: FEMALE_WALK_FRAME_SIZE, frameHeight: FEMALE_WALK_FRAME_SIZE },
       )
     })
     this.load.image('ruralBridge', '/assets/world/bridge-rural-small-v2.png')
@@ -288,15 +278,10 @@ export class MainScene extends Phaser.Scene {
       (blocker) => !Phaser.Geom.Intersects.RectangleToRectangle(blocker, spawnSafetyArea),
     )
 
-    const [initialTexture, initialFrame] = this.isFemalePlayer
-      ? [`player-girl-south`, undefined]
-      : [`player-walk-south`, 0]
+    const initialTexture = this.isFemalePlayer ? 'player-walk-girl-south' : 'player-walk-south'
     const initialDisplaySize = this.isFemalePlayer ? FEMALE_IDLE_DISPLAY_SIZE : PLAYER_IDLE_DISPLAY_SIZE
-    // 여성 정지 이미지 원본이 48x48이므로, FEMALE_IDLE_DISPLAY_SIZE가 실제로 적용하는 배율을
-    // 걷기 바운스 트윈(startFemaleWalkBounce)이 상대적으로 곱해 쓸 수 있게 미리 계산해둔다.
-    this.femaleBaseScale = this.isFemalePlayer ? FEMALE_IDLE_DISPLAY_SIZE / 48 : 1
     this.player = this.add
-      .sprite(spawnX, spawnY, initialTexture, initialFrame)
+      .sprite(spawnX, spawnY, initialTexture, 0)
       .setDepth(spawnY)
       .setDisplaySize(initialDisplaySize, initialDisplaySize)
     this.createWorldLighting()
@@ -446,18 +431,30 @@ export class MainScene extends Phaser.Scene {
     }
   }
 
-  /** 8방향 걷기 애니메이션(player-walk-*)을 씬 시작 시 한 번만 등록한다. */
+  /** 남녀 각각 8방향 걷기 애니메이션(player-walk-, player-walk-girl-)을 씬 시작 시 한 번만 등록한다. */
   private registerPlayerWalkAnimations() {
     WALK_DIRECTIONS.forEach((direction) => {
-      const key = `walk-${direction}`
-      if (this.anims.exists(key)) return
-      this.anims.create({
-        key,
-        frames: this.anims.generateFrameNumbers(`player-walk-${direction}`, { start: 0, end: 3 }),
-        frameRate: 10,
-        repeat: -1,
+      ;[
+        { key: `walk-${direction}`, texture: `player-walk-${direction}` },
+        { key: `walk-girl-${direction}`, texture: `player-walk-girl-${direction}` },
+      ].forEach(({ key, texture }) => {
+        if (this.anims.exists(key)) return
+        this.anims.create({
+          key,
+          frames: this.anims.generateFrameNumbers(texture, { start: 0, end: 3 }),
+          frameRate: 10,
+          repeat: -1,
+        })
       })
     })
+  }
+
+  private playerWalkTexturePrefix(): string {
+    return this.isFemalePlayer ? 'player-walk-girl-' : 'player-walk-'
+  }
+
+  private playerIdleDisplaySize(): number {
+    return this.isFemalePlayer ? FEMALE_IDLE_DISPLAY_SIZE : PLAYER_IDLE_DISPLAY_SIZE
   }
 
   private setPlayerDirection(dx: number, dy: number) {
@@ -467,39 +464,15 @@ export class MainScene extends Phaser.Scene {
     if (!direction) return
     this.lastDirection = direction as (typeof WALK_DIRECTIONS)[number]
 
-    if (this.isFemalePlayer) {
-      // 방향 전환마다 텍스처만 바꾼다 — 여성 정지 이미지는 8방향 모두 48x48로 크기가
-      // 같아서 setDisplaySize를 매 프레임 다시 부를 필요가 없고, 그걸 매 프레임 부르면
-      // startFemaleWalkBounce()가 돌리는 scaleX/scaleY 트윈을 매 프레임 1:1로 되돌려버려
-      // 바운스가 안 보이게 된다.
-      this.player.setTexture(`player-girl-${direction}`)
-      this.startFemaleWalkBounce()
-      return
-    }
-
-    const animKey = `walk-${direction}`
+    const animKey = this.isFemalePlayer ? `walk-girl-${direction}` : `walk-${direction}`
     // isPlaying도 같이 봐야 한다 — stopWalking()이 애니메이션을 멈추고 정지 이미지로 텍스처만
     // 바꿔도 currentAnim.key 자체는 마지막 애니메이션 키로 남아있다. key만 비교하면, 걷다가
     // 멈췄다가 같은 방향으로 다시 걸을 때 "키가 그대로니 이미 재생 중"이라고 착각해서
     // play()를 다시 안 불러 정지 이미지에서 멈춰버리는 문제가 있었다.
     if (!this.player.anims.isPlaying || this.player.anims.currentAnim?.key !== animKey) {
       this.player.play(animKey)
-      this.player.setDisplaySize(PLAYER_IDLE_DISPLAY_SIZE, PLAYER_IDLE_DISPLAY_SIZE)
+      this.player.setDisplaySize(this.playerIdleDisplaySize(), this.playerIdleDisplaySize())
     }
-  }
-
-  /** 여성 캐릭터가 걷는 동안 재생할 스쿼시&스트레치 바운스 트윈을 (아직 안 돌고 있으면) 시작한다. */
-  private startFemaleWalkBounce() {
-    if (this.femaleWalkTween?.isPlaying()) return
-    this.femaleWalkTween = this.tweens.add({
-      targets: this.player,
-      scaleY: this.femaleBaseScale * FEMALE_WALK_BOUNCE_SCALE_Y,
-      scaleX: this.femaleBaseScale * FEMALE_WALK_BOUNCE_SCALE_X,
-      duration: FEMALE_WALK_BOUNCE_DURATION,
-      yoyo: true,
-      repeat: -1,
-      ease: 'Sine.easeInOut',
-    })
   }
 
   /**
@@ -508,18 +481,10 @@ export class MainScene extends Phaser.Scene {
    * 캐릭터 생김새가 서로 다른 에셋이라 달라 보이지 않게 하기 위함.
    */
   private stopWalking() {
-    if (this.isFemalePlayer) {
-      if (!this.femaleWalkTween?.isPlaying()) return
-      this.femaleWalkTween.stop()
-      this.player.setTexture(`player-girl-${this.lastDirection}`)
-      this.player.setDisplaySize(FEMALE_IDLE_DISPLAY_SIZE, FEMALE_IDLE_DISPLAY_SIZE)
-      return
-    }
-
     if (!this.player.anims.isPlaying) return
     this.player.anims.stop()
-    this.player.setTexture(`player-walk-${this.lastDirection}`, 0)
-    this.player.setDisplaySize(PLAYER_IDLE_DISPLAY_SIZE, PLAYER_IDLE_DISPLAY_SIZE)
+    this.player.setTexture(`${this.playerWalkTexturePrefix()}${this.lastDirection}`, 0)
+    this.player.setDisplaySize(this.playerIdleDisplaySize(), this.playerIdleDisplaySize())
   }
 
   private createFarmAreaObjects() {
