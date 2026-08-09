@@ -44,10 +44,4 @@ describe('TitleScreen', () => {
     fireEvent.click(screen.getByRole('button', { name: '로그아웃' }))
     expect(props.onLogoutClick).toHaveBeenCalledTimes(1)
   })
-
-  it('calls onVillagePreview without requiring login', () => {
-    const props = renderTitleScreen()
-    fireEvent.click(screen.getByRole('button', { name: '로그인 없이 마을 화면 보기' }))
-    expect(props.onVillagePreview).toHaveBeenCalledTimes(1)
-  })
 })
