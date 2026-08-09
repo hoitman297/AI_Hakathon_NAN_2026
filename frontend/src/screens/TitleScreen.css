@@ -2,12 +2,20 @@
   position: relative;
   width: 100vw;
   height: 100vh;
-  background-size: cover;
-  background-position: center;
   display: flex;
   align-items: center;
   justify-content: center;
   overflow: hidden;
+  background: #17201a;
+}
+
+.title-canvas,
+.title-canvas canvas {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
 }
 
 .title-overlay {
@@ -42,13 +50,6 @@
   justify-content: center;
 }
 
-.title-preview-button {
-  margin-top: 14px;
-  border-color: #d5bd84;
-  color: #fff8ec;
-  background: rgba(59, 43, 32, 0.9);
-}
-
 .title-account {
   margin-top: 24px;
   font-size: 0.85rem;
@@ -63,4 +64,20 @@
   cursor: pointer;
   font: inherit;
   padding: 0;
+}
+
+.title-help {
+  position: absolute;
+  left: 50%;
+  bottom: 16px;
+  z-index: 1;
+  transform: translateX(-50%);
+  padding: 8px 14px;
+  border: 2px solid #3b2b20;
+  border-radius: 8px;
+  color: #fff8ec;
+  background: rgba(48, 39, 31, 0.88);
+  font-size: 13px;
+  line-height: 1;
+  pointer-events: none;
 }

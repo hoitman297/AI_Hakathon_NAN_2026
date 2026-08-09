@@ -2,6 +2,25 @@ import type { ComponentProps } from 'react'
 import { fireEvent, render, screen } from '@testing-library/react'
 import { TitleScreen } from './TitleScreen'
 
+// TitleScreen이 배경으로 마을 미리보기(MainScene)를 Phaser 캔버스로 마운트하는데, jsdom에는
+// 실제 2D/WebGL 캔버스 컨텍스트가 없어서(canvas npm 패키지 미설치) 진짜 Phaser를 그대로 로드하면
+// 모듈 로드 시점에 렌더러 기능 감지 코드가 곧바로 터진다. 이 테스트는 버튼/오버레이 UI만
+// 검증하면 되므로 Phaser 자체를 가볍게 목킹한다.
+vi.mock('phaser', () => {
+  class MockScene {}
+  class MockGame {
+    destroy = vi.fn()
+  }
+  return {
+    default: {
+      AUTO: 0,
+      Scale: { RESIZE: 0, CENTER_BOTH: 0 },
+      Game: MockGame,
+      Scene: MockScene,
+    },
+  }
+})
+
 function renderTitleScreen(overrides: Partial<ComponentProps<typeof TitleScreen>> = {}) {
   const props = {
     isLoggedIn: false,
@@ -10,7 +29,6 @@ function renderTitleScreen(overrides: Partial<ComponentProps<typeof TitleScreen>
     onLogoutClick: vi.fn(),
     onStartNewGame: vi.fn(),
     onContinue: vi.fn(),
-    onVillagePreview: vi.fn(),
     ...overrides,
   }
   render(<TitleScreen {...props} />)
@@ -50,14 +68,6 @@ describe('TitleScreen', () => {
 
     expect(props.onStartNewGame).toHaveBeenCalledTimes(1)
     expect(props.onContinue).toHaveBeenCalledTimes(1)
-  })
-
-  it('calls onVillagePreview without requiring login', () => {
-    const props = renderTitleScreen({ isLoggedIn: false })
-
-    fireEvent.click(screen.getByRole('button', { name: '로그인 없이 마을 화면 보기' }))
-
-    expect(props.onVillagePreview).toHaveBeenCalledTimes(1)
   })
 
   it('calls onLogoutClick from the account line when logged in', () => {
