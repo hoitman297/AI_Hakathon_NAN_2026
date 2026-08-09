@@ -22,13 +22,16 @@ const NEEDS_TARGET_NPC = new Set(['거짓말탐지기', '선물세트'])
 // (SabotageEvent 주석 참고). 조회 API가 없어 프론트에 하드코딩했다.
 const TOTAL_CLUES = 5
 
-// 장소별로 미리 만들어둔 완성형 단서 카드(프레임+삽화+캡션이 이미 합쳐진 이미지, ui/missions
-// 폴더 참고). 사보타주 장소 종류가 몇 개 안 돼서 장소별 삽화를 재사용한다 — 단서 하나하나마다
-// 새로 생성하지 않는다. 매칭되는 장소가 없으면 빈 카드 프레임(mission-card-active.png) 위에
-// 기존 텍스트를 그대로 보여준다.
-const CLUE_LOCATION_ILLUSTRATION: Record<string, string> = {
-  양계장: '/assets/ui/missions/examples/example-chicken-coop-investigation.png',
-  수박밭: '/assets/ui/missions/examples/example-watermelon-field-investigation.png',
+// 단서 주제(ClueTopic) 5종 전용으로 미리 만들어둔 완성형 카드(프레임+삽화+캡션이 이미
+// 합쳐진 이미지, ui/missions/topics 폴더). 장소(location)는 값이 없거나 매칭 안 되는
+// 경우가 있었지만 topic은 모든 단서에 항상 존재해서 이쪽이 훨씬 안정적이다 — 5종 전부
+// 커버되므로 매칭 안 되는 경우를 위한 빈 프레임 폴백만 남겨둔다(사실상 안 쓰일 안전망).
+const CLUE_TOPIC_ILLUSTRATION: Record<string, string> = {
+  HAIR: '/assets/ui/missions/topics/topic-hair.png',
+  BELONGING: '/assets/ui/missions/topics/topic-belonging.png',
+  FOOTPRINT: '/assets/ui/missions/topics/topic-footprint.png',
+  BLOOD: '/assets/ui/missions/topics/topic-blood.png',
+  MARK: '/assets/ui/missions/topics/topic-mark.png',
 }
 const CLUE_CARD_BLANK_FRAME = '/assets/ui/missions/mission-card-active.png'
 
@@ -385,11 +388,10 @@ export function InventoryHubPanel({ sessionId, currentDay, onStaminaChange, onCl
           }
         >
           <img
-            className={`clue-detail-image${(selectedSlot.location && CLUE_LOCATION_ILLUSTRATION[selectedSlot.location]) ? '' : ' clue-detail-image--blank'}`}
-            src={(selectedSlot.location && CLUE_LOCATION_ILLUSTRATION[selectedSlot.location]) || CLUE_CARD_BLANK_FRAME}
-            alt={selectedSlot.location ?? '단서 카드'}
+            className={`clue-detail-image${CLUE_TOPIC_ILLUSTRATION[selectedSlot.clue.topic] ? '' : ' clue-detail-image--blank'}`}
+            src={CLUE_TOPIC_ILLUSTRATION[selectedSlot.clue.topic] ?? CLUE_CARD_BLANK_FRAME}
+            alt={topicLabel(selectedSlot.clue.topic)}
           />
-          <div className="clue-detail-topic">{topicLabel(selectedSlot.clue.topic)}</div>
           <p className="clue-card-text">
             {selectedSlot.clue.clarified
               ? selectedSlot.clue.text
