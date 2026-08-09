@@ -122,7 +122,16 @@ public class SessionService {
         GameSession session = findSession(sessionId);
         return sabotageEventRepository.findBySessionAndDay(session, day).stream()
                 .findFirst()
-                .map(event -> new NightSummaryResponse(event.getLocation(), event.getSummaryText()));
+                .map(event -> new NightSummaryResponse(event.getLocation(), event.getSummaryText(), toSceneType(event.getType())));
+    }
+
+    private String toSceneType(com.gameproject.backend.domain.SabotageType type) {
+        if (type == null) return "theft";
+        return switch (type) {
+            case THEFT -> "theft";
+            case DAMAGE -> "vandalism";
+            case DISRUPTION -> "sabotage";
+        };
     }
 
     /**

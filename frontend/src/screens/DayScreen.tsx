@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import Phaser from 'phaser'
 import { gameConfig } from '../game/config'
-import { DayScene, type DaySceneInitData } from '../game/DayScene'
+import { MainScene, type MainSceneInitData } from '../game/MainScene'
 import { StaminaBar } from '../components/StaminaBar'
 import { DialogueBox } from '../components/DialogueBox'
 import { EscMenu } from '../components/EscMenu'
@@ -10,7 +10,7 @@ import { NightLoadingOverlay } from '../components/NightLoadingOverlay'
 import { moveSession, type SessionResponse } from '../api/sessionApi'
 import { listNpcsToday } from '../api/npcApi'
 import { listUnacquiredClues, acquireClue, topicLabel, type UnacquiredClue } from '../api/clueApi'
-import { matchesLocationSpot } from '../game/clueLocations'
+import { matchesLocationSpot, spotsWithPendingClue } from '../game/clueLocations'
 import { villageAssets } from '../assets/asset-manifest'
 import './DayScreen.css'
 
@@ -160,8 +160,8 @@ export function DayScreen({
 
     const game = new Phaser.Game({ ...gameConfig, parent: containerRef.current })
     gameRef.current = game
-    game.scene.add('DayScene', DayScene, false)
-    const initData: DaySceneInitData = {
+    game.scene.add('MainScene', MainScene, false)
+    const initData: MainSceneInitData = {
       day: session.currentDay,
       staminaCurrent: session.staminaCurrent,
       staminaMax: session.staminaMax,
@@ -188,8 +188,9 @@ export function DayScreen({
           .catch(() => {})
       },
       onLocationClick: handleLocationClick,
+      clueSpots: spotsWithPendingClue((unacquiredCluesRef.current ?? []).map((c) => c.location)),
     }
-    game.scene.start('DayScene', initData)
+    game.scene.start('MainScene', initData)
 
     return () => {
       game.destroy(true)
@@ -199,7 +200,7 @@ export function DayScreen({
   }, [session.currentDay])
 
   useEffect(() => {
-    const scene = gameRef.current?.scene.getScene('DayScene') as DayScene | undefined
+    const scene = gameRef.current?.scene.getScene('MainScene') as MainScene | undefined
     scene?.setInputLocked(!!dialogueNpc || escOpen || inventoryOpen || advancing)
   }, [dialogueNpc, escOpen, inventoryOpen, advancing])
 
@@ -208,9 +209,16 @@ export function DayScreen({
   // 자기가 들고 있던 오래된 값으로 되돌려버리는 문제(대화창을 닫고 걸으면 체력이 도로 올라가는
   // 현상)가 있었다.
   useEffect(() => {
-    const scene = gameRef.current?.scene.getScene('DayScene') as DayScene | undefined
+    const scene = gameRef.current?.scene.getScene('MainScene') as MainScene | undefined
     scene?.syncStamina(stamina)
   }, [stamina])
+
+  // 미습득 단서 목록이 바뀔 때마다(최초 로딩, 습득 후 재조회) 지도 위 "❗" 표시와 양계장/수박밭
+  // 파손 텍스처를 실제 사보타주 상태와 맞춘다.
+  useEffect(() => {
+    const scene = gameRef.current?.scene.getScene('MainScene') as MainScene | undefined
+    scene?.setClueSpots(spotsWithPendingClue((unacquiredClues ?? []).map((clue) => clue.location)))
+  }, [unacquiredClues])
 
   useEffect(() => {
     function handleKeyDown(event: KeyboardEvent) {

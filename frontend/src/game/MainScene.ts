@@ -1,5 +1,8 @@
 import Phaser from 'phaser'
 
+import { NPC_ROSTER } from '../types/npc'
+import { getPlayerProfile } from '../state/playerProfile'
+
 type TilePoint = { x: number; y: number }
 
 type TerrainMapData = {
@@ -15,8 +18,35 @@ type TerrainMapData = {
   collision: { blockedTiles: TilePoint[] }
 }
 
+export interface MainSceneInitData {
+  day: number
+  staminaCurrent: number
+  staminaMax: number
+  sneakersEquipped: boolean
+  onStaminaChange: (value: number) => void
+  /** 이동으로 실제 경과한 시간(초)을 주기적으로 보고 — 서버가 초당 소모량을 반영해 체력을 깎는다. */
+  onMove: (seconds: number) => void
+  onNpcClick: (npcName: string, npcRole: string) => void
+  /** 지도 위 장소(마을회관/상점/양계장 등)를 플레이어가 가까이서 클릭했을 때 spot.key를 보고한다. */
+  onLocationClick: (spotKey: string) => void
+  /** 지금 미습득 단서가 있는 장소 스팟 키 목록(clueLocations.spotsWithPendingClue 결과). */
+  clueSpots?: string[]
+}
+
 const PLAYER_SPEED = 145
 const WORLD_OBJECT_SCALE = 1
+const WALK_DIRECTIONS = ['south', 'south-east', 'east', 'north-east', 'north', 'north-west', 'west', 'south-west'] as const
+// player-boy-v2/player-girl-v2 Idle 이미지는 48x48로 만들어져 있고, 새로 추가된 player-male
+// 걷기 애니메이션 프레임은 92x92라 그대로 섞어 쓰면 걷기 시작/정지할 때마다 캐릭터 크기가
+// 튀어 보인다 — 항상 48px로 보이도록 걷기 텍스처 쪽만 이 비율로 축소한다.
+const PLAYER_IDLE_DISPLAY_SIZE = 48
+const PLAYER_WALK_FRAME_SIZE = 92
+// 기획서 체력 세부 수치(✅ 확정): 이동 초당 0.15 소모, 운동화 착용 시 초당 0.12(20% 감소).
+// 백엔드 GameConstants.MOVE_STAMINA_PER_SECOND(_WITH_SNEAKERS)와 값이 일치해야 한다.
+const MOVE_STAMINA_PER_SECOND = 0.15
+const MOVE_STAMINA_PER_SECOND_WITH_SNEAKERS = 0.12
+// 이동 체력 소모를 이 정도 간격(초)으로 모아서 서버에 보고한다 — 매 프레임 호출하지 않는다.
+const MOVE_REPORT_INTERVAL_SECONDS = 1
 
 const NPC_DAY_SCHEDULES = {
   hyeonSudong: { primary: 'village-hall', primaryChance: 0.7, secondary: ['village-entrance', 'pavilion'], secondaryChance: [0.2, 0.1] },
@@ -29,13 +59,16 @@ const NPC_DAY_SCHEDULES = {
 } as const
 
 export class MainScene extends Phaser.Scene {
-  private player!: Phaser.GameObjects.Image
+  private player!: Phaser.GameObjects.Sprite
   private cursors!: Phaser.Types.Input.Keyboard.CursorKeys
   private movementKeys!: Record<'up' | 'down' | 'left' | 'right', Phaser.Input.Keyboard.Key>
   private blockedTiles = new Set<string>()
   private mapData!: TerrainMapData
   private chickenCoop!: Phaser.GameObjects.Image
+  private watermelonField!: Phaser.GameObjects.Image
   private chickens: Phaser.GameObjects.Image[] = []
+  private clueMarkersBySpot = new Map<string, Phaser.GameObjects.Text>()
+  private activeClueSpots = new Set<string>()
   private villageAnimals: Phaser.GameObjects.Image[] = []
   private shadowPairs: Array<{ object: Phaser.GameObjects.Image; shadow: Phaser.GameObjects.Image }> = []
   private riverShimmers: Array<{
@@ -45,19 +78,50 @@ export class MainScene extends Phaser.Scene {
     lane: number
   }> = []
   private opaqueBottomPadding = new Map<string, number>()
-  private coopBroken = false
   private objectBlockers: Phaser.Geom.Rectangle[] = []
+
+  // initData가 있으면(실제 게임플레이) 체력 소모/이동 보고/NPC·장소 클릭 콜백이 활성화된다.
+  // 없으면(타이틀 화면의 로그인 없는 마을 미리보기) 지금처럼 자유 이동만 가능하다.
+  private initData?: MainSceneInitData
+  private stamina = 0
+  private inputLocked = false
+  private pendingMovedSeconds = 0
+  private playerTexturePrefix: 'player' | 'player-girl' = 'player'
+  private npcInteractRange = 0
+  private locationInteractRange = 0
+  // player-male 걷기 애니메이션이 있는 캐릭터(현재는 남성 전용)인지 — 없으면 예전처럼
+  // 방향별 정지 이미지를 그대로 교체하는 식으로 표현한다.
+  private hasWalkCycle = false
+  private lastDirection: (typeof WALK_DIRECTIONS)[number] = 'south'
 
   constructor() {
     super('MainScene')
   }
 
+  init(data?: MainSceneInitData) {
+    // Phaser는 scene.start(key)에 데이터 없이 호출해도(=미리보기 모드) init()에 빈 객체를
+    // 넘길 수 있어서, 존재 여부가 아니라 실제 콜백 필드로 "진짜 게임플레이 데이터인지"를 판단한다.
+    this.initData = data && typeof data.onNpcClick === 'function' ? data : undefined
+    if (this.initData) {
+      this.stamina = this.initData.staminaCurrent
+    }
+    this.pendingMovedSeconds = 0
+  }
+
   preload() {
     this.load.image('terrainChunk', '/assets/world/maps/korean-countryside-chunk-01.png?v=no-road-expanded-field-v18')
     this.load.json('terrainMapData', '/assets/world/maps/korean-countryside-chunk-01.json?v=no-road-expanded-field-v18')
-    ;['south', 'south-east', 'east', 'north-east', 'north', 'north-west', 'west', 'south-west'].forEach((direction) => {
-      this.load.image(`player-${direction}`, `/assets/characters/player-boy-v2/Idle/rotations/${direction}.png`)
+    WALK_DIRECTIONS.forEach((direction) => {
       this.load.image(`player-girl-${direction}`, `/assets/characters/player-girl-v2/Idle/rotations/${direction}.png`)
+      // 남성 캐릭터 전용 4프레임 걷기 애니메이션(여성용은 아직 원본 에셋이 없어 정지 이미지만 씀).
+      // 정지 포즈도 이 스프라이트시트의 0번 프레임을 그대로 쓴다(따로 정지 이미지 에셋을 안 씀) —
+      // 예전엔 정지 상태만 다른 화풍의 player-boy-v2 이미지를 써서 걷기 시작/정지할 때마다
+      // 캐릭터 생김새가 바뀌어 보이는 문제가 있었다.
+      this.load.spritesheet(
+        `player-walk-${direction}`,
+        `/assets/characters/player-male/walk_cycle_all_directions/${direction}/${direction}_walk_sheet.png`,
+        { frameWidth: PLAYER_WALK_FRAME_SIZE, frameHeight: PLAYER_WALK_FRAME_SIZE },
+      )
     })
     this.load.image('ruralBridge', '/assets/world/bridge-rural-small-v2.png')
     this.load.image('chickenCoopNormal', '/assets/world/facilities/chicken-coop-normal.png')
@@ -121,6 +185,7 @@ export class MainScene extends Phaser.Scene {
     this.load.image('kimHouse', '/assets/world/buildings/houses/house-6.png')
     this.load.image('baksuHouse', '/assets/world/buildings/houses/house-3.png')
     this.load.image('watermelonFieldNormal', '/assets/world/facilities/watermelon-field-normal.png')
+    this.load.image('watermelonFieldDamaged', '/assets/world/facilities/watermelon-field-damaged.png')
     this.load.image('jeonJuin', '/assets/characters/npcs/npc-03/Idle/rotations/south.png')
     this.load.image('parkYounggye', '/assets/characters/npcs/npc-04/Idle/rotations/south.png')
     this.load.image('myeongJayu', '/assets/characters/npcs/npc-05/Idle/rotations/south.png')
@@ -137,6 +202,11 @@ export class MainScene extends Phaser.Scene {
     this.blockedTiles = new Set(
       this.mapData.collision.blockedTiles.map(({ x, y }) => `${x},${y}`),
     )
+    this.npcInteractRange = this.mapData.tileWidth * 2
+    this.locationInteractRange = this.mapData.tileWidth * 2.5
+    this.playerTexturePrefix = getPlayerProfile()?.gender === 'female' ? 'player-girl' : 'player'
+    this.hasWalkCycle = this.playerTexturePrefix === 'player'
+    this.registerPlayerWalkAnimations()
 
     this.add.image(0, 0, 'terrainChunk').setOrigin(0, 0)
     this.createBridge()
@@ -150,6 +220,7 @@ export class MainScene extends Phaser.Scene {
     this.createEnvironmentalDensity()
     this.createRemainingZones()
     this.createVillageAnimals()
+    this.setClueSpots(this.initData?.clueSpots ?? [])
 
     // Keep a guaranteed walkable pocket around the initial spawn. Decorative
     // collision rectangles must never trap the player before the first input.
@@ -158,7 +229,13 @@ export class MainScene extends Phaser.Scene {
       (blocker) => !Phaser.Geom.Intersects.RectangleToRectangle(blocker, spawnSafetyArea),
     )
 
-    this.player = this.add.image(spawnX, spawnY, 'player-south').setDepth(spawnY).setScale(1)
+    const [initialTexture, initialFrame] = this.hasWalkCycle
+      ? [`player-walk-south`, 0]
+      : [`${this.playerTexturePrefix}-south`, undefined]
+    this.player = this.add
+      .sprite(spawnX, spawnY, initialTexture, initialFrame)
+      .setDepth(spawnY)
+      .setDisplaySize(PLAYER_IDLE_DISPLAY_SIZE, PLAYER_IDLE_DISPLAY_SIZE)
     this.createWorldLighting()
 
     this.cursors = this.input.keyboard!.createCursorKeys()
@@ -177,11 +254,39 @@ export class MainScene extends Phaser.Scene {
     this.startMorningFieldsBgm()
     this.startSparrowFlocks()
     this.startRiverSparkles()
+
+    // 씬을 벗어날 때(밤으로 전환 등) 아직 서버에 보고 안 된 이동 시간이 남아있으면 마저 보고한다.
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.flushPendingMove())
+  }
+
+  /**
+   * 대화창/ESC 메뉴가 열려 있는 동안 호출된다. Phaser는 기본적으로 WASD/방향키를
+   * 캔버스에서 전역으로 캡처(preventDefault)해서, 잠그지 않으면 채팅 입력창에 같은
+   * 글자를 입력할 수 없고(예: "a") 배경에서 캐릭터도 계속 움직인다.
+   */
+  setInputLocked(locked: boolean) {
+    this.inputLocked = locked
+    if (locked) {
+      this.input.keyboard?.disableGlobalCapture()
+    } else {
+      this.input.keyboard?.enableGlobalCapture()
+    }
+  }
+
+  /** 대화/아이템 사용/농사 등 이 씬 바깥에서 체력이 바뀌었을 때 내부 값도 맞춰준다. */
+  syncStamina(value: number) {
+    this.stamina = value
   }
 
   update(_time: number, delta: number) {
     this.updateWorldShadows()
     this.updateRiverShimmers(delta)
+    if (this.inputLocked) return
+    if (this.initData && this.stamina <= 0) {
+      this.stopWalking()
+      return
+    }
+
     const left = this.cursors.left.isDown || this.movementKeys.left.isDown
     const right = this.cursors.right.isDown || this.movementKeys.right.isDown
     const up = this.cursors.up.isDown || this.movementKeys.up.isDown
@@ -189,7 +294,10 @@ export class MainScene extends Phaser.Scene {
 
     let dx = Number(right) - Number(left)
     let dy = Number(down) - Number(up)
-    if (dx === 0 && dy === 0) return
+    if (dx === 0 && dy === 0) {
+      this.stopWalking()
+      return
+    }
 
     const length = Math.hypot(dx, dy)
     dx /= length
@@ -200,13 +308,120 @@ export class MainScene extends Phaser.Scene {
     this.tryMove(this.player.x + dx * distance, this.player.y)
     this.tryMove(this.player.x, this.player.y + dy * distance)
     this.player.setDepth(this.player.y)
+
+    // 정지 시 소모 없음 — 실제로 움직인 프레임에서만 경과 시간(초)만큼 체력을 깎는다.
+    if (this.initData) {
+      const deltaSeconds = delta / 1000
+      const ratePerSecond = this.initData.sneakersEquipped
+        ? MOVE_STAMINA_PER_SECOND_WITH_SNEAKERS
+        : MOVE_STAMINA_PER_SECOND
+      this.stamina = Math.max(0, this.stamina - ratePerSecond * deltaSeconds)
+      this.initData.onStaminaChange(this.stamina)
+
+      this.pendingMovedSeconds += deltaSeconds
+      if (this.pendingMovedSeconds >= MOVE_REPORT_INTERVAL_SECONDS) {
+        this.flushPendingMove()
+      }
+    }
+  }
+
+  private flushPendingMove() {
+    if (!this.initData) return
+    if (this.pendingMovedSeconds <= 0) return
+    this.initData.onMove(this.pendingMovedSeconds)
+    this.pendingMovedSeconds = 0
+  }
+
+  /** NPC/장소와 너무 멀리 떨어진 채로 클릭했을 때, 그 위치 위에 잠깐 안내 문구를 띄웠다가 지운다. */
+  private showFloatingHint(x: number, y: number, text: string) {
+    const hint = this.add
+      .text(x, y, text, {
+        fontSize: '11px',
+        color: '#fff8ec',
+        backgroundColor: '#b23a2fcc',
+        padding: { x: 4, y: 2 },
+      })
+      .setOrigin(0.5, 1)
+      .setDepth(1_000_001)
+
+    this.tweens.add({
+      targets: hint,
+      alpha: 0,
+      delay: 700,
+      duration: 400,
+      onComplete: () => hint.destroy(),
+    })
+  }
+
+  /** 게임플레이 모드에서만 동작 — 거리 안이면 대화 콜백, 멀면 안내 힌트. */
+  private handleNpcInteract(name: string, x: number, y: number) {
+    if (!this.initData) return
+    const distance = Phaser.Math.Distance.Between(this.player.x, this.player.y, x, y)
+    if (distance <= this.npcInteractRange) {
+      const role = NPC_ROSTER.find((entry) => entry.name === name)?.role ?? ''
+      this.initData.onNpcClick(name, role)
+    } else {
+      this.showFloatingHint(x, y - this.mapData.tileHeight, '너무 멀어요! 가까이 가주세요')
+    }
+  }
+
+  /** 게임플레이 모드에서만 동작 — 거리 안이면 장소 클릭 콜백(단서 습득/고발), 멀면 안내 힌트. */
+  private handleLocationInteract(spotKey: string, x: number, y: number) {
+    if (!this.initData) return
+    const distance = Phaser.Math.Distance.Between(this.player.x, this.player.y, x, y)
+    if (distance <= this.locationInteractRange) {
+      this.initData.onLocationClick(spotKey)
+    } else {
+      this.showFloatingHint(x, y - this.mapData.tileHeight, '너무 멀어요! 가까이 가주세요')
+    }
+  }
+
+  /** 8방향 걷기 애니메이션(player-walk-*)을 씬 시작 시 한 번만 등록한다. */
+  private registerPlayerWalkAnimations() {
+    WALK_DIRECTIONS.forEach((direction) => {
+      const key = `walk-${direction}`
+      if (this.anims.exists(key)) return
+      this.anims.create({
+        key,
+        frames: this.anims.generateFrameNumbers(`player-walk-${direction}`, { start: 0, end: 3 }),
+        frameRate: 10,
+        repeat: -1,
+      })
+    })
   }
 
   private setPlayerDirection(dx: number, dy: number) {
     const horizontal = dx < -0.35 ? 'west' : dx > 0.35 ? 'east' : ''
     const vertical = dy < -0.35 ? 'north' : dy > 0.35 ? 'south' : ''
     const direction = vertical && horizontal ? `${vertical}-${horizontal}` : vertical || horizontal
-    if (direction) this.player.setTexture(`player-${direction}`)
+    if (!direction) return
+    this.lastDirection = direction as (typeof WALK_DIRECTIONS)[number]
+
+    if (this.hasWalkCycle) {
+      const animKey = `walk-${direction}`
+      // isPlaying도 같이 봐야 한다 — stopWalking()이 애니메이션을 멈추고 정지 이미지로 텍스처만
+      // 바꿔도 currentAnim.key 자체는 마지막 애니메이션 키로 남아있다. key만 비교하면, 걷다가
+      // 멈췄다가 같은 방향으로 다시 걸을 때 "키가 그대로니 이미 재생 중"이라고 착각해서
+      // play()를 다시 안 불러 정지 이미지에서 멈춰버리는 문제가 있었다.
+      if (!this.player.anims.isPlaying || this.player.anims.currentAnim?.key !== animKey) {
+        this.player.play(animKey)
+        this.player.setDisplaySize(PLAYER_IDLE_DISPLAY_SIZE, PLAYER_IDLE_DISPLAY_SIZE)
+      }
+    } else {
+      this.player.setTexture(`${this.playerTexturePrefix}-${direction}`)
+    }
+  }
+
+  /**
+   * 이동을 멈추면 걷기 애니메이션을 정지하고, 마지막으로 보던 방향의 정지 포즈로 되돌린다.
+   * 정지 포즈도 같은 걷기 스프라이트시트의 0번 프레임을 그대로 쓴다 — 걷는 중/멈췄을 때
+   * 캐릭터 생김새가 서로 다른 에셋이라 달라 보이지 않게 하기 위함.
+   */
+  private stopWalking() {
+    if (!this.hasWalkCycle || !this.player.anims.isPlaying) return
+    this.player.anims.stop()
+    this.player.setTexture(`player-walk-${this.lastDirection}`, 0)
+    this.player.setDisplaySize(PLAYER_IDLE_DISPLAY_SIZE, PLAYER_IDLE_DISPLAY_SIZE)
   }
 
   private createFarmAreaObjects() {
@@ -231,8 +446,9 @@ export class MainScene extends Phaser.Scene {
       .setInteractive({ useHandCursor: true })
     this.chickenCoop.on('pointerover', () => this.chickenCoop.setTint(0xfff1b5))
     this.chickenCoop.on('pointerout', () => this.chickenCoop.clearTint())
-    this.chickenCoop.on('pointerdown', () => this.toggleChickenCoop())
+    this.chickenCoop.on('pointerdown', () => this.handleLocationInteract('chicken-coop', coopX, coopY))
     this.objectBlockers.push(new Phaser.Geom.Rectangle(coopX - 90, coopY - 72, 180, 72))
+    this.registerClueMarker('chicken-coop', coopX, coopY)
 
     const chickenSpecs: Array<[number, number, string, number, number]> = [
       [110.5, 26, 'chickenFront', 0, 0],
@@ -280,8 +496,13 @@ export class MainScene extends Phaser.Scene {
 
     // 1구역(좌상단): 회관을 중심으로 어귀와 정자가 연결되는 작은 생활권입니다.
     const hall = at(18, 18)
-    this.add.image(hall.x, hall.y, 'villageHall').setOrigin(0.5, 1).setScale(0.22).setDepth(hall.y)
+    const hallImage = this.add.image(hall.x, hall.y, 'villageHall').setOrigin(0.5, 1).setScale(0.22).setDepth(hall.y)
     this.objectBlockers.push(new Phaser.Geom.Rectangle(hall.x - 164, hall.y - 82, 328, 78))
+    hallImage.setInteractive({ useHandCursor: true })
+    hallImage.on('pointerover', () => hallImage.setTint(0xfff1b5))
+    hallImage.on('pointerout', () => hallImage.clearTint())
+    hallImage.on('pointerdown', () => this.handleLocationInteract('village-hall', hall.x, hall.y))
+    this.registerClueMarker('village-hall', hall.x, hall.y)
 
     const pavilion = at(40, 40)
     this.add
@@ -320,6 +541,7 @@ export class MainScene extends Phaser.Scene {
       .setDepth(npcLocation.y + 1)
     hyeon.on('pointerover', () => hyeon.setTint(0xfff1b5))
     hyeon.on('pointerout', () => hyeon.clearTint())
+    hyeon.on('pointerdown', () => this.handleNpcInteract('현수동', npcLocation.x, npcLocation.y))
 
   }
 
@@ -435,12 +657,22 @@ export class MainScene extends Phaser.Scene {
     // Zone 2: Najubu's home garden occupies the quieter western half while the
     // produce shop faces the road to the east. Both retain clear front paths.
     const home = at(48, 18)
-    this.add.image(home.x, home.y, 'najubuHouse').setOrigin(0.5, 1).setScale(0.4).setDepth(home.y)
+    const homeImage = this.add.image(home.x, home.y, 'najubuHouse').setOrigin(0.5, 1).setScale(0.4).setDepth(home.y)
     this.objectBlockers.push(new Phaser.Geom.Rectangle(home.x - 100, home.y - 64, 200, 62))
+    homeImage.setInteractive({ useHandCursor: true })
+    homeImage.on('pointerover', () => homeImage.setTint(0xfff1b5))
+    homeImage.on('pointerout', () => homeImage.clearTint())
+    homeImage.on('pointerdown', () => this.handleLocationInteract('house1', home.x, home.y))
+    this.registerClueMarker('house1', home.x, home.y)
 
     const shop = at(76, 19)
-    this.add.image(shop.x, shop.y, 'produceShop').setOrigin(0.5, 1).setScale(0.38).setDepth(shop.y)
+    const shopImage = this.add.image(shop.x, shop.y, 'produceShop').setOrigin(0.5, 1).setScale(0.38).setDepth(shop.y)
     this.objectBlockers.push(new Phaser.Geom.Rectangle(shop.x - 104, shop.y - 64, 208, 62))
+    shopImage.setInteractive({ useHandCursor: true })
+    shopImage.on('pointerover', () => shopImage.setTint(0xfff1b5))
+    shopImage.on('pointerout', () => shopImage.clearTint())
+    shopImage.on('pointerdown', () => this.handleLocationInteract('produce-shop', shop.x, shop.y))
+    this.registerClueMarker('produce-shop', shop.x, shop.y)
     add('ruralMailbox1', 54.8, 19.2, 0.068, { width: 20, height: 14 })
 
     // Small cared-for vegetable plot left of the house.
@@ -474,6 +706,7 @@ export class MainScene extends Phaser.Scene {
       .setDepth(npcLocation.y + 1)
     najubu.on('pointerover', () => najubu.setTint(0xfff1b5))
     najubu.on('pointerout', () => najubu.clearTint())
+    najubu.on('pointerdown', () => this.handleNpcInteract('나주부', npcLocation.x, npcLocation.y))
     nameTag.setVisible(true)
   }
 
@@ -488,12 +721,21 @@ export class MainScene extends Phaser.Scene {
       blockerWidth: number,
       blockerHeight: number,
       flipX = false,
+      spotKey?: string,
     ) => {
       const { x, y } = at(tileX, tileY)
-      this.add.image(x, y, texture).setOrigin(0.5, 1).setScale(scale).setFlipX(flipX).setDepth(y)
+      const image = this.add.image(x, y, texture).setOrigin(0.5, 1).setScale(scale).setFlipX(flipX).setDepth(y)
       this.objectBlockers.push(
         new Phaser.Geom.Rectangle(x - blockerWidth / 2, y - blockerHeight, blockerWidth, blockerHeight),
       )
+      if (spotKey) {
+        image.setInteractive({ useHandCursor: true })
+        image.on('pointerover', () => image.setTint(0xfff1b5))
+        image.on('pointerout', () => image.clearTint())
+        image.on('pointerdown', () => this.handleLocationInteract(spotKey, x, y))
+        this.registerClueMarker(spotKey, x, y)
+      }
+      return image
     }
     const prop = (texture: string, tileX: number, tileY: number, scale: number, flipX = false) => {
       const { x, y } = at(tileX, tileY)
@@ -530,11 +772,12 @@ export class MainScene extends Phaser.Scene {
         .setDepth(y + 1)
       character.on('pointerover', () => character.setTint(0xfff1b5))
       character.on('pointerout', () => character.clearTint())
+      character.on('pointerdown', () => this.handleNpcInteract(name, x, y))
     }
 
     // Zone 3: the commercial corner. The item shop faces the northern road;
     // its small storage building sits farther east, leaving a service yard between.
-    building('itemShop', 14, 53, 0.34, 180, 55)
+    building('itemShop', 14, 53, 0.34, 180, 55, false, 'item-shop')
     prop('villageBicycle', 3.5, 55.5, 0.055, true)
     prop('newWildflower1', 24.2, 56.2, 0.027)
     prop('newWildflower4', 22.9, 57, 0.019, true)
@@ -546,7 +789,7 @@ export class MainScene extends Phaser.Scene {
     npc('parkYounggye', '박영계', 101, 38.6, NPC_DAY_SCHEDULES.parkYounggye)
 
     // Zone 7: Myeong Jayu's quiet home and small, maintained side garden.
-    building('myeongHouse', 27, 84, 0.34, 160, 50)
+    building('myeongHouse', 27, 84, 0.34, 160, 50, false, 'house2')
     prop('woodFence', 17.5, 84.3, 0.12)
     prop('stoneFlowerBed', 14.8, 87.5, 0.052)
     prop('onggiJars', 34.5, 82.8, 0.08)
@@ -568,7 +811,7 @@ export class MainScene extends Phaser.Scene {
     prop('newWildflower4', 64, 85, 0.025)
 
     // Zone 9: a dedicated watermelon plot with the farmer's home on its east edge.
-    building('watermelonFieldNormal', 104, 82, 0.28, 215, 65)
+    this.watermelonField = building('watermelonFieldNormal', 104, 82, 0.28, 215, 65, false, 'watermelon-field')
     prop('scarecrow', 99, 79.5, 0.15)
     prop('woodFence', 94, 84.5, 0.13)
     prop('woodFence', 113.5, 84.4, 0.13, true)
@@ -921,10 +1164,41 @@ export class MainScene extends Phaser.Scene {
       .setDepth(10)
   }
 
-  private toggleChickenCoop() {
-    this.coopBroken = !this.coopBroken
-    this.chickenCoop.setTexture(this.coopBroken ? 'chickenCoopBroken' : 'chickenCoopNormal')
-    this.chickens.forEach((chicken) => chicken.setVisible(!this.coopBroken))
+  /** 장소 스팟 위에 "미습득 단서 있음" 표시를 달아둔다 — 기본은 숨김, setClueSpots가 켠다. */
+  private registerClueMarker(spotKey: string, x: number, y: number) {
+    const marker = this.add
+      .text(x, y - this.mapData.tileHeight * 1.6, '❗', {
+        fontFamily: 'sans-serif', fontSize: '22px', color: '#fff08a',
+      })
+      .setOrigin(0.5, 1)
+      .setDepth(y + 2)
+      .setVisible(false)
+    this.tweens.add({
+      targets: marker,
+      y: marker.y - 6,
+      duration: 620,
+      yoyo: true,
+      repeat: -1,
+      ease: 'Sine.easeInOut',
+    })
+    this.clueMarkersBySpot.set(spotKey, marker)
+  }
+
+  /**
+   * 지금 미습득 단서가 있는 장소 스팟 목록으로 지도 상태를 동기화한다 — 장소마다 "❗" 표시를
+   * 켜고, 전용 파손 텍스처가 있는 양계장/수박밭은 실제 파손 이미지로 바꾼다(예전엔 클릭할
+   * 때마다 로컬 상태만 토글하는 장식용이라 실제 사보타주 여부와 무관했다).
+   */
+  setClueSpots(spotKeys: string[]) {
+    this.activeClueSpots = new Set(spotKeys)
+    this.clueMarkersBySpot.forEach((marker, spotKey) => marker.setVisible(this.activeClueSpots.has(spotKey)))
+
+    const coopBroken = this.activeClueSpots.has('chicken-coop')
+    this.chickenCoop?.setTexture(coopBroken ? 'chickenCoopBroken' : 'chickenCoopNormal')
+    this.chickens.forEach((chicken) => chicken.setVisible(!coopBroken))
+
+    const fieldDamaged = this.activeClueSpots.has('watermelon-field')
+    this.watermelonField?.setTexture(fieldDamaged ? 'watermelonFieldDamaged' : 'watermelonFieldNormal')
   }
 
   private tryMove(nextX: number, nextY: number) {

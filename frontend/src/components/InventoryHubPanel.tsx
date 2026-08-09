@@ -373,7 +373,11 @@ export function InventoryHubPanel({ sessionId, currentDay, onStaminaChange, onCl
             🗂️
           </div>
           <div className="clue-detail-topic">{topicLabel(selectedSlot.clue.topic)}</div>
-          <p className="clue-card-text">{selectedSlot.clue.text}</p>
+          <p className="clue-card-text">
+            {selectedSlot.clue.clarified
+              ? selectedSlot.clue.text
+              : `${topicLabel(selectedSlot.clue.topic)}이 발견됐다.`}
+          </p>
         </Modal>
       )}
     </div>

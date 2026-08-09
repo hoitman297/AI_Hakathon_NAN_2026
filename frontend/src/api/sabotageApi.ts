@@ -4,6 +4,7 @@ import { API_BASE_URL } from './config'
 export interface NightSummary {
   location: string
   summaryText: string | null
+  sabotageType: 'theft' | 'vandalism' | 'sabotage'
 }
 
 function authHeaders(): HeadersInit {

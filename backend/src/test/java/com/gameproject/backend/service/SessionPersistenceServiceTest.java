@@ -103,9 +103,12 @@ class SessionPersistenceServiceTest {
         PlayerStat today = PlayerStat.builder().session(session).day(2)
                 .staminaCurrent(40.0).staminaMax(100).gold(10).fainted(false).build();
         when(playerStatRepository.findBySessionAndDay(session, 2)).thenReturn(Optional.of(today));
-        NpcCaseAssignment assignment = NpcCaseAssignment.builder().session(session).npc(culprit).build();
+        // 실제 세션에선 primaryType이 NOT NULL로 항상 채워진다(culprit "나박수"의 주 유형은
+        // CulpritProfileRegistry 기준 DAMAGE) — 대상 풀 선택이 이제 이 값에 좌우되므로 명시한다.
+        NpcCaseAssignment assignment = NpcCaseAssignment.builder().session(session).npc(culprit)
+                .primaryType(com.gameproject.backend.domain.SabotageType.DAMAGE).build();
         when(caseAssignmentRepository.findBySession(session)).thenReturn(Optional.of(assignment));
-        when(sabotageEventRepository.findBySessionAndDay(session, 1)).thenReturn(List.of());
+        when(sabotageEventRepository.findBySession(session)).thenReturn(List.of());
         // 범인 본인 말고 다른 NPC가 없으니 목격자는 항상 없음(null) — 랜덤으로 뽑히는 장소와
         // 무관하게 결정적으로 테스트할 수 있다.
         when(npcRepository.findAll()).thenReturn(List.of(culprit));
