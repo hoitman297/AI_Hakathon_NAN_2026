@@ -53,11 +53,27 @@ export function NightTransitionScreen({ sessionId, day, nextDay, onContinue }: N
   const [phase, setPhase] = useState<Phase>('loading')
   const [confirmed, setConfirmed] = useState(false)
   const audioRef = useRef<HTMLAudioElement>(null)
+  // 아래 effect 안에서만 최신 onContinue를 읽으려고 ref로 든다 — App.tsx가 매 렌더마다 새
+  // 화살표 함수를 내려주는데, 그걸 그대로 deps에 넣으면 이 effect(사보타주 여부 조회)가
+  // 불필요하게 다시 실행돼 API를 중복 호출하게 된다.
+  const onContinueRef = useRef(onContinue)
+  useEffect(() => {
+    onContinueRef.current = onContinue
+  }, [onContinue])
 
   useEffect(() => {
+    // 8·9일차로 넘어갈 때는 "잡히지 않은 범인이 사보타주를 일으켰습니다" 알림(DayScreen)이
+    // 그날 진입 직후 따로 뜬다 — 여기서 "오늘 밤은 무사히 지나갔다"까지 겹쳐 보이면 같은 날
+    // 두 팝업이 서로 모순돼 보인다. 그래서 이 밤에 정규 사보타주가 없었다면(대부분 그렇다,
+    // 정규 사보타주는 1~5일차 밤에만 있음) 이 화면 자체를 건너뛰고 바로 낮으로 넘어간다.
+    const skipNoSabotagePopup = nextDay === 8 || nextDay === 9
     getNightSummary(sessionId, day)
       .then(data => {
         if (!data) {
+          if (skipNoSabotagePopup) {
+            onContinueRef.current()
+            return
+          }
           setPhase('popup')
           return
         }
@@ -65,9 +81,13 @@ export function NightTransitionScreen({ sessionId, day, nextDay, onContinue }: N
         setPhase('scene')
       })
       .catch(() => {
+        if (skipNoSabotagePopup) {
+          onContinueRef.current()
+          return
+        }
         setPhase('popup')
       })
-  }, [sessionId, day])
+  }, [sessionId, day, nextDay])
 
   // 사건이 있었던 밤(scene/popup with summary)에만 긴장감 BGM 재생 — "평온했던 밤"(summary
   // 없음)엔 안 튼다. 브라우저 자동재생 정책 때문에 마운트 시 1차 시도 + 실패하면 첫
@@ -108,7 +128,7 @@ export function NightTransitionScreen({ sessionId, day, nextDay, onContinue }: N
   if (!summary || phase === 'popup') {
     const meta = summary ? TYPE_META[summary.sabotageType] : null
     const location = summary ? summary.location || meta!.fallbackLocation : null
-    const bodyText = meta ? `${location}에서 ${meta.badge}.` : '마을은 오늘 밤은 평온했던 것 같다.'
+    const bodyText = meta ? `${location}에서 ${meta.badge}.` : '오늘 밤은 무사히 지나갔다.'
 
     return (
       <div className="ns-root">

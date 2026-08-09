@@ -30,6 +30,8 @@ function App() {
 
   const [advancing, setAdvancing] = useState(false)
   const [advanceError, setAdvanceError] = useState<string | null>(null)
+  // handleAdvanceDay 참고 — 같은 렌더 틱 안의 중복 호출을 막기 위한 동기 플래그.
+  const advanceInFlightRef = useRef(false)
 
   // 오프닝 컷씬(ArrivalScreen) 바로 다음에만 1일차 가이드 창을 띄운다 — "이어서하기"로
   // 기존 세이브를 불러올 때는 이 플래그가 세워지지 않으므로 뜨지 않는다.
@@ -110,7 +112,15 @@ function App() {
   }
 
   async function handleAdvanceDay() {
-    if (!session) return
+    // "집으로 돌아가기" 버튼은 advancing으로 막지만, 고발 결과 화면의 확인 버튼처럼 별도
+    // 경로로 호출되는 곳은 그 state를 못 보고 지나칠 수 있다 — 특히 오답 확인 버튼을 빠르게
+    // 두 번 누르면 이 함수가 같은 렌더 틱에 두 번 호출돼(advancing state가 아직 반영되기
+    // 전) 서버에 advance-day가 중복 호출됐다. 7·8일차라면 하루를 건너뛰는 정도로 끝나지만,
+    // 9일차에 중복 호출되면 두 번째 호출이 이미 9일차로 넘어간 세션을 다시 읽어 "9일차에도
+    // 고발 안 하고 넘김"으로 오판, 고발할 틈도 없이 배드엔딩 처리하는 버그로 이어졌다.
+    // ref는 useState와 달리 동기적으로 즉시 반영되므로, 같은 틱의 재호출도 확실히 막는다.
+    if (!session || advanceInFlightRef.current) return
+    advanceInFlightRef.current = true
     setAdvancing(true)
     setAdvanceError(null)
     try {
@@ -129,6 +139,7 @@ function App() {
     } catch (err) {
       setAdvanceError(err instanceof Error ? err.message : '다음 날로 넘어가지 못했습니다.')
     } finally {
+      advanceInFlightRef.current = false
       setAdvancing(false)
     }
   }

@@ -19,6 +19,9 @@ export function AccusationScreen({ sessionId, day, onResolved, onCancel }: Accus
   const [submitting, setSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
   const [result, setResult] = useState<AccuseResult | null>(null)
+  // 결과 확인 버튼을 빠르게 두 번 누르면 onResolved(부모의 다음날 전환 로직)가 중복 호출될 수
+  // 있어서, 한 번 누르면 곧바로 비활성화한다.
+  const [resolving, setResolving] = useState(false)
 
   useEffect(() => {
     listNpcsToday(sessionId)
@@ -64,7 +67,14 @@ export function AccusationScreen({ sessionId, day, onResolved, onCancel }: Accus
             {result.correct ? '정답' : '오답'}
           </div>
           <p>{result.message}</p>
-          <button className="pixel-button pixel-button--accent" onClick={() => onResolved(result)}>
+          <button
+            className="pixel-button pixel-button--accent"
+            disabled={resolving}
+            onClick={() => {
+              setResolving(true)
+              onResolved(result)
+            }}
+          >
             확인
           </button>
         </div>
