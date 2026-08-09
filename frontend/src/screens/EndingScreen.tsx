@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { getEnding, type EndingResult } from '../api/accusationApi'
+import { withWasCopula } from '../utils/korean'
 import './EndingScreen.css'
 
 // npc_id(1~7, DataSeeder 시딩 순서: 현수동/나주부/전주인/박영계/명자유/김치준/나박수)와
@@ -60,7 +61,7 @@ export function EndingScreen({ sessionId, onBackToTitle }: EndingScreenProps) {
             {!isSuccess && (
               <img className="ending-motive-image pixel-art" src={BAD_ENDING_IMAGE} alt="마을에서 쫓겨났습니다" />
             )}
-            {isSuccess && ending.culpritName && <h2>범인은 {ending.culpritName}였다</h2>}
+            {isSuccess && ending.culpritName && <h2>범인은 {withWasCopula(ending.culpritName)}</h2>}
             <p className="ending-story">{ending.endingStory}</p>
             {isSuccess && (
               <img className="ending-peace-image pixel-art" src={HAPPY_ENDING_IMAGE} alt="마을은 다시 평화를 되찾았습니다" />
