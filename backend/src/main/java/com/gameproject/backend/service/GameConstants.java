@@ -25,7 +25,7 @@ public final class GameConstants {
     public static final int INVENTORY_SLOT_COUNT = 7;
 
     /** 기획서 미명시 — 시작 골드 0이면 씨앗(최저 5G)조차 못 사는 초반 경제 병목이 있어 잠정값으로 지급. */
-    public static final int STARTING_GOLD = 100;
+    public static final int STARTING_GOLD = 50;
 
     /** 계정당 동시에 보유 가능한 세이브(게임 세션) 슬롯 수. 삭제된(DELETED) 세션은 여기 안 낀다. */
     public static final int MAX_SAVES_PER_ACCOUNT = 3;
