@@ -62,14 +62,14 @@ export function NightTransitionScreen({ sessionId, day, nextDay, onContinue }: N
   if (phase === 'loading') {
     return (
       <div className="ns-root">
-        <p className="ns-loading-text">지난밤 소식을 불러오는 중...</p>
+        <p className="ns-loading-text">모두가 잠드는 중...</p>
       </div>
     )
   }
 
   if (!summary || phase === 'popup') {
     const desc = summary ? SCENE_DESCRIPTIONS[summary.sabotageType] : null
-    const bodyText = summary?.summaryText ?? desc?.text ?? '마을은 오늘 밤도 평온했던 것 같다.'
+    const bodyText = desc ? `${desc.location}에서 ${desc.badge}.` : '마을은 오늘 밤도 평온했던 것 같다.'
 
     return (
       <div className="ns-root">
