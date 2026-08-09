@@ -108,14 +108,17 @@ export function NightTransitionScreen({ sessionId, day, nextDay, onContinue }: N
   if (!summary || phase === 'popup') {
     const meta = summary ? TYPE_META[summary.sabotageType] : null
     const location = summary ? summary.location || meta!.fallbackLocation : null
-    const bodyText = meta ? `${location}에서 ${meta.badge}.` : '마을은 오늘 밤도 평온했던 것 같다.'
+    const bodyText = meta ? `${location}에서 ${meta.badge}.` : '마을은 오늘 밤은 평온했던 것 같다.'
 
     return (
       <div className="ns-root">
         {summary && <audio ref={audioRef} src={SABOTAGE_BGM_SRC} loop />}
         <div className="ns-popup pixel-panel">
           {summary && <div className="ns-popup-stamp">사건 발생</div>}
-          <div className="ns-popup-day">{day}일차, 깊은 밤</div>
+          {/* 사건이 벌어진 건 day의 밤이지만, 플레이어가 실제로 이 소식을 듣는 건 다음날
+              아침(nextDay)이라 표시도 그 기준으로 맞춘다 — 첫 사보타주(1일차 밤)가
+              "1일차"가 아니라 "2일차"로 보여야 한다는 피드백. */}
+          <div className="ns-popup-day">{nextDay}일차, 깊은 밤</div>
           <p className="ns-popup-body">{bodyText}</p>
           <div className="ns-popup-action">
             {!confirmed ? (
@@ -171,7 +174,8 @@ export function NightTransitionScreen({ sessionId, day, nextDay, onContinue }: N
 
       {/* scene stage */}
       <div className="ns-stage-wrapper">
-        <div className="ns-day-badge">{day}일차 · 깊은 밤</div>
+        {/* ns-popup-day와 같은 이유로 nextDay 기준 표시 — 위 주석 참고. */}
+        <div className="ns-day-badge">{nextDay}일차 · 깊은 밤</div>
 
         <div className="ns-stage">
           <div className="ns-bg" style={{ backgroundImage: `url('${bgSrc}')` }} />
