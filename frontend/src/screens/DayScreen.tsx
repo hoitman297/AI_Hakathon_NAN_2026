@@ -10,7 +10,7 @@ import { NightLoadingOverlay } from '../components/NightLoadingOverlay'
 import { moveSession, type SessionResponse } from '../api/sessionApi'
 import { listNpcsToday } from '../api/npcApi'
 import { listUnacquiredClues, acquireClue, topicLabel, type UnacquiredClue } from '../api/clueApi'
-import { matchesLocationSpot } from '../game/clueLocations'
+import { matchesLocationSpot, spotsWithPendingClue } from '../game/clueLocations'
 import { villageAssets } from '../assets/asset-manifest'
 import './DayScreen.css'
 
@@ -188,6 +188,7 @@ export function DayScreen({
           .catch(() => {})
       },
       onLocationClick: handleLocationClick,
+      clueSpots: spotsWithPendingClue((unacquiredCluesRef.current ?? []).map((c) => c.location)),
     }
     game.scene.start('MainScene', initData)
 
@@ -211,6 +212,13 @@ export function DayScreen({
     const scene = gameRef.current?.scene.getScene('MainScene') as MainScene | undefined
     scene?.syncStamina(stamina)
   }, [stamina])
+
+  // 미습득 단서 목록이 바뀔 때마다(최초 로딩, 습득 후 재조회) 지도 위 "❗" 표시와 양계장/수박밭
+  // 파손 텍스처를 실제 사보타주 상태와 맞춘다.
+  useEffect(() => {
+    const scene = gameRef.current?.scene.getScene('MainScene') as MainScene | undefined
+    scene?.setClueSpots(spotsWithPendingClue((unacquiredClues ?? []).map((clue) => clue.location)))
+  }, [unacquiredClues])
 
   useEffect(() => {
     function handleKeyDown(event: KeyboardEvent) {

@@ -29,6 +29,8 @@ export interface MainSceneInitData {
   onNpcClick: (npcName: string, npcRole: string) => void
   /** 지도 위 장소(마을회관/상점/양계장 등)를 플레이어가 가까이서 클릭했을 때 spot.key를 보고한다. */
   onLocationClick: (spotKey: string) => void
+  /** 지금 미습득 단서가 있는 장소 스팟 키 목록(clueLocations.spotsWithPendingClue 결과). */
+  clueSpots?: string[]
 }
 
 const PLAYER_SPEED = 145
@@ -63,7 +65,10 @@ export class MainScene extends Phaser.Scene {
   private blockedTiles = new Set<string>()
   private mapData!: TerrainMapData
   private chickenCoop!: Phaser.GameObjects.Image
+  private watermelonField!: Phaser.GameObjects.Image
   private chickens: Phaser.GameObjects.Image[] = []
+  private clueMarkersBySpot = new Map<string, Phaser.GameObjects.Text>()
+  private activeClueSpots = new Set<string>()
   private villageAnimals: Phaser.GameObjects.Image[] = []
   private shadowPairs: Array<{ object: Phaser.GameObjects.Image; shadow: Phaser.GameObjects.Image }> = []
   private riverShimmers: Array<{
@@ -73,7 +78,6 @@ export class MainScene extends Phaser.Scene {
     lane: number
   }> = []
   private opaqueBottomPadding = new Map<string, number>()
-  private coopBroken = false
   private objectBlockers: Phaser.Geom.Rectangle[] = []
 
   // initData가 있으면(실제 게임플레이) 체력 소모/이동 보고/NPC·장소 클릭 콜백이 활성화된다.
@@ -181,6 +185,7 @@ export class MainScene extends Phaser.Scene {
     this.load.image('kimHouse', '/assets/world/buildings/houses/house-6.png')
     this.load.image('baksuHouse', '/assets/world/buildings/houses/house-3.png')
     this.load.image('watermelonFieldNormal', '/assets/world/facilities/watermelon-field-normal.png')
+    this.load.image('watermelonFieldDamaged', '/assets/world/facilities/watermelon-field-damaged.png')
     this.load.image('jeonJuin', '/assets/characters/npcs/npc-03/Idle/rotations/south.png')
     this.load.image('parkYounggye', '/assets/characters/npcs/npc-04/Idle/rotations/south.png')
     this.load.image('myeongJayu', '/assets/characters/npcs/npc-05/Idle/rotations/south.png')
@@ -215,6 +220,7 @@ export class MainScene extends Phaser.Scene {
     this.createEnvironmentalDensity()
     this.createRemainingZones()
     this.createVillageAnimals()
+    this.setClueSpots(this.initData?.clueSpots ?? [])
 
     // Keep a guaranteed walkable pocket around the initial spawn. Decorative
     // collision rectangles must never trap the player before the first input.
@@ -440,11 +446,9 @@ export class MainScene extends Phaser.Scene {
       .setInteractive({ useHandCursor: true })
     this.chickenCoop.on('pointerover', () => this.chickenCoop.setTint(0xfff1b5))
     this.chickenCoop.on('pointerout', () => this.chickenCoop.clearTint())
-    this.chickenCoop.on('pointerdown', () => {
-      this.toggleChickenCoop()
-      this.handleLocationInteract('chicken-coop', coopX, coopY)
-    })
+    this.chickenCoop.on('pointerdown', () => this.handleLocationInteract('chicken-coop', coopX, coopY))
     this.objectBlockers.push(new Phaser.Geom.Rectangle(coopX - 90, coopY - 72, 180, 72))
+    this.registerClueMarker('chicken-coop', coopX, coopY)
 
     const chickenSpecs: Array<[number, number, string, number, number]> = [
       [110.5, 26, 'chickenFront', 0, 0],
@@ -498,6 +502,7 @@ export class MainScene extends Phaser.Scene {
     hallImage.on('pointerover', () => hallImage.setTint(0xfff1b5))
     hallImage.on('pointerout', () => hallImage.clearTint())
     hallImage.on('pointerdown', () => this.handleLocationInteract('village-hall', hall.x, hall.y))
+    this.registerClueMarker('village-hall', hall.x, hall.y)
 
     const pavilion = at(40, 40)
     this.add
@@ -658,6 +663,7 @@ export class MainScene extends Phaser.Scene {
     homeImage.on('pointerover', () => homeImage.setTint(0xfff1b5))
     homeImage.on('pointerout', () => homeImage.clearTint())
     homeImage.on('pointerdown', () => this.handleLocationInteract('house1', home.x, home.y))
+    this.registerClueMarker('house1', home.x, home.y)
 
     const shop = at(76, 19)
     const shopImage = this.add.image(shop.x, shop.y, 'produceShop').setOrigin(0.5, 1).setScale(0.38).setDepth(shop.y)
@@ -666,6 +672,7 @@ export class MainScene extends Phaser.Scene {
     shopImage.on('pointerover', () => shopImage.setTint(0xfff1b5))
     shopImage.on('pointerout', () => shopImage.clearTint())
     shopImage.on('pointerdown', () => this.handleLocationInteract('produce-shop', shop.x, shop.y))
+    this.registerClueMarker('produce-shop', shop.x, shop.y)
     add('ruralMailbox1', 54.8, 19.2, 0.068, { width: 20, height: 14 })
 
     // Small cared-for vegetable plot left of the house.
@@ -726,7 +733,9 @@ export class MainScene extends Phaser.Scene {
         image.on('pointerover', () => image.setTint(0xfff1b5))
         image.on('pointerout', () => image.clearTint())
         image.on('pointerdown', () => this.handleLocationInteract(spotKey, x, y))
+        this.registerClueMarker(spotKey, x, y)
       }
+      return image
     }
     const prop = (texture: string, tileX: number, tileY: number, scale: number, flipX = false) => {
       const { x, y } = at(tileX, tileY)
@@ -802,7 +811,7 @@ export class MainScene extends Phaser.Scene {
     prop('newWildflower4', 64, 85, 0.025)
 
     // Zone 9: a dedicated watermelon plot with the farmer's home on its east edge.
-    building('watermelonFieldNormal', 104, 82, 0.28, 215, 65, false, 'watermelon-field')
+    this.watermelonField = building('watermelonFieldNormal', 104, 82, 0.28, 215, 65, false, 'watermelon-field')
     prop('scarecrow', 99, 79.5, 0.15)
     prop('woodFence', 94, 84.5, 0.13)
     prop('woodFence', 113.5, 84.4, 0.13, true)
@@ -1155,10 +1164,41 @@ export class MainScene extends Phaser.Scene {
       .setDepth(10)
   }
 
-  private toggleChickenCoop() {
-    this.coopBroken = !this.coopBroken
-    this.chickenCoop.setTexture(this.coopBroken ? 'chickenCoopBroken' : 'chickenCoopNormal')
-    this.chickens.forEach((chicken) => chicken.setVisible(!this.coopBroken))
+  /** 장소 스팟 위에 "미습득 단서 있음" 표시를 달아둔다 — 기본은 숨김, setClueSpots가 켠다. */
+  private registerClueMarker(spotKey: string, x: number, y: number) {
+    const marker = this.add
+      .text(x, y - this.mapData.tileHeight * 1.6, '❗', {
+        fontFamily: 'sans-serif', fontSize: '22px', color: '#fff08a',
+      })
+      .setOrigin(0.5, 1)
+      .setDepth(y + 2)
+      .setVisible(false)
+    this.tweens.add({
+      targets: marker,
+      y: marker.y - 6,
+      duration: 620,
+      yoyo: true,
+      repeat: -1,
+      ease: 'Sine.easeInOut',
+    })
+    this.clueMarkersBySpot.set(spotKey, marker)
+  }
+
+  /**
+   * 지금 미습득 단서가 있는 장소 스팟 목록으로 지도 상태를 동기화한다 — 장소마다 "❗" 표시를
+   * 켜고, 전용 파손 텍스처가 있는 양계장/수박밭은 실제 파손 이미지로 바꾼다(예전엔 클릭할
+   * 때마다 로컬 상태만 토글하는 장식용이라 실제 사보타주 여부와 무관했다).
+   */
+  setClueSpots(spotKeys: string[]) {
+    this.activeClueSpots = new Set(spotKeys)
+    this.clueMarkersBySpot.forEach((marker, spotKey) => marker.setVisible(this.activeClueSpots.has(spotKey)))
+
+    const coopBroken = this.activeClueSpots.has('chicken-coop')
+    this.chickenCoop?.setTexture(coopBroken ? 'chickenCoopBroken' : 'chickenCoopNormal')
+    this.chickens.forEach((chicken) => chicken.setVisible(!coopBroken))
+
+    const fieldDamaged = this.activeClueSpots.has('watermelon-field')
+    this.watermelonField?.setTexture(fieldDamaged ? 'watermelonFieldDamaged' : 'watermelonFieldNormal')
   }
 
   private tryMove(nextX: number, nextY: number) {
