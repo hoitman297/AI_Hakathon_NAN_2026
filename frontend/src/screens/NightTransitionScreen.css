@@ -47,8 +47,8 @@
   100% { opacity: 1; transform: scale(1) translateY(0); }
 }
 @keyframes ns-stamp-popup-in {
-  0% { opacity: 0; transform: rotate(-3deg) scale(1.6); }
-  100% { opacity: 1; transform: rotate(-3deg) scale(1); }
+  0% { opacity: 0; transform: rotate(0deg) scale(1.6); }
+  100% { opacity: 1; transform: rotate(0deg) scale(1); }
 }
 
 /* ─── root ─── */
@@ -370,7 +370,7 @@
   font-size: .85rem;
   letter-spacing: 1px;
   margin-bottom: 16px;
-  transform: rotate(-3deg);
+  transform: rotate(0deg);
   box-shadow: 0 3px 0 rgba(0, 0, 0, .3);
   animation: ns-stamp-popup-in .5s cubic-bezier(.2, 1.4, .4, 1) both;
 }
