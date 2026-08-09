@@ -569,6 +569,13 @@ export class MainScene extends Phaser.Scene {
 
       return { soil, crop }
     })
+
+    // 8~9일차 랜덤 이벤트(밭 훼손)용 ❗ — 특정 밭 한 칸이 아니라 밭 구역 전체를 대표하는
+    // 좌표(전체 8칸의 중앙)에 띄운다. 실제로 어떤 작물이 자라는지와는 무관한 연출용 표시라
+    // farmPlotSlots(파종/수확 상호작용)와는 완전히 분리해 둔다.
+    const centerTileX = (FARM_PLOT_POSITIONS[0].x + FARM_PLOT_POSITIONS[FARM_PLOT_POSITIONS.length - 1].x) / 2
+    const centerTileY = (FARM_PLOT_POSITIONS[0].y + FARM_PLOT_POSITIONS[FARM_PLOT_POSITIONS.length - 1].y) / 2
+    this.registerClueMarker('farm-damage', centerTileX * tile, centerTileY * tile)
   }
 
   /**
@@ -734,7 +741,12 @@ export class MainScene extends Phaser.Scene {
 
     // Signature 1990s village props. The center line from the road to the hall
     // doors stays open while the objects form two uneven civic-yard clusters.
-    place('villageNoticeBoard', 28, 21.5, 0.075, { width: 62, height: 20 })
+    const noticeBoard = place('villageNoticeBoard', 28, 21.5, 0.075, { width: 62, height: 20 })
+    noticeBoard.setInteractive({ useHandCursor: true })
+    noticeBoard.on('pointerover', () => noticeBoard.setTint(0xfff1b5))
+    noticeBoard.on('pointerout', () => noticeBoard.clearTint())
+    noticeBoard.on('pointerdown', () => this.handleLocationInteract('village-board', noticeBoard.x, noticeBoard.y))
+    this.registerClueMarker('village-board', noticeBoard.x, noticeBoard.y)
     place('stoneFlowerBed', 14.2, 26.2, 0.065, { width: 72, height: 20 })
     place('newWildflower1', 9.5, 30.2, 0.028)
     place('broadcastSpeakerPole', 4.7, 14, 0.14, { width: 24, height: 20 })

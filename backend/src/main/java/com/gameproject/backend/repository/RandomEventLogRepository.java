@@ -10,4 +10,6 @@ import com.gameproject.backend.domain.RandomEventLog;
 public interface RandomEventLogRepository extends JpaRepository<RandomEventLog, Long> {
 
     List<RandomEventLog> findBySession(GameSession session);
+
+    List<RandomEventLog> findBySessionAndViewedFalse(GameSession session);
 }

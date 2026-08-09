@@ -11,10 +11,16 @@ import { ItemShopPanel } from '../components/ItemShopPanel'
 import { SeedPickerPopup } from '../components/SeedPickerPopup'
 import { NightLoadingOverlay } from '../components/NightLoadingOverlay'
 import { Modal } from '../components/Modal'
-import { hasSeenSabotageGuide, markSabotageGuideSeen } from '../state/guideFlags'
+import {
+  hasSeenSabotageGuide,
+  markSabotageGuideSeen,
+  hasSeenRandomEventNotice,
+  markRandomEventNoticeSeen,
+} from '../state/guideFlags'
 import { moveSession, getSabotageLocations, type SessionResponse } from '../api/sessionApi'
 import { listNpcsToday } from '../api/npcApi'
 import { listUnacquiredClues, acquireClue, topicLabel, type UnacquiredClue } from '../api/clueApi'
+import { listUnviewedEvents, markEventViewed, type RandomEvent } from '../api/randomEventApi'
 import { matchesLocationSpot, spotsWithPendingClue } from '../game/clueLocations'
 import {
   listFarmPlots,
@@ -43,6 +49,25 @@ function assignPlotsToSlots(plots: FarmPlot[]): Array<FarmPlot | null> {
     slots[index] = plot
   })
   return slots
+}
+
+// 백엔드 AccusationPersistenceService.VILLAGE_EVENTS/PLAYER_EVENTS의 이벤트 종류 문자열과
+// 정확히 일치해야 한다 — 케이스별로 ❗ 마커를 띄울지, 대화로만 자연스럽게 흘릴지, 공용 알림
+// 직후 바로 팝업을 이어붙일지가 이 문자열로 갈린다.
+const VILLAGE_EVENT_BOARD_NOTE = '마을 게시판 도발 쪽지'
+const VILLAGE_EVENT_MYSTERY_ITEM = '특정 NPC 집 앞 정체불명 물건'
+const PLAYER_EVENT_THREAT_LETTER = '협박 편지'
+const PLAYER_EVENT_FARM_DAMAGE = '밭 훼손'
+
+/** 미확인 랜덤 이벤트 중 ❗ 마커가 필요한 케이스(도발 쪽지/밭 훼손)만 지도 스팟 키로 뽑아낸다.
+ *  정체불명 물건은 대화로만, 협박 편지는 공용 알림 직후 자동으로 이어지는 팝업으로만 드러나서
+ *  별도 마커가 필요 없다. */
+function eventSpotKeys(events: RandomEvent[] | null): string[] {
+  if (!events) return []
+  const keys: string[] = []
+  if (events.some((e) => e.target === 'VILLAGE' && e.eventType === VILLAGE_EVENT_BOARD_NOTE)) keys.push('village-board')
+  if (events.some((e) => e.target === 'PLAYER' && e.eventType === PLAYER_EVENT_FARM_DAMAGE)) keys.push('farm-damage')
+  return keys
 }
 
 // 백엔드 GameConstants.FIRST_ACCUSATION_DAY / LAST_ACCUSATION_DAY 와 맞춰야 한다.
@@ -77,6 +102,12 @@ export function DayScreen({
 }: DayScreenProps) {
   const [day1GuideOpen, setDay1GuideOpen] = useState(showOpeningGuide)
   const [sabotageGuideDismissed, setSabotageGuideDismissed] = useState(false)
+  const [villageNoticeDismissed, setVillageNoticeDismissed] = useState(false)
+  const [playerNoticeDismissed, setPlayerNoticeDismissed] = useState(false)
+  // 협박 편지(케이스 A)는 공용 알림이 닫히자마자 바로 이어서 뜨는 팝업이라 별도 상태로 든다.
+  const [threatLetterPopup, setThreatLetterPopup] = useState<RandomEvent | null>(null)
+  // 도발 쪽지/밭 훼손 ❗을 클릭했을 때 뜨는 상세 팝업 — 두 케이스가 제목만 다르고 구조는 같아 공용으로 쓴다.
+  const [eventDetailPopup, setEventDetailPopup] = useState<{ title: string; event: RandomEvent } | null>(null)
   const containerRef = useRef<HTMLDivElement>(null)
   const gameRef = useRef<Phaser.Game | null>(null)
   const [stamina, setStamina] = useState(() => session.staminaCurrent)
@@ -129,6 +160,15 @@ export function DayScreen({
     unacquiredCluesRef.current = unacquiredClues
   }, [unacquiredClues])
 
+  // 7~8/8~9일차 랜덤 이벤트(오답 고발 시 발생) — unacquiredClues와 같은 이유로 ref도 같이 든다.
+  const [unviewedEvents, setUnviewedEvents] = useState<RandomEvent[] | null>(null)
+  const unviewedEventsRef = useRef<RandomEvent[] | null>(null)
+  useEffect(() => {
+    unviewedEventsRef.current = unviewedEvents
+  }, [unviewedEvents])
+  const villageEvent = unviewedEvents?.find((e) => e.target === 'VILLAGE') ?? null
+  const playerEvent = unviewedEvents?.find((e) => e.target === 'PLAYER') ?? null
+
   const [mapMessage, setMapMessage] = useState<string | null>(null)
   useEffect(() => {
     if (!mapMessage) return
@@ -152,11 +192,33 @@ export function DayScreen({
   }
   useEffect(reloadUnacquiredClues, [session.sessionId])
 
+  function reloadUnviewedEvents() {
+    listUnviewedEvents(session.sessionId)
+      .then(setUnviewedEvents)
+      .catch((err: unknown) => console.error('랜덤 이벤트 목록을 불러오지 못했습니다.', err))
+  }
+  useEffect(reloadUnviewedEvents, [session.sessionId])
+
+  /** ❗ 클릭/체이닝 팝업으로 이벤트 내용을 다 보여준 뒤 서버에 확인 처리한다 — 실패해도 팝업은
+   *  이미 닫혔으니 사용자에게 막힘없이, 콘솔에만 남긴다. */
+  function markEventViewedAndReload(eventId: number) {
+    markEventViewed(session.sessionId, eventId)
+      .then(reloadUnviewedEvents)
+      .catch((err: unknown) => console.error('이벤트를 확인 처리하지 못했습니다.', err))
+  }
+
   // 첫 사보타주가 발생한 다음날(맵 위에 ❗ 단서 표시가 처음 뜨는 날) 딱 한 번, 그 사용법을
   // 안내하는 가이드 창을 띄운다. 실제로 몇 일차에 뜨는지는 사보타주 발생 여부에 달려 있어
   // 고정된 날짜 대신 "미습득 단서가 처음 생긴 시점"을 기준으로 삼는다.
   const showSabotageGuide =
     !sabotageGuideDismissed && !hasSeenSabotageGuide(session.sessionId) && (unacquiredClues?.length ?? 0) > 0
+
+  // 7~8일차(마을 대상)/8~9일차(플레이어 대상) 랜덤 이벤트 공용 알림 — 실제로 오답 고발을 해서
+  // 이벤트가 생성된 경우에만(랜덤 발생이라 안 생겼을 수도 있음) 진입일에 1회 노출한다.
+  const showVillageNotice =
+    !villageNoticeDismissed && !!villageEvent && session.currentDay >= 8 && !hasSeenRandomEventNotice(session.sessionId, 8)
+  const showPlayerNotice =
+    !playerNoticeDismissed && !!playerEvent && session.currentDay >= 9 && !hasSeenRandomEventNotice(session.sessionId, 9)
 
   function reloadFarmPlots() {
     listFarmPlots(session.sessionId)
@@ -276,6 +338,18 @@ export function DayScreen({
       return
     }
 
+    // 랜덤 이벤트 ❗ — 항상 최신값을 봐야 해서(단서와 같은 이유) ref를 읽는다.
+    if (spotKey === 'village-board') {
+      const event = unviewedEventsRef.current?.find((e) => e.target === 'VILLAGE' && e.eventType === VILLAGE_EVENT_BOARD_NOTE)
+      if (event) setEventDetailPopup({ title: '마을 게시판', event })
+      return
+    }
+    if (spotKey === 'farm-damage') {
+      const event = unviewedEventsRef.current?.find((e) => e.target === 'PLAYER' && e.eventType === PLAYER_EVENT_FARM_DAMAGE)
+      if (event) setEventDetailPopup({ title: '밭이 훼손되었습니다.', event })
+      return
+    }
+
     if (locationBusyRef.current) return
     const target = (unacquiredCluesRef.current ?? []).find((clue) => matchesLocationSpot(clue.location, spotKey))
     if (target) {
@@ -386,7 +460,10 @@ export function DayScreen({
       onLocationClick: handleLocationClick,
       onFarmTileClick: handleFarmTileClick,
       onForageTreeClick: handleForageTreeClick,
-      clueSpots: spotsWithPendingClue((unacquiredCluesRef.current ?? []).map((c) => c.location)),
+      clueSpots: [
+        ...spotsWithPendingClue((unacquiredCluesRef.current ?? []).map((c) => c.location)),
+        ...eventSpotKeys(unviewedEventsRef.current),
+      ],
     }
     game.scene.start('MainScene', initData)
 
@@ -417,7 +494,10 @@ export function DayScreen({
       scene.syncFarmPlots(plotView)
       scene.syncForageTrees(availableFruitKeysRef.current)
       scene.syncSabotageDamage(sabotageLocationsRef.current)
-      scene.setClueSpots(spotsWithPendingClue((unacquiredCluesRef.current ?? []).map((c) => c.location)))
+      scene.setClueSpots([
+        ...spotsWithPendingClue((unacquiredCluesRef.current ?? []).map((c) => c.location)),
+        ...eventSpotKeys(unviewedEventsRef.current),
+      ])
     }
     rafId = requestAnimationFrame(pushOnceReady)
 
@@ -452,12 +532,15 @@ export function DayScreen({
     scene?.syncStamina(stamina)
   }, [stamina])
 
-  // 미습득 단서 목록이 바뀔 때마다(최초 로딩, 습득 후 재조회) 지도 위 "❗" 표시와 양계장/수박밭
-  // 파손 텍스처를 실제 사보타주 상태와 맞춘다.
+  // 미습득 단서/미확인 랜덤 이벤트 목록이 바뀔 때마다(최초 로딩, 습득·확인 후 재조회) 지도 위
+  // "❗" 표시를 실제 상태와 맞춘다.
   useEffect(() => {
     const scene = gameRef.current?.scene.getScene('MainScene') as MainScene | undefined
-    scene?.setClueSpots(spotsWithPendingClue((unacquiredClues ?? []).map((clue) => clue.location)))
-  }, [unacquiredClues])
+    scene?.setClueSpots([
+      ...spotsWithPendingClue((unacquiredClues ?? []).map((clue) => clue.location)),
+      ...eventSpotKeys(unviewedEvents),
+    ])
+  }, [unacquiredClues, unviewedEvents])
 
   useEffect(() => {
     function handleKeyDown(event: KeyboardEvent) {
@@ -642,6 +725,92 @@ export function DayScreen({
         >
           <p>어젯밤, 마을에 사건이 발생했습니다. ❗ 표시가 있는 장소를 찾아가 보세요.</p>
           <p>해당 장소에서 단서 카드를 발견할 수 있습니다.</p>
+        </Modal>
+      )}
+
+      {showVillageNotice && (
+        <Modal
+          title="사건 발생"
+          actions={
+            <button
+              className="pixel-button pixel-button--accent"
+              onClick={() => {
+                markRandomEventNoticeSeen(session.sessionId, 8)
+                setVillageNoticeDismissed(true)
+                // 정체불명 물건(케이스 B)은 ❗ 없이 NPC와의 대화로만 자연스럽게 드러나는
+                // 설계라, 알아볼 별도의 팝업이 없다 — 공용 알림을 확인한 시점에 바로
+                // 확인 처리해서 ❗ 마커 후보에서도 빠지게 한다.
+                if (villageEvent && villageEvent.eventType === VILLAGE_EVENT_MYSTERY_ITEM) {
+                  markEventViewedAndReload(villageEvent.eventId)
+                }
+              }}
+            >
+              확인
+            </button>
+          }
+        >
+          <p>잡히지 않은 범인이 사보타주를 일으켰습니다.</p>
+        </Modal>
+      )}
+
+      {showPlayerNotice && (
+        <Modal
+          title="사건 발생"
+          actions={
+            <button
+              className="pixel-button pixel-button--accent"
+              onClick={() => {
+                markRandomEventNoticeSeen(session.sessionId, 9)
+                setPlayerNoticeDismissed(true)
+                // 협박 편지(케이스 A)는 이 알림이 닫히자마자 바로 편지 내용 팝업으로 이어진다.
+                if (playerEvent && playerEvent.eventType === PLAYER_EVENT_THREAT_LETTER) {
+                  setThreatLetterPopup(playerEvent)
+                }
+              }}
+            >
+              확인
+            </button>
+          }
+        >
+          <p>잡히지 않은 범인이 사보타주를 일으켰습니다.</p>
+        </Modal>
+      )}
+
+      {threatLetterPopup && (
+        <Modal
+          title="협박 편지"
+          actions={
+            <button
+              className="pixel-button pixel-button--accent"
+              onClick={() => {
+                markEventViewedAndReload(threatLetterPopup.eventId)
+                setThreatLetterPopup(null)
+              }}
+            >
+              확인
+            </button>
+          }
+        >
+          <p>{threatLetterPopup.description}</p>
+        </Modal>
+      )}
+
+      {eventDetailPopup && (
+        <Modal
+          title={eventDetailPopup.title}
+          actions={
+            <button
+              className="pixel-button pixel-button--accent"
+              onClick={() => {
+                markEventViewedAndReload(eventDetailPopup.event.eventId)
+                setEventDetailPopup(null)
+              }}
+            >
+              확인
+            </button>
+          }
+        >
+          <p>{eventDetailPopup.event.description}</p>
         </Modal>
       )}
     </div>

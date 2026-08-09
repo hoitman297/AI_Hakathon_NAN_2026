@@ -46,8 +46,10 @@ class AccusationPersistenceService {
             "전주인", "나주부"
     );
 
+    // "마을 공용시설 낙서·표식"은 프론트 UI(❗ 표시/알림)가 아직 없어 이번 라운드엔 후보에서
+    // 뺐다 — 나중에 지원하게 되면 다시 추가.
     private static final List<String> VILLAGE_EVENTS = List.of(
-            "마을 게시판 도발 쪽지", "특정 NPC 집 앞 정체불명 물건", "마을 공용시설 낙서·표식");
+            "마을 게시판 도발 쪽지", "특정 NPC 집 앞 정체불명 물건");
     private static final List<String> PLAYER_EVENTS = List.of("협박 편지", "밭 훼손");
 
     private final NpcRepository npcRepository;
@@ -147,7 +149,7 @@ class AccusationPersistenceService {
     void saveRandomEvent(GameSession session, int day, EventTarget target, String eventType, String description) {
         randomEventLogRepository.save(RandomEventLog.builder()
                 .session(session).day(day).target(target).eventType(eventType)
-                .description(description)
+                .description(description).viewed(false)
                 .createdAt(LocalDateTime.now())
                 .build());
     }
