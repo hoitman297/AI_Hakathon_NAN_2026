@@ -1,6 +1,10 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { getNightSummary, type NightSummary } from '../api/sabotageApi'
 import './NightTransitionScreen.css'
+
+// 사보타주 알림용 긴장감 BGM 에셋(04-sabotage-alert.wav)이 팀원 커밋으로 추가돼 있었는데
+// 실제로 이 화면(사보타주 발생을 알리는 화면)에 연결된 적이 없었다.
+const SABOTAGE_BGM_SRC = '/assets/audio/bgm-samples/04-sabotage-alert.wav'
 
 interface NightTransitionScreenProps {
   sessionId: number
@@ -48,6 +52,7 @@ export function NightTransitionScreen({ sessionId, day, nextDay, onContinue }: N
   const [summary, setSummary] = useState<NightSummary | null>(null)
   const [phase, setPhase] = useState<Phase>('loading')
   const [confirmed, setConfirmed] = useState(false)
+  const audioRef = useRef<HTMLAudioElement>(null)
 
   useEffect(() => {
     getNightSummary(sessionId, day)
@@ -63,6 +68,29 @@ export function NightTransitionScreen({ sessionId, day, nextDay, onContinue }: N
         setPhase('popup')
       })
   }, [sessionId, day])
+
+  // 사건이 있었던 밤(scene/popup with summary)에만 긴장감 BGM 재생 — "평온했던 밤"(summary
+  // 없음)엔 안 튼다. 브라우저 자동재생 정책 때문에 마운트 시 1차 시도 + 실패하면 첫
+  // pointerdown/keydown에 이어서 재생(TitleScreen과 동일 패턴).
+  useEffect(() => {
+    if (phase === 'loading') return
+    const audio = audioRef.current
+    if (!audio || !summary) return
+
+    const play = () => {
+      audio.play()?.catch(() => undefined)
+    }
+    play()
+    window.addEventListener('pointerdown', play, { once: true })
+    window.addEventListener('keydown', play, { once: true })
+
+    return () => {
+      window.removeEventListener('pointerdown', play)
+      window.removeEventListener('keydown', play)
+      audio.pause()
+      audio.currentTime = 0
+    }
+  }, [phase, summary])
 
   const handleConfirm = () => {
     setConfirmed(true)
@@ -84,6 +112,7 @@ export function NightTransitionScreen({ sessionId, day, nextDay, onContinue }: N
 
     return (
       <div className="ns-root">
+        {summary && <audio ref={audioRef} src={SABOTAGE_BGM_SRC} loop />}
         <div className="ns-popup pixel-panel">
           {summary && <div className="ns-popup-stamp">사건 발생</div>}
           <div className="ns-popup-day">{day}일차, 깊은 밤</div>
@@ -115,6 +144,7 @@ export function NightTransitionScreen({ sessionId, day, nextDay, onContinue }: N
 
   return (
     <div className="ns-root">
+      <audio ref={audioRef} src={SABOTAGE_BGM_SRC} loop />
       {/* ambient sky */}
       <div className="ns-sky" aria-hidden>
         <img

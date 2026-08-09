@@ -140,6 +140,10 @@ public class LlmService {
                 기계적으로 반복하지 말고, 플레이어의 실제 발화 내용에 맞춰 조금씩 다르게 반응하세요 —
                 단답이 곧 무성의함은 아닙니다. 차분함/무뚝뚝함은 어휘·어조로 표현하되, 대화 자체가
                 꽉 막힌 벽처럼 느껴지지 않게 하세요.
+                모든 문장은 조사·어미·띄어쓰기가 정확한 표준 한국어 문법을 따라야 합니다(사투리·
+                반말·말줄임 같은 의도된 말투 특징은 그대로 유지하되, 조사가 빠지거나 잘못 붙는 등의
+                실제 문법 오류는 만들지 마세요). 다 쓰고 나서 문법이 자연스러운지 스스로 한 번
+                검토한 뒤에 답하세요.
                 """.formatted(persona.name(), persona.role(), persona.age(),
                 persona.personality(), persona.speechStyle(), persona.backstory());
 
