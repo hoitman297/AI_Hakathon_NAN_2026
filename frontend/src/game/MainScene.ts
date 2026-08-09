@@ -659,6 +659,13 @@ export class MainScene extends Phaser.Scene {
     hallImage.on('pointerout', () => hallImage.clearTint())
     hallImage.on('pointerdown', () => this.handleLocationInteract('village-hall', hall.x, hall.y))
     this.registerClueMarker('village-hall', hall.x, hall.y)
+    this.add
+      .text(hall.x, hall.y - hallImage.displayHeight - 8, '마을회관', {
+        fontFamily: 'sans-serif', fontSize: '15px', fontStyle: 'bold', color: '#fff5d6',
+        backgroundColor: '#5b3a1edd', padding: { x: 8, y: 4 },
+      })
+      .setOrigin(0.5, 1)
+      .setDepth(hall.y + 1)
 
     const pavilion = at(40, 40)
     this.add
