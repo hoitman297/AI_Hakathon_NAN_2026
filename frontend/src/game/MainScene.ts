@@ -52,11 +52,17 @@ const WALK_DIRECTIONS = ['south', 'south-east', 'east', 'north-east', 'north', '
 // 튀어 보인다 — 항상 48px로 보이도록 걷기 텍스처 쪽만 이 비율로 축소한다.
 const PLAYER_IDLE_DISPLAY_SIZE = 48
 const PLAYER_WALK_FRAME_SIZE = 92
+// 여성 정지 이미지는 48x48 캔버스에 남캐 걷기 프레임(92x92, 24% 정도 여백)보다 여백 없이
+// 꽉 차게 그려져 있어, 같은 48px로 맞추면 상대적으로 작고 밋밋해 보인다는 피드백이 있었다
+// — 남캐와 체감 크기를 맞추기 위해 여성만 살짝 더 크게 표시한다.
+const FEMALE_IDLE_DISPLAY_SIZE = 54
 // 여성 캐릭터는 아직 걷기 프레임 원본 에셋이 없어서, 정지 이미지(player-girl-v2)를 방향별로
-// 그대로 쓰면서 걷는 동안만 통통 튀는 스쿼시&스트레치 트윈으로 움직임을 표현한다.
-const FEMALE_WALK_BOUNCE_DURATION = 180
-const FEMALE_WALK_BOUNCE_SCALE_Y = 0.88
-const FEMALE_WALK_BOUNCE_SCALE_X = 1.06
+// 그대로 쓰면서 걷는 동안만 통통 튀는 스쿼시&스트레치 트윈으로 움직임을 표현한다. 스케일
+// 변화폭이 너무 크면(과거 0.88/1.06) 걷는 동안 순간적으로 쪼그라드는 것처럼 보여 어색하다는
+// 피드백을 받아 폭을 줄였다.
+const FEMALE_WALK_BOUNCE_DURATION = 220
+const FEMALE_WALK_BOUNCE_SCALE_Y = 0.95
+const FEMALE_WALK_BOUNCE_SCALE_X = 1.03
 // 기획서 체력 세부 수치(✅ 확정): 이동 초당 0.15 소모, 운동화 착용 시 초당 0.12(20% 감소).
 // 백엔드 GameConstants.MOVE_STAMINA_PER_SECOND(_WITH_SNEAKERS)와 값이 일치해야 한다.
 const MOVE_STAMINA_PER_SECOND = 0.15
@@ -140,6 +146,11 @@ export class MainScene extends Phaser.Scene {
   // 아직 걷기 프레임 에셋이 없어 정지 이미지 + 스쿼시&스트레치 트윈으로 움직임을 표현한다.
   private isFemalePlayer = false
   private femaleWalkTween?: Phaser.Tweens.Tween
+  // setDisplaySize(FEMALE_IDLE_DISPLAY_SIZE)가 48x48 원본 텍스처에 실제로 적용한 배율.
+  // startFemaleWalkBounce()의 scaleX/scaleY 트윈이 이 배율을 무시하고 절대값(0.95/1.03 등)을
+  // 그대로 넣으면, setDisplaySize가 이미 키워둔 배율을 트윈이 덮어써서 걷는 동안 오히려
+  // 작아 보이는 역효과가 난다 — 이 배율을 곱해서 상대적으로만 통통 튀게 한다.
+  private femaleBaseScale = 1
 
   constructor() {
     super('MainScene')
@@ -280,10 +291,14 @@ export class MainScene extends Phaser.Scene {
     const [initialTexture, initialFrame] = this.isFemalePlayer
       ? [`player-girl-south`, undefined]
       : [`player-walk-south`, 0]
+    const initialDisplaySize = this.isFemalePlayer ? FEMALE_IDLE_DISPLAY_SIZE : PLAYER_IDLE_DISPLAY_SIZE
+    // 여성 정지 이미지 원본이 48x48이므로, FEMALE_IDLE_DISPLAY_SIZE가 실제로 적용하는 배율을
+    // 걷기 바운스 트윈(startFemaleWalkBounce)이 상대적으로 곱해 쓸 수 있게 미리 계산해둔다.
+    this.femaleBaseScale = this.isFemalePlayer ? FEMALE_IDLE_DISPLAY_SIZE / 48 : 1
     this.player = this.add
       .sprite(spawnX, spawnY, initialTexture, initialFrame)
       .setDepth(spawnY)
-      .setDisplaySize(PLAYER_IDLE_DISPLAY_SIZE, PLAYER_IDLE_DISPLAY_SIZE)
+      .setDisplaySize(initialDisplaySize, initialDisplaySize)
     this.createWorldLighting()
 
     this.cursors = this.input.keyboard!.createCursorKeys()
@@ -391,10 +406,10 @@ export class MainScene extends Phaser.Scene {
   private showFloatingHint(x: number, y: number, text: string) {
     const hint = this.add
       .text(x, y, text, {
-        fontSize: '11px',
+        fontSize: '14px',
         color: '#fff8ec',
         backgroundColor: '#b23a2fcc',
-        padding: { x: 4, y: 2 },
+        padding: { x: 6, y: 3 },
       })
       .setOrigin(0.5, 1)
       .setDepth(1_000_001)
@@ -402,8 +417,8 @@ export class MainScene extends Phaser.Scene {
     this.tweens.add({
       targets: hint,
       alpha: 0,
-      delay: 700,
-      duration: 400,
+      delay: 1400,
+      duration: 500,
       onComplete: () => hint.destroy(),
     })
   }
@@ -478,8 +493,8 @@ export class MainScene extends Phaser.Scene {
     if (this.femaleWalkTween?.isPlaying()) return
     this.femaleWalkTween = this.tweens.add({
       targets: this.player,
-      scaleY: FEMALE_WALK_BOUNCE_SCALE_Y,
-      scaleX: FEMALE_WALK_BOUNCE_SCALE_X,
+      scaleY: this.femaleBaseScale * FEMALE_WALK_BOUNCE_SCALE_Y,
+      scaleX: this.femaleBaseScale * FEMALE_WALK_BOUNCE_SCALE_X,
       duration: FEMALE_WALK_BOUNCE_DURATION,
       yoyo: true,
       repeat: -1,
@@ -497,7 +512,7 @@ export class MainScene extends Phaser.Scene {
       if (!this.femaleWalkTween?.isPlaying()) return
       this.femaleWalkTween.stop()
       this.player.setTexture(`player-girl-${this.lastDirection}`)
-      this.player.setDisplaySize(PLAYER_IDLE_DISPLAY_SIZE, PLAYER_IDLE_DISPLAY_SIZE)
+      this.player.setDisplaySize(FEMALE_IDLE_DISPLAY_SIZE, FEMALE_IDLE_DISPLAY_SIZE)
       return
     }
 
@@ -1348,7 +1363,9 @@ export class MainScene extends Phaser.Scene {
     this.watermelonField?.setTexture(damaged.has('수박밭') ? 'watermelonFieldDamaged' : 'watermelonFieldNormal')
   }
 
-  /** 장소 스팟 위에 "미습득 단서 있음" 표시를 달아둔다 — 기본은 숨김, setClueSpots가 켠다. */
+  /** 장소 스팟 위에 "미습득 단서 있음" 표시를 달아둔다 — 기본은 숨김, setClueSpots가 켠다.
+   *  건물 스프라이트가 아니라 이 ❗ 표시 자체를 눌러보는 플레이어도 많아서, 마커도 건물과
+   *  동일한 handleLocationInteract로 클릭 판정을 받게 한다(둘 중 어디를 눌러도 동작). */
   private registerClueMarker(spotKey: string, x: number, y: number) {
     const marker = this.add
       .text(x, y - this.mapData.tileHeight * 1.6, '❗', {
@@ -1357,6 +1374,9 @@ export class MainScene extends Phaser.Scene {
       .setOrigin(0.5, 1)
       .setDepth(y + 2)
       .setVisible(false)
+      .setPadding(10)
+      .setInteractive({ useHandCursor: true })
+    marker.on('pointerdown', () => this.handleLocationInteract(spotKey, x, y))
     this.tweens.add({
       targets: marker,
       y: marker.y - 6,

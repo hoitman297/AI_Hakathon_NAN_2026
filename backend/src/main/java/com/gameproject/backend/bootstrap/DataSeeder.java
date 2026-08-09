@@ -223,7 +223,7 @@ public class DataSeeder implements CommandLineRunner {
                         .effectDesc("애매한 단서 카드 1개를 더 명확한 문구로 갱신").usageLimit("1일 1회").build(),
                 ShopItemMaster.builder().name("선물세트").itemCode(ShopItemCode.GIFT_SET)
                         .category(ItemCategory.CONSUMABLE).price(40)
-                        .effectDesc("지정 NPC 호감도 즉시 +10~15").usageLimit("1개당 1회").build()
+                        .effectDesc("지정 NPC 호감도 즉시 +18~25").usageLimit("1개당 1회").build()
         ));
     }
 }

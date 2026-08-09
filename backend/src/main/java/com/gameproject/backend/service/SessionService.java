@@ -100,7 +100,7 @@ public class SessionService {
                 .day(1)
                 .staminaCurrent((double) GameConstants.DEFAULT_STAMINA_MAX)
                 .staminaMax(GameConstants.DEFAULT_STAMINA_MAX)
-                .gold(0)
+                .gold(GameConstants.STARTING_GOLD)
                 .fainted(false)
                 .build());
 

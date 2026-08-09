@@ -85,6 +85,34 @@
   border-color: var(--leaf-dark);
 }
 
+@keyframes day-map-message-pop {
+  0% { opacity: 0; transform: translate(-50%, -8px) scale(0.94); }
+  12% { opacity: 1; transform: translate(-50%, 0) scale(1); }
+  88% { opacity: 1; transform: translate(-50%, 0) scale(1); }
+  100% { opacity: 0; transform: translate(-50%, -6px) scale(0.98); }
+}
+
+/* 캔버스 밖 HUD 영역에 작게 뜨면 게임 화면에 시선이 가 있을 때 놓치기 쉬웠다 —
+   캔버스 위쪽에 오버레이로 띄우고 더 크고 오래 보이게 한다. */
+.day-map-message--overlay {
+  position: absolute;
+  top: 14px;
+  left: 50%;
+  z-index: 20;
+  margin: 0;
+  padding: 10px 22px;
+  font-size: 1rem;
+  border-width: 3px;
+  border-radius: 999px;
+  box-shadow: 0 4px 0 var(--leaf-dark), 0 6px 14px rgba(0, 0, 0, 0.35);
+  animation: day-map-message-pop 4.5s ease-in-out both;
+  pointer-events: none;
+  white-space: nowrap;
+  max-width: 90%;
+  text-overflow: ellipsis;
+  overflow: hidden;
+}
+
 .day-canvas-wrap {
   position: relative;
   line-height: 0;

@@ -123,7 +123,7 @@ export function DayScreen({
   const [mapMessage, setMapMessage] = useState<string | null>(null)
   useEffect(() => {
     if (!mapMessage) return
-    const timer = setTimeout(() => setMapMessage(null), 3200)
+    const timer = setTimeout(() => setMapMessage(null), 4500)
     return () => clearTimeout(timer)
   }, [mapMessage])
 
@@ -154,17 +154,23 @@ export function DayScreen({
       .catch((err: unknown) => console.error('씨앗 인벤토리를 불러오지 못했습니다.', err))
   }
   function reloadAvailableFruitsToday() {
-    listAvailableFruits(session.sessionId)
+    return listAvailableFruits(session.sessionId)
       .then(setAvailableFruitsToday)
       .catch((err: unknown) => console.error('오늘 채집 가능한 과일 목록을 불러오지 못했습니다.', err))
   }
+  // 맵 진입 직후 나무를 바로 클릭하면 fruitSpeciesRef/availableFruitKeysRef가 아직 비어있는
+  // 레이스가 있었다(채집이 조용히 아무 반응 없거나 "오늘은 딸 게 없다"는 잘못된 메시지가 뜸) —
+  // NPC 목록 조회 때 겪었던 것과 같은 종류의 레이스라 같은 패턴(요청을 들고 있다가 클릭 시점에
+  // 기다렸다 재확인)으로 고친다.
+  const forageReadyPromiseRef = useRef<Promise<unknown> | null>(null)
   useEffect(() => {
     reloadFarmPlots()
     reloadSeedInventory()
-    reloadAvailableFruitsToday()
-    listFruitSpecies(session.sessionId)
+    const availablePromise = reloadAvailableFruitsToday()
+    const speciesPromise = listFruitSpecies(session.sessionId)
       .then(setFruitSpecies)
       .catch((err: unknown) => console.error('과일 종류 목록을 불러오지 못했습니다.', err))
+    forageReadyPromiseRef.current = Promise.all([availablePromise, speciesPromise])
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session.sessionId])
 
@@ -212,9 +218,15 @@ export function DayScreen({
     setMapMessage(`${plot.cropName}이(가) 아직 자라는 중입니다 (${plot.readyDay}일차부터 수확 가능).`)
   }
 
-  function handleForageTreeClick(fruitKey: string) {
+  async function handleForageTreeClick(fruitKey: string) {
+    // 초기 로딩(과일 종류/오늘의 채집 목록)이 아직 안 끝났을 수 있다 — 그 요청이 끝나길
+    // 기다렸다가 한 번 더 확인한다(이미 끝났으면 즉시 통과).
+    await forageReadyPromiseRef.current?.catch(() => undefined)
     const species = fruitSpeciesRef.current.find((fruit) => FRUIT_NAME_TO_KEY[fruit.name] === fruitKey)
-    if (!species) return
+    if (!species) {
+      setMapMessage('채집 정보를 불러오는 중입니다. 잠시 후 다시 시도해주세요.')
+      return
+    }
     if (!availableFruitKeysRef.current.includes(fruitKey)) {
       setMapMessage('오늘은 여기서 딸 수 있는 게 없습니다.')
       return
@@ -509,10 +521,10 @@ export function DayScreen({
       {accusationArmed && (
         <p className="day-armed-hint">마을회관으로 이동해 그 자리에서 다시 한번 클릭하면 고발 카드를 건넬 수 있습니다.</p>
       )}
-      {mapMessage && <p className="day-map-message">{mapMessage}</p>}
 
       <div className="day-canvas-wrap">
         <StaminaBar value={stamina} max={session.staminaMax} />
+        {mapMessage && <p className="day-map-message day-map-message--overlay">{mapMessage}</p>}
         <div ref={containerRef} className="day-canvas-inner" />
       </div>
 

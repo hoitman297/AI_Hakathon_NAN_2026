@@ -22,6 +22,16 @@ const NEEDS_TARGET_NPC = new Set(['거짓말탐지기', '선물세트'])
 // (SabotageEvent 주석 참고). 조회 API가 없어 프론트에 하드코딩했다.
 const TOTAL_CLUES = 5
 
+// 장소별로 미리 만들어둔 완성형 단서 카드(프레임+삽화+캡션이 이미 합쳐진 이미지, ui/missions
+// 폴더 참고). 사보타주 장소 종류가 몇 개 안 돼서 장소별 삽화를 재사용한다 — 단서 하나하나마다
+// 새로 생성하지 않는다. 매칭되는 장소가 없으면 빈 카드 프레임(mission-card-active.png) 위에
+// 기존 텍스트를 그대로 보여준다.
+const CLUE_LOCATION_ILLUSTRATION: Record<string, string> = {
+  양계장: '/assets/ui/missions/examples/example-chicken-coop-investigation.png',
+  수박밭: '/assets/ui/missions/examples/example-watermelon-field-investigation.png',
+}
+const CLUE_CARD_BLANK_FRAME = '/assets/ui/missions/mission-card-active.png'
+
 type MainTab = 'items' | 'clues' | 'affinity'
 
 type ClueSlotStatus = 'locked' | 'pending' | 'acquired'
@@ -374,9 +384,11 @@ export function InventoryHubPanel({ sessionId, currentDay, onStaminaChange, onCl
             </>
           }
         >
-          <div className="clue-detail-image" aria-hidden="true">
-            🗂️
-          </div>
+          <img
+            className={`clue-detail-image${(selectedSlot.location && CLUE_LOCATION_ILLUSTRATION[selectedSlot.location]) ? '' : ' clue-detail-image--blank'}`}
+            src={(selectedSlot.location && CLUE_LOCATION_ILLUSTRATION[selectedSlot.location]) || CLUE_CARD_BLANK_FRAME}
+            alt={selectedSlot.location ?? '단서 카드'}
+          />
           <div className="clue-detail-topic">{topicLabel(selectedSlot.clue.topic)}</div>
           <p className="clue-card-text">
             {selectedSlot.clue.clarified
