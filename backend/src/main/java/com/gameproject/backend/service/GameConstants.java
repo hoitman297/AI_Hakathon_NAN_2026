@@ -40,10 +40,11 @@ public final class GameConstants {
     public static final int AFFINITY_WRONG_CLOSE_PENALTY_MAGNITUDE_MIN = 10;
     public static final int AFFINITY_WRONG_CLOSE_PENALTY_MAGNITUDE_MAX = 15;
     public static final int AFFINITY_WRONG_UNRELATED_PENALTY = -5;
-    /** 선물세트 1개당 호감도 +10~15는 시작(50)에서 만점(100)까지 최소 4개(160G)가 필요해
-     *  체감상 너무 안 오른다는 플레이테스트 피드백으로 상승폭을 늘림(잠정값). */
-    public static final int AFFINITY_GIFT_MIN = 18;
-    public static final int AFFINITY_GIFT_MAX = 25;
+    /** 선물세트 1개당 호감도 상승폭. 원래 +10~15(4개 필요)였다가 +18~25로 한 차례 올렸는데도
+     *  체감상 더 올려달라는 플레이테스트 피드백을 받아 재조정(잠정값) — 평균 +30이면 2개
+     *  (80G)로 시작(50)에서 만점(100) 근처까지 도달한다. */
+    public static final int AFFINITY_GIFT_MIN = 25;
+    public static final int AFFINITY_GIFT_MAX = 35;
 
     /** 사보타주 유형만으로 범인이 특정되는 것을 막기 위한 보조 유형 등장 확률(기획 방향성: 주 80% + 보조 20%) */
     public static final int SECONDARY_SABOTAGE_TYPE_CHANCE_PERCENT = 20;

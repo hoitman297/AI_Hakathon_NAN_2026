@@ -141,6 +141,9 @@ export class MainScene extends Phaser.Scene {
   private pendingMovedSeconds = 0
   private npcInteractRange = 0
   private locationInteractRange = 0
+  // 채집 나무/덤불은 건물보다 스프라이트가 훨씬 작아서(scale 0.07~0.09), 건물과 같은 반경(2.5칸)을
+  // 쓰면 나무 바로 옆에 서도 "너무 멀어요"로 튕기는 경우가 잦았다 — 채집 전용으로 더 넓게 잡는다.
+  private forageInteractRange = 0
   private lastDirection: (typeof WALK_DIRECTIONS)[number] = 'south'
   // 남성은 player-male 걷기 스프라이트시트로 실제 프레임 애니메이션을 재생하고, 여성은
   // 아직 걷기 프레임 에셋이 없어 정지 이미지 + 스쿼시&스트레치 트윈으로 움직임을 표현한다.
@@ -263,6 +266,7 @@ export class MainScene extends Phaser.Scene {
     )
     this.npcInteractRange = this.mapData.tileWidth * 2
     this.locationInteractRange = this.mapData.tileWidth * 2.5
+    this.forageInteractRange = this.mapData.tileWidth * 5
     this.isFemalePlayer = getPlayerProfile()?.gender === 'female'
     this.registerPlayerWalkAnimations()
 
@@ -640,7 +644,7 @@ export class MainScene extends Phaser.Scene {
   private handleForageTreeInteract(fruitKey: string, x: number, y: number) {
     if (!this.initData) return
     const distance = Phaser.Math.Distance.Between(this.player.x, this.player.y, x, y)
-    if (distance <= this.locationInteractRange) {
+    if (distance <= this.forageInteractRange) {
       this.initData.onForageTreeClick(fruitKey)
     } else {
       this.showFloatingHint(x, y - this.mapData.tileHeight, '너무 멀어요! 가까이 가주세요')
@@ -1348,14 +1352,25 @@ export class MainScene extends Phaser.Scene {
     }
   }
 
+  /**
+   * 다리는 원래 순수 장식(클릭 판정 없음)이었는데, 백엔드 사보타주 장소 "마을 어귀 순찰"이
+   * clueLocations.ts에서 마땅히 매칭할 스팟이 없어 'village-hall' 쪽으로 흘러들어갔다 —
+   * 다리가 지도상 마을 어귀에 있는데 정작 단서 ❗는 멀리 떨어진 회관에 뜨는 위치 불일치로
+   * 플레이어가 혼란스러워했다. 다리 자체를 'bridge' 스팟으로 클릭 가능하게 만들어 분리한다.
+   */
   private createBridge() {
     const bridgeX = (this.mapData.bridge.tileX + 0.5) * this.mapData.tileWidth
     const bridgeY = this.mapData.bridge.tileY * this.mapData.tileHeight
-    this.add
+    const bridgeImage = this.add
       .image(bridgeX, bridgeY, 'ruralBridge')
       .setOrigin(0.5, 0.5)
       .setScale(0.36)
       .setDepth(10)
+      .setInteractive({ useHandCursor: true })
+    bridgeImage.on('pointerover', () => bridgeImage.setTint(0xfff1b5))
+    bridgeImage.on('pointerout', () => bridgeImage.clearTint())
+    bridgeImage.on('pointerdown', () => this.handleLocationInteract('bridge', bridgeX, bridgeY))
+    this.registerClueMarker('bridge', bridgeX, bridgeY)
   }
 
   /**
