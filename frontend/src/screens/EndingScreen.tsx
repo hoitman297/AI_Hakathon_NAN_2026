@@ -25,10 +25,20 @@ interface EndingScreenProps {
   onBackToTitle: () => void
 }
 
+/**
+ * 범인 지목 이후 마지막에 보여주는 화면 — 작은 카드 팝업이 아니라 화면 전체를 쓰는 컷씬으로
+ * 구성한다. 주의: story-cuts 이미지들은 전부 하단에 자체 캡션이 이미 그림으로 박혀 있어서
+ * (오프닝 ArrivalScreen 때와 같은 문제), 이미지를 배경으로 깔고 그 위에 텍스트를 얹으면
+ * 자체 캡션과 겹쳐서 읽을 수 없게 된다 — 그래서 이미지는 위쪽 영역에 전체(object-fit:
+ * contain, 잘리지 않게)로 보여주고, 우리가 표시할 자막(범인 이름/사건 전문)은 그 아래
+ * 별도의 자막 바 영역에 둬서 절대 겹치지 않게 분리한다. 성공 엔딩은 2단계(범인 동기 공개 →
+ * 마을 평화 에필로그)로 이어지고, "다음" 버튼을 눌러야 마지막 화면(에필로그)으로 넘어간다.
+ */
 export function EndingScreen({ sessionId, onBackToTitle }: EndingScreenProps) {
   const [ending, setEnding] = useState<EndingResult | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
+  const [showEpilogue, setShowEpilogue] = useState(false)
 
   useEffect(() => {
     getEnding(sessionId)
@@ -37,42 +47,58 @@ export function EndingScreen({ sessionId, onBackToTitle }: EndingScreenProps) {
       .finally(() => setLoading(false))
   }, [sessionId])
 
-  // ending이 아직 없을 때(로딩 중/에러) isSuccess를 false로 취급하면 정답 고발 직후에도
-  // 스토리가 오기 전까지 잠깐 "배드엔딩" 배지/배경이 먼저 뜨는 것처럼 보인다 — 로딩 중에는
-  // 성공/실패 어느 쪽 스타일도 아닌 중립 상태로 보여준다.
-  const isSuccess = ending?.status === 'SUCCESS'
-  const screenVariant = loading ? 'ending-screen--loading' : isSuccess ? 'ending-screen--success' : 'ending-screen--bad'
+  if (loading) {
+    return (
+      <div className="ending-screen ending-screen--loading">
+        <p className="ending-note">엔딩을 준비하는 중...</p>
+      </div>
+    )
+  }
+
+  if (error || !ending) {
+    return (
+      <div className="ending-screen ending-screen--loading">
+        {error && <p className="pixel-error">{error}</p>}
+        <button className="pixel-button pixel-button--accent" onClick={onBackToTitle}>
+          타이틀로 돌아가기
+        </button>
+      </div>
+    )
+  }
+
+  const isSuccess = ending.status === 'SUCCESS'
+  const isEpilogue = isSuccess && showEpilogue
+
+  const cutImage = !isSuccess
+    ? BAD_ENDING_IMAGE
+    : isEpilogue
+      ? HAPPY_ENDING_IMAGE
+      : (ending.culpritNpcId && MOTIVE_REVEAL_IMAGE_BY_NPC_ID[ending.culpritNpcId]) || HAPPY_ENDING_IMAGE
 
   return (
-    <div className={`ending-screen ${screenVariant}`}>
-      <div className="ending-panel pixel-panel">
-        {loading && <p className="ending-note">엔딩을 준비하는 중...</p>}
-        {!loading && <div className="ending-badge">{isSuccess ? '성공' : '배드엔딩'}</div>}
-        {error && <p className="pixel-error">{error}</p>}
-        {!loading && ending && (
-          <>
-            {isSuccess && ending.culpritNpcId && MOTIVE_REVEAL_IMAGE_BY_NPC_ID[ending.culpritNpcId] && (
-              <img
-                className="ending-motive-image pixel-art"
-                src={MOTIVE_REVEAL_IMAGE_BY_NPC_ID[ending.culpritNpcId]}
-                alt={`${ending.culpritName ?? '범인'}의 동기`}
-              />
-            )}
-            {!isSuccess && (
-              <img className="ending-motive-image pixel-art" src={BAD_ENDING_IMAGE} alt="마을에서 쫓겨났습니다" />
-            )}
-            {isSuccess && ending.culpritName && <h2>범인은 {withWasCopula(ending.culpritName)}</h2>}
-            <p className="ending-story">{ending.endingStory}</p>
-            {isSuccess && (
-              <img className="ending-peace-image pixel-art" src={HAPPY_ENDING_IMAGE} alt="마을은 다시 평화를 되찾았습니다" />
-            )}
-          </>
+    <div className="ending-cinematic">
+      <div className="ending-cinematic-badge">{isSuccess ? '성공' : '배드엔딩'}</div>
+
+      <div className="ending-cinematic-stage">
+        <img className="ending-cinematic-image" src={cutImage} alt={isSuccess ? (ending.culpritName ?? '엔딩') : '마을에서 쫓겨났습니다'} />
+      </div>
+
+      <div className="ending-cinematic-subtitle">
+        {!isEpilogue && isSuccess && ending.culpritName && (
+          <p className="ending-cinematic-heading">범인은 {withWasCopula(ending.culpritName)}</p>
         )}
-        {!loading && (
-          <button className="pixel-button pixel-button--accent" onClick={onBackToTitle}>
-            타이틀로 돌아가기
-          </button>
-        )}
+        {!isEpilogue && <p className="ending-cinematic-body">{ending.endingStory}</p>}
+        <div className="ending-cinematic-actions">
+          {isSuccess && !isEpilogue ? (
+            <button className="pixel-button pixel-button--accent" onClick={() => setShowEpilogue(true)}>
+              다음
+            </button>
+          ) : (
+            <button className="pixel-button pixel-button--accent" onClick={onBackToTitle}>
+              타이틀로 돌아가기
+            </button>
+          )}
+        </div>
       </div>
     </div>
   )
