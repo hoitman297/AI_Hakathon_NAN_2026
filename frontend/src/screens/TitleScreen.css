@@ -66,6 +66,10 @@
   box-shadow: 0 4px 0 #806849;
 }
 
+.title-preview-button {
+  margin-top: 14px;
+}
+
 .title-account {
   margin-top: 22px;
   color: #6e5335;
