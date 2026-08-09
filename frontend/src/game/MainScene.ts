@@ -108,9 +108,11 @@ export class MainScene extends Phaser.Scene {
     this.load.image('terrainChunk', '/assets/world/maps/korean-countryside-chunk-01.png?v=no-road-expanded-field-v18')
     this.load.json('terrainMapData', '/assets/world/maps/korean-countryside-chunk-01.json?v=no-road-expanded-field-v18')
     WALK_DIRECTIONS.forEach((direction) => {
-      this.load.image(`player-${direction}`, `/assets/characters/player-boy-v2/Idle/rotations/${direction}.png`)
       this.load.image(`player-girl-${direction}`, `/assets/characters/player-girl-v2/Idle/rotations/${direction}.png`)
       // 남성 캐릭터 전용 4프레임 걷기 애니메이션(여성용은 아직 원본 에셋이 없어 정지 이미지만 씀).
+      // 정지 포즈도 이 스프라이트시트의 0번 프레임을 그대로 쓴다(따로 정지 이미지 에셋을 안 씀) —
+      // 예전엔 정지 상태만 다른 화풍의 player-boy-v2 이미지를 써서 걷기 시작/정지할 때마다
+      // 캐릭터 생김새가 바뀌어 보이는 문제가 있었다.
       this.load.spritesheet(
         `player-walk-${direction}`,
         `/assets/characters/player-male/walk_cycle_all_directions/${direction}/${direction}_walk_sheet.png`,
@@ -221,8 +223,11 @@ export class MainScene extends Phaser.Scene {
       (blocker) => !Phaser.Geom.Intersects.RectangleToRectangle(blocker, spawnSafetyArea),
     )
 
+    const [initialTexture, initialFrame] = this.hasWalkCycle
+      ? [`player-walk-south`, 0]
+      : [`${this.playerTexturePrefix}-south`, undefined]
     this.player = this.add
-      .sprite(spawnX, spawnY, `${this.playerTexturePrefix}-south`)
+      .sprite(spawnX, spawnY, initialTexture, initialFrame)
       .setDepth(spawnY)
       .setDisplaySize(PLAYER_IDLE_DISPLAY_SIZE, PLAYER_IDLE_DISPLAY_SIZE)
     this.createWorldLighting()
@@ -401,11 +406,15 @@ export class MainScene extends Phaser.Scene {
     }
   }
 
-  /** 이동을 멈추면 걷기 애니메이션을 정지하고, 마지막으로 보던 방향의 정지 이미지로 되돌린다. */
+  /**
+   * 이동을 멈추면 걷기 애니메이션을 정지하고, 마지막으로 보던 방향의 정지 포즈로 되돌린다.
+   * 정지 포즈도 같은 걷기 스프라이트시트의 0번 프레임을 그대로 쓴다 — 걷는 중/멈췄을 때
+   * 캐릭터 생김새가 서로 다른 에셋이라 달라 보이지 않게 하기 위함.
+   */
   private stopWalking() {
     if (!this.hasWalkCycle || !this.player.anims.isPlaying) return
     this.player.anims.stop()
-    this.player.setTexture(`${this.playerTexturePrefix}-${this.lastDirection}`)
+    this.player.setTexture(`player-walk-${this.lastDirection}`, 0)
     this.player.setDisplaySize(PLAYER_IDLE_DISPLAY_SIZE, PLAYER_IDLE_DISPLAY_SIZE)
   }
 
