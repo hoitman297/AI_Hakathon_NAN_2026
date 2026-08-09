@@ -1,6 +1,7 @@
 package com.gameproject.backend.service;
 
 import java.time.LocalDateTime;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Random;
 
@@ -154,15 +155,17 @@ class SessionPersistenceService {
         Npc culprit = assignment.getNpc();
         CulpritProfile profile = culpritProfileRegistry.get(culprit.getName());
 
-        Target previousTarget = sabotageEventRepository.findBySessionAndDay(session, day - 1).stream()
-                .findFirst()
+        // 대상 풀이 오늘 밤 유형(주/보조)에 따라 달라지므로, 대상을 뽑기 전에 유형부터 정한다.
+        SabotageType tonightType = pickTonightType(assignment, random);
+
+        List<Target> previousTargets = sabotageEventRepository.findBySession(session).stream()
+                .sorted(Comparator.comparing(SabotageEvent::getDay))
                 .map(prev -> new Target(prev.getLocation(), prev.getSubTarget()))
-                .orElse(null);
-        Target tonight = profile.pickTonight(random, previousTarget);
+                .toList();
+        Target tonight = profile.pickTonight(random, tonightType, previousTargets);
 
         boolean selfDecoy = random.nextInt(100) < 10; // 낮은 확률(10%)로 자작극
         Npc witness = findWitness(session, culprit, tonight.location());
-        SabotageType tonightType = pickTonightType(assignment, random);
 
         // 단서 카드 5장 총량에 맞춰 1~5일차 밤마다 주제를 하나씩 순환 배정
         ClueTopic topic = ClueTopic.values()[(day - 1) % ClueTopic.values().length];

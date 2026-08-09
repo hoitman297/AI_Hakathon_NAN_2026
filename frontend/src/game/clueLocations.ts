@@ -17,3 +17,11 @@ export function matchesLocationSpot(location: string, spotKey: string): boolean 
   if (!keywords) return false
   return keywords.some((keyword) => location.includes(keyword))
 }
+
+/** 지도 위에 실제로 존재하는 모든 장소 스팟 키. */
+export const ALL_SPOT_KEYS = Object.keys(SPOT_KEYWORDS)
+
+/** 미습득 단서들의 장소 문자열 중 하나라도 이 스팟과 매칭되면 포함한다. */
+export function spotsWithPendingClue(locations: string[]): string[] {
+  return ALL_SPOT_KEYS.filter((spotKey) => locations.some((location) => matchesLocationSpot(location, spotKey)))
+}

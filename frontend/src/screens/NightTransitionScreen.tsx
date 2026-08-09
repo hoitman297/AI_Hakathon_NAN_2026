@@ -11,22 +11,37 @@ interface NightTransitionScreenProps {
 
 type Phase = 'loading' | 'scene' | 'popup'
 
-const SCENE_DESCRIPTIONS: Record<NightSummary['sabotageType'], { location: string; badge: string; text: string }> = {
+/** 사보타주 유형별 뱃지 문구 + 실제 장소 데이터가 없거나 매칭 에셋이 없을 때의 대체값. */
+const TYPE_META: Record<NightSummary['sabotageType'], { badge: string; fallbackLocation: string; fallbackImage: string }> = {
   theft: {
-    location: '농산물 상점 앞',
     badge: '도난 흔적 발견',
-    text: '농산물 상점 앞에서 진열해 둔 작물 몇 개가\n감쪽같이 사라져 있었다.',
+    fallbackLocation: '농산물 상점 앞',
+    fallbackImage: '/assets/background-assets/buildings/public/produce-shop.png',
   },
   vandalism: {
-    location: '수박밭',
     badge: '파손 흔적 발견',
-    text: '수박밭에서 잘 익은 수박 몇 통이\n처참히 짓이겨져 있었다.',
+    fallbackLocation: '수박밭',
+    fallbackImage: '/assets/background-assets/facilities/watermelon-field-damaged.png',
   },
   sabotage: {
-    location: '양계장',
-    badge: '우리 문이 열려있다',
-    text: '양계장 문이 활짝 열려 있고,\n닭 몇 마리가 밖을 헤매고 있었다.',
+    badge: '훼손 흔적 발견',
+    fallbackLocation: '양계장',
+    fallbackImage: '/assets/background-assets/facilities/chicken-coop-broken.png',
   },
+}
+
+/** 백엔드가 내려주는 실제 사건 장소(CulpritProfileRegistry의 location 문자열)와 배경 에셋 매핑. */
+const LOCATION_IMAGES: Record<string, string> = {
+  '마을회관': '/assets/background-assets/buildings/public/village-hall.png',
+  '정자': '/assets/background-assets/facilities/village-park.png',
+  '마을 어귀 순찰': '/assets/background-assets/bridge-concrete.png',
+  '상점': '/assets/background-assets/buildings/public/produce-shop.png',
+  '상점(근무)': '/assets/background-assets/buildings/public/produce-shop.png',
+  '상점(납품)': '/assets/background-assets/buildings/public/produce-shop.png',
+  '양계장': '/assets/background-assets/facilities/chicken-coop-broken.png',
+  '수박밭': '/assets/background-assets/facilities/watermelon-field-damaged.png',
+  '자택': '/assets/background-assets/buildings/houses/house-1.png',
+  '자택 인근 텃밭': '/assets/background-assets/buildings/houses/house-1.png',
 }
 
 export function NightTransitionScreen({ sessionId, day, nextDay, onContinue }: NightTransitionScreenProps) {
@@ -68,8 +83,9 @@ export function NightTransitionScreen({ sessionId, day, nextDay, onContinue }: N
   }
 
   if (!summary || phase === 'popup') {
-    const desc = summary ? SCENE_DESCRIPTIONS[summary.sabotageType] : null
-    const bodyText = desc ? `${desc.location}에서 ${desc.badge}.` : '마을은 오늘 밤도 평온했던 것 같다.'
+    const meta = summary ? TYPE_META[summary.sabotageType] : null
+    const location = summary ? summary.location || meta!.fallbackLocation : null
+    const bodyText = meta ? `${location}에서 ${meta.badge}.` : '마을은 오늘 밤도 평온했던 것 같다.'
 
     return (
       <div className="ns-root">
@@ -92,13 +108,9 @@ export function NightTransitionScreen({ sessionId, day, nextDay, onContinue }: N
   }
 
   const type = summary.sabotageType
-  const desc = SCENE_DESCRIPTIONS[type]
-
-  const bgImage: Record<NightSummary['sabotageType'], string> = {
-    theft: '/assets/background-assets/buildings/public/produce-shop.png',
-    vandalism: '/assets/background-assets/facilities/watermelon-field-damaged.png',
-    sabotage: '/assets/background-assets/facilities/chicken-coop-broken.png',
-  }
+  const meta = TYPE_META[type]
+  const location = summary.location || meta.fallbackLocation
+  const bgSrc = LOCATION_IMAGES[summary.location] ?? meta.fallbackImage
 
   const walkSheet: Record<NightSummary['sabotageType'], string> = {
     theft: '/assets/characters/player-male/walk/east_walk_sheet.png',
@@ -137,22 +149,32 @@ export function NightTransitionScreen({ sessionId, day, nextDay, onContinue }: N
         <div className="ns-day-badge">{day}일차 · 깊은 밤</div>
 
         <div className="ns-stage" onClick={() => { if (timerRef.current) clearTimeout(timerRef.current); setPhase('popup') }}>
-          <div className="ns-bg" style={{ backgroundImage: `url('${bgImage[type]}')` }} />
+          <div className="ns-bg" style={{ backgroundImage: `url('${bgSrc}')` }} />
 
-          <div className="ns-stage-tag">{desc.location}</div>
-          <div className="ns-stage-badge-bottom">{desc.badge}</div>
+          <div className="ns-stage-tag">{location}</div>
+          <div className="ns-stage-badge-bottom">{meta.badge}</div>
 
           {type === 'theft' && (
             <>
-              <img className="ns-crop ns-crop--potato" src="/assets/background-assets/growth/crops/potato-stage-3.png" alt="" />
-              <img className="ns-crop ns-crop--carrot" src="/assets/background-assets/growth/crops/carrot-stage-3.png" alt="" />
-              <img className="ns-crop ns-crop--strawberry" src="/assets/background-assets/growth/crops/strawberry-stage-3.png" alt="" />
+              {(location === '수박밭' || location === '자택 인근 텃밭') && (
+                <>
+                  <img className="ns-crop ns-crop--potato" src="/assets/background-assets/growth/crops/potato-stage-3.png" alt="" />
+                  <img className="ns-crop ns-crop--carrot" src="/assets/background-assets/growth/crops/carrot-stage-3.png" alt="" />
+                  <img className="ns-crop ns-crop--strawberry" src="/assets/background-assets/growth/crops/strawberry-stage-3.png" alt="" />
+                </>
+              )}
               <img className="ns-bag" src="/assets/items/bag-level-1.png" alt="" />
             </>
           )}
 
-          {type === 'sabotage' && (
+          {location === '양계장' && (
             <img className="ns-chicken" src="/assets/background-assets/objects/chicken-front.png" alt="" />
+          )}
+
+          {/* 마을회관/정자/상점/자택 등은 전용 파손(broken) 배경 에셋이 없어서, 부서진 울타리
+              소품으로 "여기서 파손 사고가 났다"는 걸 대신 표시한다. */}
+          {type === 'vandalism' && location !== '수박밭' && (
+            <img className="ns-fence-broken" src="/assets/background-assets/objects/wood-fence-broken.png" alt="" />
           )}
 
           <div className="ns-player-glow" />

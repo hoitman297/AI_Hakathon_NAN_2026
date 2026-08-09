@@ -274,6 +274,18 @@
   z-index: 3;
 }
 
+/* vandalism prop — fallback "something's broken" cue for locations without a
+   dedicated damaged background asset (only 양계장/수박밭 have one) */
+.ns-fence-broken {
+  position: absolute;
+  left: 18%;
+  bottom: 10%;
+  width: 64px;
+  image-rendering: pixelated;
+  filter: brightness(.7) drop-shadow(0 3px 4px rgba(0, 0, 0, .5));
+  z-index: 2;
+}
+
 /* sabotage (chicken) */
 .ns-chicken {
   position: absolute;
