@@ -44,7 +44,7 @@ class AccusationServiceTest {
 
     @BeforeEach
     void setUp() {
-        accusationService = new AccusationService(llmProxyClient, persistence);
+        accusationService = new AccusationService(llmProxyClient, persistence, Runnable::run);
 
         culprit = Npc.builder().npcId(1L).name("나박수").role("수박밭 주인").age(32)
                 .personalityDesc("다혈질").speechStyle("사투리").sampleLine("아이고").build();

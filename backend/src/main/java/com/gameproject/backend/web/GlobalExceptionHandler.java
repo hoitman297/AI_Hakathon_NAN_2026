@@ -1,7 +1,10 @@
 package com.gameproject.backend.web;
 
 import java.util.Map;
+import java.util.concurrent.CompletionException;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -17,6 +20,8 @@ import com.gameproject.backend.service.LlmRateLimitExceededException;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
+
+    private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
 
     @ExceptionHandler(IllegalArgumentException.class)
     public ResponseEntity<Map<String, String>> handleBadRequest(IllegalArgumentException e) {
@@ -75,6 +80,34 @@ public class GlobalExceptionHandler {
     public ResponseEntity<Map<String, String>> handleUpstreamTimeout(RestClientException e) {
         return ResponseEntity.status(HttpStatus.GATEWAY_TIMEOUT)
                 .body(Map.of("error", "LLM 서버 응답이 지연되고 있습니다. 잠시 후 다시 시도해주세요."));
+    }
+
+    /**
+     * SessionService.advanceDay()/AccusationService.accuse()가 서로 독립적인 llm-proxy
+     * 호출 2개를 CompletableFuture로 병렬 실행하고 join()으로 기다리는데, join()은 원인
+     * 예외를 항상 CompletionException으로 감싸서 던진다 — 그 안의 원인이 위
+     * RestClientResponseException/RestClientException/IllegalStateException/
+     * IllegalArgumentException이어도 타입이 안 맞아 해당 핸들러가 못 잡고 그대로 새서 일반
+     * 500(스택트레이스 노출 위험)으로 떨어졌었다. 원인을 풀어서 같은 방식으로 재분류한다.
+     */
+    @ExceptionHandler(CompletionException.class)
+    public ResponseEntity<Map<String, String>> handleCompletionException(CompletionException e) {
+        Throwable cause = e.getCause();
+        if (cause instanceof RestClientResponseException restClientResponseException) {
+            return handleUpstreamHttpError(restClientResponseException);
+        }
+        if (cause instanceof RestClientException restClientException) {
+            return handleUpstreamTimeout(restClientException);
+        }
+        if (cause instanceof IllegalStateException illegalStateException) {
+            return handleConflict(illegalStateException);
+        }
+        if (cause instanceof IllegalArgumentException illegalArgumentException) {
+            return handleBadRequest(illegalArgumentException);
+        }
+        log.error("병렬 LLM 호출 중 예기치 못한 예외", cause);
+        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(Map.of("error", "처리 중 예기치 못한 오류가 발생했습니다."));
     }
 
     /** 같은 세션 상태(체력/골드/인벤토리 등)를 동시에 수정하려다 낙관적 락(@Version)에 걸린 경우. */

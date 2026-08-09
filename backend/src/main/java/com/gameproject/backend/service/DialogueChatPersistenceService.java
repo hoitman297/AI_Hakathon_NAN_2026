@@ -77,6 +77,20 @@ class DialogueChatPersistenceService {
         // 실제 상태 변경(체력 소모 등) 전에 먼저 검사해서, 막힐 요청은 아무 부작용 없이 막는다.
         llmRateLimiter.checkAllowed(session.getAccount().getAccountId());
 
+        List<DialogueLog> allLogs = dialogueLogRepository.findBySessionAndNpcOrderByCreatedAtAsc(session, npc);
+
+        // 기획서: NPC 한 명당 하루 최대 3회 대화. 예전엔 프론트 로컬 state(대화창을 새로 열 때마다
+        // 0으로 초기화)로만 세서, 대화창을 닫았다 다시 열면 한도가 그냥 풀렸다 — 여기서 이 세션의
+        // 오늘(currentDay)치 USER 발화 수를 DB 기준으로 직접 세서, 대화창을 몇 번을 열고 닫든
+        // 하루 누적치가 유지되게 한다.
+        long todayExchangeCount = allLogs.stream()
+                .filter(log -> log.getSender() == DialogueSender.USER && log.getDay().equals(session.getCurrentDay()))
+                .count();
+        if (todayExchangeCount >= GameConstants.MAX_DIALOGUE_EXCHANGES_PER_NPC_PER_DAY) {
+            throw new IllegalStateException(npc.getName() + "와(과)는 오늘 더 대화할 수 없습니다 (하루 최대 "
+                    + GameConstants.MAX_DIALOGUE_EXCHANGES_PER_NPC_PER_DAY + "회).");
+        }
+
         PlayerStat stat = staminaService.consume(session, GameConstants.DIALOGUE_STAMINA);
 
         String existingPersonaJson = personaStateRepository.findBySessionAndNpc(session, npc)
@@ -89,7 +103,7 @@ class DialogueChatPersistenceService {
                     .orElse(null);
         }
 
-        List<DialogueTurn> history = dialogueLogRepository.findBySessionAndNpcOrderByCreatedAtAsc(session, npc).stream()
+        List<DialogueTurn> history = allLogs.stream()
                 .map(log -> new DialogueTurn(log.getSender().name(), log.getMessage()))
                 .toList();
 
@@ -141,7 +155,7 @@ class DialogueChatPersistenceService {
 
         return new DialogueChatContext(session, npc, stat, existingPersonaJson, motiveTextForPersonaGen, history,
                 honestMode, affinityScore, restrictDetectiveTalk, witnessContext, witnessIsSecondhand,
-                recentVillageEventContext);
+                recentVillageEventContext, (int) todayExchangeCount + 1);
     }
 
     @Transactional

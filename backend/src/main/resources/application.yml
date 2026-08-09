@@ -11,6 +11,14 @@ spring:
     hibernate:
       ddl-auto: ${DB_DDL_AUTO:none}
     open-in-view: false
+    properties:
+      hibernate:
+        # 세션 생성 시 NPC 수만큼 도는 affinity INSERT 등, 같은 타입 반복 저장을 묶어서
+        # DB 왕복 횟수를 줄인다 (order_inserts/updates가 있어야 배치가 실제로 묶여서 나간다).
+        jdbc:
+          batch_size: 20
+        order_inserts: true
+        order_updates: true
 
 server:
   port: ${SERVER_PORT:8080}

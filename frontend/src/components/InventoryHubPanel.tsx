@@ -68,6 +68,7 @@ interface AffinityEntry {
   npcId: number
   name: string
   role: string
+  age: number
   score: number
 }
 
@@ -120,7 +121,9 @@ export function InventoryHubPanel({ sessionId, currentDay, onStaminaChange, onCl
     return listNpcsToday(sessionId)
       .then((npcs) => Promise.all(npcs.map((npc) => getNpcDetail(sessionId, npc.npcId))))
       .then((details) => {
-        setAffinityList(details.map((d) => ({ npcId: d.npcId, name: d.name, role: d.role, score: d.affinityScore })))
+        setAffinityList(
+          details.map((d) => ({ npcId: d.npcId, name: d.name, role: d.role, age: d.age, score: d.affinityScore })),
+        )
         setAffinityError(null)
       })
       .catch((err: unknown) => setAffinityError(err instanceof Error ? err.message : '호감도 정보를 불러오지 못했습니다.'))
@@ -333,7 +336,9 @@ export function InventoryHubPanel({ sessionId, currentDay, onStaminaChange, onCl
                   <div key={npc.npcId} className="affinity-row">
                     <div className="affinity-info">
                       <div className="affinity-name">{npc.name}</div>
-                      <div className="affinity-role">{npc.role}</div>
+                      <div className="affinity-role">
+                        {npc.role} · {npc.age}세
+                      </div>
                     </div>
                     <div className="affinity-meter">
                       <HeartMeter score={npc.score} />

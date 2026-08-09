@@ -106,3 +106,11 @@ export async function moveSession(sessionId: number, seconds: number): Promise<S
   })
   return parseOrThrow<SessionResponse>(response, '이동 체력 반영에 실패했습니다.')
 }
+
+/** 맵 위 시설(양계장/수박밭 등) 파손 표시용 — 지금까지 사보타주가 발생한 장소 이름 목록. */
+export async function getSabotageLocations(sessionId: number): Promise<string[]> {
+  const response = await fetch(`${API_BASE_URL}/api/sessions/${sessionId}/sabotage/locations`, {
+    headers: authHeaders(),
+  })
+  return parseOrThrow<string[]>(response, '사보타주 발생 장소를 불러오지 못했습니다.')
+}

@@ -3,7 +3,7 @@ import { API_BASE_URL } from './config'
 
 export interface InventorySlot {
   slotIndex: number
-  itemType: 'CROP' | 'FRUIT' | 'SHOP_ITEM'
+  itemType: 'CROP' | 'FRUIT' | 'SHOP_ITEM' | 'SEED'
   itemRefId: number
   itemName: string
   quantity: number

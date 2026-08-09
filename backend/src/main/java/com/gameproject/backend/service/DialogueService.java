@@ -7,8 +7,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.gameproject.backend.client.LlmProxyClient;
+import com.gameproject.backend.domain.DialogueSender;
 import com.gameproject.backend.domain.GameSession;
 import com.gameproject.backend.domain.Npc;
+import com.gameproject.backend.dto.DialogueHistoryResponse;
 import com.gameproject.backend.dto.DialogueMessageResponse;
 import com.gameproject.backend.dto.DialogueReplyResponse;
 import com.gameproject.backend.dto.llm.DialogueChatResponse;
@@ -39,12 +41,17 @@ public class DialogueService {
     private final DialogueChatPersistenceService persistence;
 
     @Transactional(readOnly = true)
-    public List<DialogueMessageResponse> history(Long sessionId, Long npcId) {
+    public DialogueHistoryResponse history(Long sessionId, Long npcId) {
         GameSession session = sessionService.findSession(sessionId);
         Npc npc = findNpc(npcId);
-        return dialogueLogRepository.findBySessionAndNpcOrderByCreatedAtAsc(session, npc).stream()
+        var logs = dialogueLogRepository.findBySessionAndNpcOrderByCreatedAtAsc(session, npc);
+        List<DialogueMessageResponse> messages = logs.stream()
                 .map(log -> new DialogueMessageResponse(log.getSender().name(), log.getMessage(), log.getCreatedAt()))
                 .toList();
+        long usedToday = logs.stream()
+                .filter(log -> log.getSender() == DialogueSender.USER && log.getDay().equals(session.getCurrentDay()))
+                .count();
+        return new DialogueHistoryResponse(messages, (int) usedToday, GameConstants.MAX_DIALOGUE_EXCHANGES_PER_NPC_PER_DAY);
     }
 
     public DialogueReplyResponse send(Long sessionId, Long npcId, String userMessage) {
@@ -81,7 +88,8 @@ public class DialogueService {
             newAffinity = ctx.affinityScore();
         }
 
-        return new DialogueReplyResponse(reply, newAffinity, ctx.stat().getStaminaCurrent());
+        return new DialogueReplyResponse(reply, newAffinity, ctx.stat().getStaminaCurrent(),
+                ctx.exchangesUsedToday(), GameConstants.MAX_DIALOGUE_EXCHANGES_PER_NPC_PER_DAY);
     }
 
     private Npc findNpc(Long npcId) {

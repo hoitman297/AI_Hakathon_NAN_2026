@@ -7,10 +7,19 @@ export interface DialogueMessage {
   createdAt: string
 }
 
+/** exchangesUsedToday는 대화창을 새로 열어도 초기화되지 않는, 서버가 세는 오늘 누적 대화 횟수. */
+export interface DialogueHistoryResult {
+  messages: DialogueMessage[]
+  exchangesUsedToday: number
+  maxExchangesPerDay: number
+}
+
 export interface DialogueReplyResult {
   npcReply: string
   affinityScore: number
   staminaCurrent: number
+  exchangesUsedToday: number
+  maxExchangesPerDay: number
 }
 
 function authHeaders(): HeadersInit {
@@ -32,11 +41,11 @@ async function parseOrThrow<T>(response: Response, fallbackMessage: string): Pro
   return (await response.json()) as T
 }
 
-export async function fetchDialogueHistory(sessionId: number, npcId: number): Promise<DialogueMessage[]> {
+export async function fetchDialogueHistory(sessionId: number, npcId: number): Promise<DialogueHistoryResult> {
   const response = await fetch(`${API_BASE_URL}/api/sessions/${sessionId}/npcs/${npcId}/dialogue`, {
     headers: authHeaders(),
   })
-  return parseOrThrow<DialogueMessage[]>(response, '대화 기록을 불러오지 못했습니다.')
+  return parseOrThrow<DialogueHistoryResult>(response, '대화 기록을 불러오지 못했습니다.')
 }
 
 export async function sendDialogueMessage(

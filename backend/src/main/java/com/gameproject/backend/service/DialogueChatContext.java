@@ -24,5 +24,7 @@ record DialogueChatContext(
         boolean restrictDetectiveTalk,
         String witnessContext,
         boolean witnessIsSecondhand,
-        String recentVillageEventContext) {
+        String recentVillageEventContext,
+        /** 이 요청까지 포함해 오늘 이 NPC에게 보낸 USER 발화 수(1부터 시작). */
+        int exchangesUsedToday) {
 }

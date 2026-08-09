@@ -62,6 +62,7 @@ public class InventoryService {
             case CROP -> cropMasterRepository.findById(refId).map(CropMaster::getName).orElse("알 수 없는 작물");
             case FRUIT -> fruitMasterRepository.findById(refId).map(FruitMaster::getName).orElse("알 수 없는 과일");
             case SHOP_ITEM -> shopItem != null ? shopItem.getName() : "알 수 없는 아이템";
+            case SEED -> cropMasterRepository.findById(refId).map(crop -> crop.getName() + " 씨앗").orElse("알 수 없는 씨앗");
         };
         String itemCode = shopItem != null ? shopItem.getItemCode().name() : null;
 

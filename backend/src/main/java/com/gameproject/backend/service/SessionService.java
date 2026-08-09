@@ -4,6 +4,8 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 import java.util.Random;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Executor;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -45,6 +47,7 @@ public class SessionService {
     private final GameSaveService gameSaveService;
     private final LlmProxyClient llmProxyClient;
     private final SessionPersistenceService persistence;
+    private final Executor llmParallelExecutor;
 
     private final Random random = new Random();
 
@@ -125,6 +128,16 @@ public class SessionService {
                 .map(event -> new NightSummaryResponse(event.getLocation(), event.getSummaryText(), toSceneType(event.getType())));
     }
 
+    /** 맵 위 시설(양계장/수박밭 등) 파손 표시용 — 지금까지 발생한 사보타주 장소 이름만 중복 없이. */
+    @Transactional(readOnly = true)
+    public List<String> getSabotageLocations(Long sessionId) {
+        GameSession session = findSession(sessionId);
+        return sabotageEventRepository.findBySession(session).stream()
+                .map(com.gameproject.backend.domain.SabotageEvent::getLocation)
+                .distinct()
+                .toList();
+    }
+
     private String toSceneType(com.gameproject.backend.domain.SabotageType type) {
         if (type == null) return "theft";
         return switch (type) {
@@ -185,12 +198,21 @@ public class SessionService {
         String clueText = null;
         if (ctx.sabotage() != null) {
             SabotagePrepContext sabotage = ctx.sabotage();
-            // 다음날 아침 화면(NightTransitionScreen)에 노출되는 연출 문구 — 범인 정보는 안 들어간다.
-            summaryText = llmProxyClient.generateSabotageSummary(
-                    sabotage.location(), sabotage.type().name(), sabotage.subTarget(), ctx.day());
-            clueText = llmProxyClient.generateClueContent(
-                    sabotage.topic().name(), sabotage.culpritAppearanceDesc(), sabotage.culpritPersonalityDesc(),
-                    sabotage.location(), sabotage.subTarget());
+            // 서로 독립적인 두 호출(연출 문구 vs 단서 문구)이라 순차 대기 대신 동시에 보낸다 —
+            // 둘 다 최대 45초까지 걸릴 수 있어(LlmProxyRestClientConfig), 순차 실행이면 최악의
+            // 경우 두 배로 늘어난다. 다음날 아침 화면(NightTransitionScreen)에 노출되는 연출
+            // 문구 — 범인 정보는 안 들어간다.
+            CompletableFuture<String> summaryFuture = CompletableFuture.supplyAsync(
+                    () -> llmProxyClient.generateSabotageSummary(
+                            sabotage.location(), sabotage.type().name(), sabotage.subTarget(), ctx.day()),
+                    llmParallelExecutor);
+            CompletableFuture<String> clueFuture = CompletableFuture.supplyAsync(
+                    () -> llmProxyClient.generateClueContent(
+                            sabotage.topic().name(), sabotage.culpritAppearanceDesc(), sabotage.culpritPersonalityDesc(),
+                            sabotage.location(), sabotage.subTarget()),
+                    llmParallelExecutor);
+            summaryText = summaryFuture.join();
+            clueText = clueFuture.join();
         }
 
         return persistence.finalizeAdvanceDay(ctx, summaryText, clueText);

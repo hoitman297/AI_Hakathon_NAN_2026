@@ -44,6 +44,12 @@ public class FarmController {
         return ResponseEntity.ok(farmService.listPlots(sessionId));
     }
 
+    @PostMapping("/farm/seeds/buy")
+    public ResponseEntity<SessionResponse> buySeed(@PathVariable("sessionId") Long sessionId, @Valid @RequestBody PlantRequest request) {
+        farmService.buySeed(sessionId, request.cropId());
+        return ResponseEntity.ok(sessionService.getSession(sessionId));
+    }
+
     @PostMapping("/farm/plant")
     public ResponseEntity<SessionResponse> plant(@PathVariable("sessionId") Long sessionId, @Valid @RequestBody PlantRequest request) {
         farmService.plant(sessionId, request.cropId());
@@ -54,6 +60,11 @@ public class FarmController {
     public ResponseEntity<SessionResponse> harvest(@PathVariable("sessionId") Long sessionId, @Valid @RequestBody HarvestRequest request) {
         farmService.harvest(sessionId, request.farmPlotId());
         return ResponseEntity.ok(sessionService.getSession(sessionId));
+    }
+
+    @GetMapping("/forage/species")
+    public ResponseEntity<List<AvailableFruitResponse>> allSpecies(@PathVariable("sessionId") Long sessionId) {
+        return ResponseEntity.ok(forageService.listAllSpecies());
     }
 
     @GetMapping("/forage/today")

@@ -18,6 +18,13 @@ type TerrainMapData = {
   collision: { blockedTiles: TilePoint[] }
 }
 
+/** 농장 밭 한 칸의 현재 표시 상태 — DayScreen이 FarmPlot API 응답을 이 형태로 가공해 넘긴다. */
+export interface FarmPlotVisual {
+  /** preload된 텍스처 키(예: 'crop-carrot-2'). null이면 아무것도 안 심긴 빈 밭. */
+  textureKey: string | null
+  readyToHarvest: boolean
+}
+
 export interface MainSceneInitData {
   day: number
   staminaCurrent: number
@@ -29,6 +36,10 @@ export interface MainSceneInitData {
   onNpcClick: (npcName: string, npcRole: string) => void
   /** 지도 위 장소(마을회관/상점/양계장 등)를 플레이어가 가까이서 클릭했을 때 spot.key를 보고한다. */
   onLocationClick: (spotKey: string) => void
+  /** 농장 밭 타일(0..FARM_PLOT_POSITIONS.length-1)을 가까이서 클릭했을 때 보고한다. */
+  onFarmTileClick: (slotIndex: number) => void
+  /** 채집 가능한 나무/덤불(과일 키)을 가까이서 클릭했을 때 보고한다. */
+  onForageTreeClick: (fruitKey: string) => void
 }
 
 const PLAYER_SPEED = 145
@@ -39,12 +50,46 @@ const WALK_DIRECTIONS = ['south', 'south-east', 'east', 'north-east', 'north', '
 // 튀어 보인다 — 항상 48px로 보이도록 걷기 텍스처 쪽만 이 비율로 축소한다.
 const PLAYER_IDLE_DISPLAY_SIZE = 48
 const PLAYER_WALK_FRAME_SIZE = 92
+// 여성 캐릭터는 아직 걷기 프레임 원본 에셋이 없어서, 정지 이미지(player-girl-v2)를 방향별로
+// 그대로 쓰면서 걷는 동안만 통통 튀는 스쿼시&스트레치 트윈으로 움직임을 표현한다.
+const FEMALE_WALK_BOUNCE_DURATION = 180
+const FEMALE_WALK_BOUNCE_SCALE_Y = 0.88
+const FEMALE_WALK_BOUNCE_SCALE_X = 1.06
 // 기획서 체력 세부 수치(✅ 확정): 이동 초당 0.15 소모, 운동화 착용 시 초당 0.12(20% 감소).
 // 백엔드 GameConstants.MOVE_STAMINA_PER_SECOND(_WITH_SNEAKERS)와 값이 일치해야 한다.
 const MOVE_STAMINA_PER_SECOND = 0.15
 const MOVE_STAMINA_PER_SECOND_WITH_SNEAKERS = 0.12
 // 이동 체력 소모를 이 정도 간격(초)으로 모아서 서버에 보고한다 — 매 프레임 호출하지 않는다.
 const MOVE_REPORT_INTERVAL_SECONDS = 1
+
+// 농장 밭 타일 — 스타듀밸리처럼 직접 걸어가서 심고/기다리고/수확하는 실제 상호작용 지점.
+// key는 farmVisuals.ts의 CROP_NAME_TO_KEY 값과 일치해야 preload된 텍스처를 찾을 수 있다.
+const FARM_CROP_ASSET_FILES: Record<string, string> = {
+  carrot: 'carrot',
+  potato: 'potato',
+  strawberry: 'strawberry',
+  sweetPotato: 'sweet-potato',
+}
+const FARM_PLOT_POSITIONS: TilePoint[] = [
+  { x: 80, y: 29 }, { x: 85, y: 29 }, { x: 90, y: 29 }, { x: 95, y: 29 },
+  { x: 80, y: 34 }, { x: 85, y: 34 }, { x: 90, y: 34 }, { x: 95, y: 34 },
+]
+
+// 채집 가능한 나무/덤불 — key는 farmVisuals.ts의 FRUIT_NAME_TO_KEY 값과 일치해야 한다.
+// 항상 다 자란(3단계) 모습으로 고정 배치하고, "오늘 딸 게 있는지"만 밝기로 표시한다
+// (실제로 자라는 나무가 아니라 상시 존재하는 채집 지점이라는 게임 설계이기 때문).
+const FORAGE_TREE_ASSET_FILES: Record<string, string> = {
+  apple: 'apple-tree',
+  cherry: 'cherry-tree',
+  persimmon: 'persimmon-tree',
+  raspberry: 'raspberry-bush',
+}
+const FORAGE_TREE_DEFS: Array<{ key: string; tileX: number; tileY: number; scale: number }> = [
+  { key: 'apple', tileX: 60, tileY: 30, scale: 0.09 },
+  { key: 'cherry', tileX: 66, tileY: 29.5, scale: 0.075 },
+  { key: 'persimmon', tileX: 60, tileY: 36, scale: 0.09 },
+  { key: 'raspberry', tileX: 66, tileY: 36, scale: 0.07 },
+]
 
 const NPC_DAY_SCHEDULES = {
   hyeonSudong: { primary: 'village-hall', primaryChance: 0.7, secondary: ['village-entrance', 'pavilion'], secondaryChance: [0.2, 0.1] },
@@ -63,6 +108,7 @@ export class MainScene extends Phaser.Scene {
   private blockedTiles = new Set<string>()
   private mapData!: TerrainMapData
   private chickenCoop!: Phaser.GameObjects.Image
+  private watermelonField?: Phaser.GameObjects.Image
   private chickens: Phaser.GameObjects.Image[] = []
   private villageAnimals: Phaser.GameObjects.Image[] = []
   private shadowPairs: Array<{ object: Phaser.GameObjects.Image; shadow: Phaser.GameObjects.Image }> = []
@@ -73,8 +119,9 @@ export class MainScene extends Phaser.Scene {
     lane: number
   }> = []
   private opaqueBottomPadding = new Map<string, number>()
-  private coopBroken = false
   private objectBlockers: Phaser.Geom.Rectangle[] = []
+  private farmPlotSlots: Array<{ soil: Phaser.GameObjects.Image; crop: Phaser.GameObjects.Image }> = []
+  private forageTreeSprites: Array<{ key: string; sprite: Phaser.GameObjects.Image }> = []
 
   // initData가 있으면(실제 게임플레이) 체력 소모/이동 보고/NPC·장소 클릭 콜백이 활성화된다.
   // 없으면(타이틀 화면의 로그인 없는 마을 미리보기) 지금처럼 자유 이동만 가능하다.
@@ -82,13 +129,13 @@ export class MainScene extends Phaser.Scene {
   private stamina = 0
   private inputLocked = false
   private pendingMovedSeconds = 0
-  private playerTexturePrefix: 'player' | 'player-girl' = 'player'
   private npcInteractRange = 0
   private locationInteractRange = 0
-  // player-male 걷기 애니메이션이 있는 캐릭터(현재는 남성 전용)인지 — 없으면 예전처럼
-  // 방향별 정지 이미지를 그대로 교체하는 식으로 표현한다.
-  private hasWalkCycle = false
   private lastDirection: (typeof WALK_DIRECTIONS)[number] = 'south'
+  // 남성은 player-male 걷기 스프라이트시트로 실제 프레임 애니메이션을 재생하고, 여성은
+  // 아직 걷기 프레임 에셋이 없어 정지 이미지 + 스쿼시&스트레치 트윈으로 움직임을 표현한다.
+  private isFemalePlayer = false
+  private femaleWalkTween?: Phaser.Tweens.Tween
 
   constructor() {
     super('MainScene')
@@ -109,7 +156,7 @@ export class MainScene extends Phaser.Scene {
     this.load.json('terrainMapData', '/assets/world/maps/korean-countryside-chunk-01.json?v=no-road-expanded-field-v18')
     WALK_DIRECTIONS.forEach((direction) => {
       this.load.image(`player-girl-${direction}`, `/assets/characters/player-girl-v2/Idle/rotations/${direction}.png`)
-      // 남성 캐릭터 전용 4프레임 걷기 애니메이션(여성용은 아직 원본 에셋이 없어 정지 이미지만 씀).
+      // 남성 전용 4프레임 걷기 애니메이션(여성용은 아직 원본 에셋이 없어 정지 이미지 + 트윈으로 대체).
       // 정지 포즈도 이 스프라이트시트의 0번 프레임을 그대로 쓴다(따로 정지 이미지 에셋을 안 씀) —
       // 예전엔 정지 상태만 다른 화풍의 player-boy-v2 이미지를 써서 걷기 시작/정지할 때마다
       // 캐릭터 생김새가 바뀌어 보이는 문제가 있었다.
@@ -165,11 +212,12 @@ export class MainScene extends Phaser.Scene {
     this.load.image('najubuHouse', '/assets/world/buildings/houses/house-2.png')
     this.load.image('produceShop', '/assets/world/buildings/public/produce-shop.png')
     this.load.image('najubu', '/assets/characters/npcs/npc-02/Idle/rotations/south.png')
-    this.load.image('gardenAppleTree', '/assets/world/growth/fruit/apple-tree-stage-3.png')
-    ;[1, 2, 3].forEach((stage) => {
-      this.load.image(`farmCarrot${stage}`, `/assets/world/growth/crops/carrot-stage-${stage}.png`)
-      this.load.image(`farmStrawberry${stage}`, `/assets/world/growth/crops/strawberry-stage-${stage}.png`)
-      this.load.image(`farmCherry${stage}`, `/assets/world/growth/fruit/cherry-tree-stage-${stage}.png`)
+    this.load.image('tilledSoil', '/assets/world/terrain-tilled-soil-source.png')
+    Object.entries(FARM_CROP_ASSET_FILES).forEach(([key, file]) => {
+      ;[1, 2, 3].forEach((stage) => this.load.image(`crop-${key}-${stage}`, `/assets/world/growth/crops/${file}-stage-${stage}.png`))
+    })
+    Object.entries(FORAGE_TREE_ASSET_FILES).forEach(([key, file]) => {
+      ;[1, 2, 3].forEach((stage) => this.load.image(`fruit-${key}-${stage}`, `/assets/world/growth/fruit/${file}-stage-${stage}.png`))
     })
     this.load.spritesheet('itemShop', '/assets/world/buildings/public/item-shop.png', {
       frameWidth: 600,
@@ -181,6 +229,7 @@ export class MainScene extends Phaser.Scene {
     this.load.image('kimHouse', '/assets/world/buildings/houses/house-6.png')
     this.load.image('baksuHouse', '/assets/world/buildings/houses/house-3.png')
     this.load.image('watermelonFieldNormal', '/assets/world/facilities/watermelon-field-normal.png')
+    this.load.image('watermelonFieldDamaged', '/assets/world/facilities/watermelon-field-damaged.png')
     this.load.image('jeonJuin', '/assets/characters/npcs/npc-03/Idle/rotations/south.png')
     this.load.image('parkYounggye', '/assets/characters/npcs/npc-04/Idle/rotations/south.png')
     this.load.image('myeongJayu', '/assets/characters/npcs/npc-05/Idle/rotations/south.png')
@@ -199,8 +248,7 @@ export class MainScene extends Phaser.Scene {
     )
     this.npcInteractRange = this.mapData.tileWidth * 2
     this.locationInteractRange = this.mapData.tileWidth * 2.5
-    this.playerTexturePrefix = getPlayerProfile()?.gender === 'female' ? 'player-girl' : 'player'
-    this.hasWalkCycle = this.playerTexturePrefix === 'player'
+    this.isFemalePlayer = getPlayerProfile()?.gender === 'female'
     this.registerPlayerWalkAnimations()
 
     this.add.image(0, 0, 'terrainChunk').setOrigin(0, 0)
@@ -209,7 +257,8 @@ export class MainScene extends Phaser.Scene {
     const spawnX = (this.mapData.spawn.x + 0.5) * this.mapData.tileWidth
     const spawnY = (this.mapData.spawn.y + 0.5) * this.mapData.tileHeight
     this.createFarmAreaObjects()
-    this.createFarmCropRows()
+    this.createFarmPlots()
+    this.createForageTrees()
     this.createZoneOne()
     this.createZoneTwo()
     this.createEnvironmentalDensity()
@@ -223,9 +272,9 @@ export class MainScene extends Phaser.Scene {
       (blocker) => !Phaser.Geom.Intersects.RectangleToRectangle(blocker, spawnSafetyArea),
     )
 
-    const [initialTexture, initialFrame] = this.hasWalkCycle
-      ? [`player-walk-south`, 0]
-      : [`${this.playerTexturePrefix}-south`, undefined]
+    const [initialTexture, initialFrame] = this.isFemalePlayer
+      ? [`player-girl-south`, undefined]
+      : [`player-walk-south`, 0]
     this.player = this.add
       .sprite(spawnX, spawnY, initialTexture, initialFrame)
       .setDepth(spawnY)
@@ -270,6 +319,13 @@ export class MainScene extends Phaser.Scene {
   /** 대화/아이템 사용/농사 등 이 씬 바깥에서 체력이 바뀌었을 때 내부 값도 맞춰준다. */
   syncStamina(value: number) {
     this.stamina = value
+  }
+
+  /** create()가 끝나 밭/나무/시설 오브젝트가 전부 준비됐는지 — DayScreen이 최초 상태를
+   *  안전하게 밀어넣을 시점을 판단하는 데 쓴다(Scene 라이프사이클 이벤트 대신 폴링 방식을
+   *  쓰는 이유는 MainScene.ts 주석 없음, DayScreen.tsx의 호출부 주석 참고). */
+  isReady() {
+    return !!this.chickenCoop
   }
 
   update(_time: number, delta: number) {
@@ -391,19 +447,39 @@ export class MainScene extends Phaser.Scene {
     if (!direction) return
     this.lastDirection = direction as (typeof WALK_DIRECTIONS)[number]
 
-    if (this.hasWalkCycle) {
-      const animKey = `walk-${direction}`
-      // isPlaying도 같이 봐야 한다 — stopWalking()이 애니메이션을 멈추고 정지 이미지로 텍스처만
-      // 바꿔도 currentAnim.key 자체는 마지막 애니메이션 키로 남아있다. key만 비교하면, 걷다가
-      // 멈췄다가 같은 방향으로 다시 걸을 때 "키가 그대로니 이미 재생 중"이라고 착각해서
-      // play()를 다시 안 불러 정지 이미지에서 멈춰버리는 문제가 있었다.
-      if (!this.player.anims.isPlaying || this.player.anims.currentAnim?.key !== animKey) {
-        this.player.play(animKey)
-        this.player.setDisplaySize(PLAYER_IDLE_DISPLAY_SIZE, PLAYER_IDLE_DISPLAY_SIZE)
-      }
-    } else {
-      this.player.setTexture(`${this.playerTexturePrefix}-${direction}`)
+    if (this.isFemalePlayer) {
+      // 방향 전환마다 텍스처만 바꾼다 — 여성 정지 이미지는 8방향 모두 48x48로 크기가
+      // 같아서 setDisplaySize를 매 프레임 다시 부를 필요가 없고, 그걸 매 프레임 부르면
+      // startFemaleWalkBounce()가 돌리는 scaleX/scaleY 트윈을 매 프레임 1:1로 되돌려버려
+      // 바운스가 안 보이게 된다.
+      this.player.setTexture(`player-girl-${direction}`)
+      this.startFemaleWalkBounce()
+      return
     }
+
+    const animKey = `walk-${direction}`
+    // isPlaying도 같이 봐야 한다 — stopWalking()이 애니메이션을 멈추고 정지 이미지로 텍스처만
+    // 바꿔도 currentAnim.key 자체는 마지막 애니메이션 키로 남아있다. key만 비교하면, 걷다가
+    // 멈췄다가 같은 방향으로 다시 걸을 때 "키가 그대로니 이미 재생 중"이라고 착각해서
+    // play()를 다시 안 불러 정지 이미지에서 멈춰버리는 문제가 있었다.
+    if (!this.player.anims.isPlaying || this.player.anims.currentAnim?.key !== animKey) {
+      this.player.play(animKey)
+      this.player.setDisplaySize(PLAYER_IDLE_DISPLAY_SIZE, PLAYER_IDLE_DISPLAY_SIZE)
+    }
+  }
+
+  /** 여성 캐릭터가 걷는 동안 재생할 스쿼시&스트레치 바운스 트윈을 (아직 안 돌고 있으면) 시작한다. */
+  private startFemaleWalkBounce() {
+    if (this.femaleWalkTween?.isPlaying()) return
+    this.femaleWalkTween = this.tweens.add({
+      targets: this.player,
+      scaleY: FEMALE_WALK_BOUNCE_SCALE_Y,
+      scaleX: FEMALE_WALK_BOUNCE_SCALE_X,
+      duration: FEMALE_WALK_BOUNCE_DURATION,
+      yoyo: true,
+      repeat: -1,
+      ease: 'Sine.easeInOut',
+    })
   }
 
   /**
@@ -412,7 +488,15 @@ export class MainScene extends Phaser.Scene {
    * 캐릭터 생김새가 서로 다른 에셋이라 달라 보이지 않게 하기 위함.
    */
   private stopWalking() {
-    if (!this.hasWalkCycle || !this.player.anims.isPlaying) return
+    if (this.isFemalePlayer) {
+      if (!this.femaleWalkTween?.isPlaying()) return
+      this.femaleWalkTween.stop()
+      this.player.setTexture(`player-girl-${this.lastDirection}`)
+      this.player.setDisplaySize(PLAYER_IDLE_DISPLAY_SIZE, PLAYER_IDLE_DISPLAY_SIZE)
+      return
+    }
+
+    if (!this.player.anims.isPlaying) return
     this.player.anims.stop()
     this.player.setTexture(`player-walk-${this.lastDirection}`, 0)
     this.player.setDisplaySize(PLAYER_IDLE_DISPLAY_SIZE, PLAYER_IDLE_DISPLAY_SIZE)
@@ -440,10 +524,7 @@ export class MainScene extends Phaser.Scene {
       .setInteractive({ useHandCursor: true })
     this.chickenCoop.on('pointerover', () => this.chickenCoop.setTint(0xfff1b5))
     this.chickenCoop.on('pointerout', () => this.chickenCoop.clearTint())
-    this.chickenCoop.on('pointerdown', () => {
-      this.toggleChickenCoop()
-      this.handleLocationInteract('chicken-coop', coopX, coopY)
-    })
+    this.chickenCoop.on('pointerdown', () => this.handleLocationInteract('chicken-coop', coopX, coopY))
     this.objectBlockers.push(new Phaser.Geom.Rectangle(coopX - 90, coopY - 72, 180, 72))
 
     const chickenSpecs: Array<[number, number, string, number, number]> = [
@@ -469,20 +550,102 @@ export class MainScene extends Phaser.Scene {
 
   }
 
-  private createFarmCropRows() {
+  /**
+   * 실제 상호작용 가능한 밭 타일들. 처음엔 갈아둔 흙(tilledSoil)만 보이고, DayScreen이
+   * syncFarmPlots()로 실제 FarmPlot 상태를 넘겨주면 심긴 작물의 성장 단계 스프라이트가
+   * 그 위에 겹쳐 보인다. 클릭은 handleFarmTileInteract를 거쳐 거리 판정 후에만 콜백된다.
+   */
+  private createFarmPlots() {
     const tile = this.mapData.tileWidth
-    const rows: Array<{ y: number; prefix: string; scale: number }> = [
-      { y: 27, prefix: 'farmCarrot', scale: 0.058 },
-      { y: 32, prefix: 'farmCarrot', scale: 0.058 },
-      { y: 37, prefix: 'farmStrawberry', scale: 0.06 },
-      { y: 43, prefix: 'farmCherry', scale: 0.075 },
-    ]
-    rows.forEach(({ y, prefix, scale }, rowIndex) => {
-      for (let column = 0; column < 7; column += 1) {
-        const x = 78 + column * 5
-        const stage = ((column + rowIndex) % 3) + 1
-        this.add.image(x * tile, y * tile, `${prefix}${stage}`).setOrigin(0.5, 1).setScale(scale).setDepth(y * tile)
+    this.farmPlotSlots = FARM_PLOT_POSITIONS.map(({ x: tileX, y: tileY }, index) => {
+      const x = tileX * tile
+      const y = tileY * tile
+      const soil = this.add
+        .image(x, y, 'tilledSoil')
+        .setOrigin(0.5, 1)
+        .setScale(0.032)
+        .setDepth(y - 1)
+        .setInteractive({ useHandCursor: true })
+      soil.on('pointerover', () => soil.setTint(0xfff1b5))
+      soil.on('pointerout', () => soil.clearTint())
+      soil.on('pointerdown', () => this.handleFarmTileInteract(index, x, y))
+
+      const crop = this.add
+        .image(x, y, 'tilledSoil')
+        .setOrigin(0.5, 1)
+        .setScale(0.06)
+        .setDepth(y)
+        .setVisible(false)
+
+      return { soil, crop }
+    })
+  }
+
+  /**
+   * 채집 가능한 나무/덤불. 실제로 자라는 게 아니라 항상 다 자란 모습(3단계)으로 고정
+   * 배치하고, 오늘 딸 게 있는지는 syncForageTrees()가 밝기/틴트로만 표시한다.
+   */
+  private createForageTrees() {
+    const tile = this.mapData.tileWidth
+    this.forageTreeSprites = FORAGE_TREE_DEFS.map(({ key, tileX, tileY, scale }) => {
+      const x = tileX * tile
+      const y = tileY * tile
+      const sprite = this.add
+        .image(x, y, `fruit-${key}-3`)
+        .setOrigin(0.5, 1)
+        .setScale(scale)
+        .setDepth(y)
+        .setInteractive({ useHandCursor: true })
+      sprite.on('pointerover', () => sprite.setTint(0xfff1b5))
+      sprite.on('pointerout', () => sprite.clearTint())
+      sprite.on('pointerdown', () => this.handleForageTreeInteract(key, x, y))
+      this.objectBlockers.push(new Phaser.Geom.Rectangle(x - 24, y - 36, 48, 34))
+      return { key, sprite }
+    })
+  }
+
+  /** 게임플레이 모드에서만 동작 — 거리 안이면 밭 타일 클릭 콜백, 멀면 안내 힌트. */
+  private handleFarmTileInteract(slotIndex: number, x: number, y: number) {
+    if (!this.initData) return
+    const distance = Phaser.Math.Distance.Between(this.player.x, this.player.y, x, y)
+    if (distance <= this.locationInteractRange) {
+      this.initData.onFarmTileClick(slotIndex)
+    } else {
+      this.showFloatingHint(x, y - this.mapData.tileHeight, '너무 멀어요! 가까이 가주세요')
+    }
+  }
+
+  /** 게임플레이 모드에서만 동작 — 거리 안이면 채집 나무 클릭 콜백, 멀면 안내 힌트. */
+  private handleForageTreeInteract(fruitKey: string, x: number, y: number) {
+    if (!this.initData) return
+    const distance = Phaser.Math.Distance.Between(this.player.x, this.player.y, x, y)
+    if (distance <= this.locationInteractRange) {
+      this.initData.onForageTreeClick(fruitKey)
+    } else {
+      this.showFloatingHint(x, y - this.mapData.tileHeight, '너무 멀어요! 가까이 가주세요')
+    }
+  }
+
+  /** DayScreen이 밭 상태(FarmPlot API 응답을 가공한 결과)를 슬롯 순서대로 넘겨줄 때 호출한다. */
+  syncFarmPlots(plots: Array<FarmPlotVisual | null>) {
+    this.farmPlotSlots.forEach((slot, index) => {
+      const state = plots[index] ?? null
+      if (!state || !state.textureKey) {
+        slot.crop.setVisible(false)
+        return
       }
+      slot.crop.setTexture(state.textureKey).setVisible(true)
+      slot.crop.setTint(state.readyToHarvest ? 0xfff2b8 : 0xffffff)
+    })
+  }
+
+  /** DayScreen이 "오늘 딸 수 있는 과일 키" 목록을 넘겨줄 때 호출한다. */
+  syncForageTrees(availableFruitKeys: string[]) {
+    const available = new Set(availableFruitKeys)
+    this.forageTreeSprites.forEach(({ key, sprite }) => {
+      const isAvailable = available.has(key)
+      sprite.setAlpha(isAvailable ? 1 : 0.45)
+      sprite.setTint(isAvailable ? 0xffffff : 0x9fa89f)
     })
   }
 
@@ -727,6 +890,7 @@ export class MainScene extends Phaser.Scene {
         image.on('pointerout', () => image.clearTint())
         image.on('pointerdown', () => this.handleLocationInteract(spotKey, x, y))
       }
+      return image
     }
     const prop = (texture: string, tileX: number, tileY: number, scale: number, flipX = false) => {
       const { x, y } = at(tileX, tileY)
@@ -802,7 +966,7 @@ export class MainScene extends Phaser.Scene {
     prop('newWildflower4', 64, 85, 0.025)
 
     // Zone 9: a dedicated watermelon plot with the farmer's home on its east edge.
-    building('watermelonFieldNormal', 104, 82, 0.28, 215, 65, false, 'watermelon-field')
+    this.watermelonField = building('watermelonFieldNormal', 104, 82, 0.28, 215, 65, false, 'watermelon-field')
     prop('scarecrow', 99, 79.5, 0.15)
     prop('woodFence', 94, 84.5, 0.13)
     prop('woodFence', 113.5, 84.4, 0.13, true)
@@ -1155,10 +1319,22 @@ export class MainScene extends Phaser.Scene {
       .setDepth(10)
   }
 
-  private toggleChickenCoop() {
-    this.coopBroken = !this.coopBroken
-    this.chickenCoop.setTexture(this.coopBroken ? 'chickenCoopBroken' : 'chickenCoopNormal')
-    this.chickens.forEach((chicken) => chicken.setVisible(!this.coopBroken))
+  /**
+   * DayScreen이 "지금까지 사보타주가 발생한 장소" 목록을 넘겨줄 때 호출한다. 예전엔 양계장을
+   * 클릭할 때마다(실제 피해 여부와 무관하게) 정상/파손 텍스처가 그냥 토글돼서, 실제로 사보타주가
+   * 일어났는지와 화면에 보이는 상태가 서로 무관했다 — 이제 실제 SabotageEvent 발생 장소를
+   * 기준으로만 파손 상태를 반영한다.
+   */
+  syncSabotageDamage(damagedLocations: string[]) {
+    // create()가 아직 끝나지 않은 시점(React 쪽 데이터가 이미지 로딩보다 먼저 도착한 경우)에
+    // 호출될 수 있다 — 이때는 조용히 무시한다. DayScreen이 create() 완료 이벤트에 맞춰
+    // 한 번 더 밀어주므로(pushInitialSceneState) 데이터가 유실되지는 않는다.
+    if (!this.chickenCoop) return
+    const damaged = new Set(damagedLocations)
+    const coopDamaged = damaged.has('양계장')
+    this.chickenCoop.setTexture(coopDamaged ? 'chickenCoopBroken' : 'chickenCoopNormal')
+    this.chickens.forEach((chicken) => chicken.setVisible(!coopDamaged))
+    this.watermelonField?.setTexture(damaged.has('수박밭') ? 'watermelonFieldDamaged' : 'watermelonFieldNormal')
   }
 
   private tryMove(nextX: number, nextY: number) {

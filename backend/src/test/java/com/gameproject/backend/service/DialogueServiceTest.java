@@ -75,7 +75,7 @@ class DialogueServiceTest {
         PlayerStat stat = PlayerStat.builder().session(session).day(2)
                 .staminaCurrent(92.0).staminaMax(100).gold(0).fainted(false).build();
         return new DialogueChatContext(session, npc, stat, "{}", null, List.of(),
-                false, 50, restrictDetectiveTalk, null, false, null);
+                false, 50, restrictDetectiveTalk, null, false, null, 1);
     }
 
     @Test
@@ -112,7 +112,7 @@ class DialogueServiceTest {
         PlayerStat stat = PlayerStat.builder().session(session).day(2)
                 .staminaCurrent(92.0).staminaMax(100).gold(0).fainted(false).build();
         DialogueChatContext ctx = new DialogueChatContext(session, npc, stat, null, "동기", List.of(),
-                false, 50, false, null, false, null);
+                false, 50, false, null, false, null, 1);
         when(persistence.prepareChatContext(100L, 1L)).thenReturn(ctx);
         when(llmProxyClient.generatePersona(1L, "현수동", "이장", null, null, null, null, "동기"))
                 .thenReturn("{\"generated\":true}");

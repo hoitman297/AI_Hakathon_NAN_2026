@@ -9,6 +9,7 @@ import org.springframework.transaction.annotation.Transactional;
 import com.gameproject.backend.client.LlmProxyClient;
 import com.gameproject.backend.domain.ClueCard;
 import com.gameproject.backend.domain.GameSession;
+import com.gameproject.backend.domain.SessionStatus;
 import com.gameproject.backend.dto.ClueCardResponse;
 import com.gameproject.backend.dto.UnacquiredClueResponse;
 import com.gameproject.backend.repository.ClueCardRepository;
@@ -58,6 +59,9 @@ public class ClueService {
     @Transactional
     public ClueCardResponse acquire(Long sessionId, Long clueId) {
         GameSession session = sessionService.findSession(sessionId);
+        if (session.getStatus() != SessionStatus.IN_PROGRESS) {
+            throw new IllegalStateException("이미 종료된 세션입니다.");
+        }
         ClueCard clue = getOwnedClue(session, clueId);
         if (Boolean.TRUE.equals(clue.getAcquired())) {
             return toResponse(clue);

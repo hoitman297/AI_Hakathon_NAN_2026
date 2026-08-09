@@ -65,6 +65,17 @@ export async function listFarmPlots(sessionId: number): Promise<FarmPlot[]> {
   return parseOrThrow<FarmPlot[]>(response, '밭 상태를 불러오지 못했습니다.')
 }
 
+/** 상점에서 씨앗을 사서 인벤토리(SEED)에 보관 — 아직 심는 것은 아니다. */
+export async function buySeed(sessionId: number, cropId: number): Promise<SessionResponse> {
+  const response = await fetch(`${API_BASE_URL}/api/sessions/${sessionId}/farm/seeds/buy`, {
+    method: 'POST',
+    headers: authHeaders(),
+    body: JSON.stringify({ cropId }),
+  })
+  return parseOrThrow<SessionResponse>(response, '씨앗 구매에 실패했습니다.')
+}
+
+/** 보유 중인 씨앗(SEED) 1개를 소모해 실제로 밭에 심는다. */
 export async function plantCrop(sessionId: number, cropId: number): Promise<SessionResponse> {
   const response = await fetch(`${API_BASE_URL}/api/sessions/${sessionId}/farm/plant`, {
     method: 'POST',
@@ -88,6 +99,14 @@ export async function listAvailableFruits(sessionId: number): Promise<AvailableF
     headers: authHeaders(),
   })
   return parseOrThrow<AvailableFruit[]>(response, '채집 가능한 과일 목록을 불러오지 못했습니다.')
+}
+
+/** 오늘 딸 수 있는지와 무관하게 전체 과일 종류 — 맵 위 나무/덤불에 실제 fruitId를 매핑하는 용도. */
+export async function listFruitSpecies(sessionId: number): Promise<AvailableFruit[]> {
+  const response = await fetch(`${API_BASE_URL}/api/sessions/${sessionId}/forage/species`, {
+    headers: authHeaders(),
+  })
+  return parseOrThrow<AvailableFruit[]>(response, '과일 종류 목록을 불러오지 못했습니다.')
 }
 
 export async function forageFruit(sessionId: number, fruitId: number): Promise<ForageResult> {

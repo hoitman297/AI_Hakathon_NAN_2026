@@ -23,6 +23,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import com.gameproject.backend.domain.Account;
 import com.gameproject.backend.domain.DialogueLog;
+import com.gameproject.backend.domain.DialogueSender;
 import com.gameproject.backend.domain.EventTarget;
 import com.gameproject.backend.domain.GameSession;
 import com.gameproject.backend.domain.Npc;
@@ -120,6 +121,50 @@ class DialogueChatPersistenceServiceTest {
                 .isInstanceOf(LlmRateLimitExceededException.class);
 
         verify(staminaService, never()).consume(any(), any(Double.class));
+    }
+
+    /** session.currentDay(2) 기준 today용 USER 로그 n개를 만든다. */
+    private List<DialogueLog> userLogsOnDay(int day, int count) {
+        return java.util.stream.IntStream.range(0, count)
+                .mapToObj(i -> DialogueLog.builder().session(session).npc(npc).day(day)
+                        .sender(DialogueSender.USER).message("q" + i).createdAt(LocalDateTime.now()).build())
+                .toList();
+    }
+
+    @Test
+    void prepareChatContext_dailyLimitReachedToday_throwsBeforeStaminaConsumed() {
+        stubSessionAndNpcLookup();
+        // currentDay(2)에 이미 MAX_DIALOGUE_EXCHANGES_PER_NPC_PER_DAY(3)번 말을 건 상태.
+        when(dialogueLogRepository.findBySessionAndNpcOrderByCreatedAtAsc(session, npc))
+                .thenReturn(userLogsOnDay(2, GameConstants.MAX_DIALOGUE_EXCHANGES_PER_NPC_PER_DAY));
+
+        assertThatThrownBy(() -> service.prepareChatContext(100L, 1L))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("하루 최대");
+
+        verify(staminaService, never()).consume(any(), any(Double.class));
+    }
+
+    @Test
+    void prepareChatContext_dailyLimitReachedOnPreviousDay_doesNotBlockToday() {
+        // 어제(day=1)는 대화창을 여러 번 열고 닫으며 한도(3회)를 다 썼지만, 오늘(currentDay=2)은
+        // 아직 한 번도 말을 안 걸었다 — "대화창을 새로 열면 초기화되던" 예전 버그와 반대로,
+        // 이번엔 "날짜가 실제로 바뀌면 정상적으로 리셋"되는지를 검증한다.
+        stubSessionAndNpcLookup();
+        when(personaStateRepository.findBySessionAndNpc(session, npc))
+                .thenReturn(Optional.of(NpcPersonaState.builder().session(session).npc(npc)
+                        .generatedPersonaJson("{}").generatedAt(LocalDateTime.now()).build()));
+        when(staminaService.consume(session, GameConstants.DIALOGUE_STAMINA)).thenReturn(stat());
+        when(dialogueLogRepository.findBySessionAndNpcOrderByCreatedAtAsc(session, npc))
+                .thenReturn(userLogsOnDay(1, GameConstants.MAX_DIALOGUE_EXCHANGES_PER_NPC_PER_DAY));
+        when(npcService.getAffinityScore(session, npc)).thenReturn(50);
+        when(sabotageEventRepository.findBySession(session)).thenReturn(List.of());
+        when(randomEventLogRepository.findBySession(session)).thenReturn(List.of());
+        when(witnessAwarenessRepository.findBySessionAndNpc(session, npc)).thenReturn(List.of());
+
+        DialogueChatContext ctx = service.prepareChatContext(100L, 1L);
+
+        assertThat(ctx.exchangesUsedToday()).isEqualTo(1);
     }
 
     @Test

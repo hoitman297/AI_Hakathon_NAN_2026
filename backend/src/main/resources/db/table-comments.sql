@@ -97,7 +97,7 @@ ALTER TABLE player_stat
 ALTER TABLE inventory_item COMMENT = '인벤토리 슬롯 (판당 7칸 고정)';
 ALTER TABLE inventory_item
   MODIFY item_ref_id BIGINT                              NOT NULL COMMENT 'item_type에 따라 crop_master/fruit_master/shop_item_master의 PK를 참조 (FK 아님, 애플리케이션에서 분기 처리)',
-  MODIFY item_type   ENUM('CROP','FRUIT','SHOP_ITEM')    NOT NULL COMMENT 'CROP/FRUIT/SHOP_ITEM 중 어떤 마스터를 참조하는지',
+  MODIFY item_type   ENUM('CROP','FRUIT','SHOP_ITEM','SEED') NOT NULL COMMENT 'CROP/FRUIT/SHOP_ITEM/SEED 중 어떤 마스터를 참조하는지',
   MODIFY slot_index  INT                                 NOT NULL COMMENT '슬롯 번호 (1~7)';
 
 ALTER TABLE accusation_log COMMENT = '고발(범인 지목) 시도 이력 - 7~9일차에만 발생 가능';

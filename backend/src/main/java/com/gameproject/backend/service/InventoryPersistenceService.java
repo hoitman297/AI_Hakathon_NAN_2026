@@ -75,6 +75,7 @@ class InventoryPersistenceService {
                         .orElseThrow(() -> new IllegalStateException("상점 아이템 마스터 데이터를 찾을 수 없습니다."));
                 yield applyShopItemEffect(session, item, shopItem, targetNpcId);
             }
+            case SEED -> throw new IllegalStateException("씨앗은 농장 밭에 직접 심어야 합니다.");
             default -> throw new IllegalStateException("알 수 없는 아이템 타입입니다.");
         };
     }

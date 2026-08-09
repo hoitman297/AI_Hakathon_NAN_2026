@@ -34,6 +34,15 @@ public class ForageService {
     private final StaminaService staminaService;
     private final InventoryService inventoryService;
 
+    /** 이 세션에서 존재하는 과일 전체 종류(오늘 딸 수 있는지와 무관) — 프론트가 맵 위에 항상
+     *  고정 위치로 놓아두는 나무/덤불에 실제 fruitId를 매핑하는 용도. */
+    @Transactional(readOnly = true)
+    public List<AvailableFruitResponse> listAllSpecies() {
+        return fruitMasterRepository.findAll().stream()
+                .map(f -> new AvailableFruitResponse(f.getFruitId(), f.getName()))
+                .toList();
+    }
+
     @Transactional(readOnly = true)
     public List<AvailableFruitResponse> listAvailableToday(Long sessionId) {
         GameSession session = sessionService.findSession(sessionId);

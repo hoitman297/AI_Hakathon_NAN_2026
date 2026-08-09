@@ -84,10 +84,16 @@ public class DataSeeder implements CommandLineRunner {
                                 + "a muted lavender blouse with a rounded collar, a dusty rose calf-length skirt, a "
                                 + "simple warm-beige waist apron, and practical dark brown shoes. Feminine average "
                                 + "build with narrow shoulders and a defined waist.",
+                        // "정자"는 CulpritProfileRegistry에서 현수동의 사보타주 대상 장소인데,
+                        // 예전엔 현수동 본인 스케줄에만 있어서 그가 범인일 때 정자를 노리면
+                        // 범인 본인(목격자 후보에서 제외됨) 말고는 아무도 그 자리에 없어 목격자가
+                        // 절대 나올 수 없었다(SessionPersistenceService.findWitness). 나주부가
+                        // 가끔 산책 삼아 정자에 들르는 걸로 목격 가능성을 열어둔다.
                         List.of(
-                                new Object[]{LocationSlot.PRIMARY, "자택 정원", 60},
+                                new Object[]{LocationSlot.PRIMARY, "자택 정원", 50},
                                 new Object[]{LocationSlot.SECONDARY, "상점", 25},
-                                new Object[]{LocationSlot.SECONDARY, "마을회관", 15}
+                                new Object[]{LocationSlot.SECONDARY, "마을회관", 15},
+                                new Object[]{LocationSlot.SECONDARY, "정자", 10}
                         )),
                 new NpcSeed("전주인", "남편, 상점 주인", 35,
                         "친절, 손님 응대 능숙, 눈치 빠르고 계산적. 은근히 승부욕 있음. 소비 패턴 파악 가능. 아내(나주부)와 신혼부부 느낌",
@@ -111,10 +117,16 @@ public class DataSeeder implements CommandLineRunner {
                                 + "round fluffy silhouette. She wears a faded mustard-yellow work blouse, a dark "
                                 + "teal full apron, loose warm-brown work pants, and dark green rubber farm boots. "
                                 + "Sturdy feminine build with a slightly large head.",
+                        // "마을 어귀 순찰"(현수동 대상)과 "자택 인근 텃밭"(명자유 대상)도 위 정자와
+                        // 같은 이유로 목격자가 원천 불가능했던 장소들이다. 박영계는 "마을 소식통"
+                        // 설정(WitnessGossipService의 GOSSIP_HUB_NAME)이라 여기저기 돌아다니는
+                        // 캐릭터성과도 맞아서, 두 장소를 가끔 들르는 동선을 추가해 목격 가능성을 연다.
                         List.of(
-                                new Object[]{LocationSlot.PRIMARY, "양계장", 60},
-                                new Object[]{LocationSlot.SECONDARY, "마을회관", 25},
-                                new Object[]{LocationSlot.SECONDARY, "상점", 15}
+                                new Object[]{LocationSlot.PRIMARY, "양계장", 50},
+                                new Object[]{LocationSlot.SECONDARY, "마을회관", 15},
+                                new Object[]{LocationSlot.SECONDARY, "상점", 10},
+                                new Object[]{LocationSlot.SECONDARY, "마을 어귀 순찰", 15},
+                                new Object[]{LocationSlot.SECONDARY, "자택 인근 텃밭", 10}
                         )),
                 new NpcSeed("명자유", "프리랜서", 25,
                         "내향적, 히키코모리에 가까움. 겁 많고 예민하나 악의는 없음",

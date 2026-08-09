@@ -1,7 +1,5 @@
 package com.gameproject.backend.web;
 
-import java.util.List;
-
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -10,7 +8,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import com.gameproject.backend.dto.DialogueMessageResponse;
+import com.gameproject.backend.dto.DialogueHistoryResponse;
 import com.gameproject.backend.dto.DialogueReplyResponse;
 import com.gameproject.backend.dto.DialogueRequest;
 import com.gameproject.backend.service.DialogueService;
@@ -26,7 +24,7 @@ public class DialogueController {
     private final DialogueService dialogueService;
 
     @GetMapping
-    public ResponseEntity<List<DialogueMessageResponse>> history(@PathVariable("sessionId") Long sessionId, @PathVariable("npcId") Long npcId) {
+    public ResponseEntity<DialogueHistoryResponse> history(@PathVariable("sessionId") Long sessionId, @PathVariable("npcId") Long npcId) {
         return ResponseEntity.ok(dialogueService.history(sessionId, npcId));
     }
 

@@ -1,18 +1,47 @@
 import { useEffect, useRef, useState } from 'react'
 import Phaser from 'phaser'
 import { gameConfig } from '../game/config'
-import { MainScene, type MainSceneInitData } from '../game/MainScene'
+import { MainScene, type MainSceneInitData, type FarmPlotVisual } from '../game/MainScene'
 import { StaminaBar } from '../components/StaminaBar'
 import { DialogueBox } from '../components/DialogueBox'
 import { EscMenu } from '../components/EscMenu'
 import { InventoryHubPanel } from '../components/InventoryHubPanel'
+import { ProduceShopPanel } from '../components/ProduceShopPanel'
+import { ItemShopPanel } from '../components/ItemShopPanel'
+import { SeedPickerPopup } from '../components/SeedPickerPopup'
 import { NightLoadingOverlay } from '../components/NightLoadingOverlay'
-import { moveSession, type SessionResponse } from '../api/sessionApi'
+import { moveSession, getSabotageLocations, type SessionResponse } from '../api/sessionApi'
 import { listNpcsToday } from '../api/npcApi'
 import { listUnacquiredClues, acquireClue, topicLabel, type UnacquiredClue } from '../api/clueApi'
 import { matchesLocationSpot } from '../game/clueLocations'
+import {
+  listFarmPlots,
+  plantCrop,
+  harvestPlot,
+  listAvailableFruits,
+  listFruitSpecies,
+  forageFruit,
+  type FarmPlot,
+  type AvailableFruit,
+} from '../api/farmApi'
+import { listInventory, type InventorySlot } from '../api/inventoryApi'
+import { cropTextureKey, computeCropStage, FRUIT_NAME_TO_KEY } from '../game/farmVisuals'
 import { villageAssets } from '../assets/asset-manifest'
 import './DayScreen.css'
+
+// MainScene.ts의 FARM_PLOT_POSITIONS 길이와 맞춰야 한다 — 맵 위 실제 밭 타일 개수.
+const FARM_PLOT_SLOT_COUNT = 8
+
+/** 수확 안 한 밭들을 farmPlotId 순서로 맵 위 고정 슬롯(0..N-1)에 배정한다.
+ *  수확된 밭은 더 이상 슬롯을 차지하지 않아 그 타일이 다시 빈 밭으로 보인다. */
+function assignPlotsToSlots(plots: FarmPlot[]): Array<FarmPlot | null> {
+  const unharvested = [...plots].filter((p) => !p.harvested).sort((a, b) => a.farmPlotId - b.farmPlotId)
+  const slots: Array<FarmPlot | null> = new Array(FARM_PLOT_SLOT_COUNT).fill(null)
+  unharvested.slice(0, FARM_PLOT_SLOT_COUNT).forEach((plot, index) => {
+    slots[index] = plot
+  })
+  return slots
+}
 
 // 백엔드 GameConstants.FIRST_ACCUSATION_DAY / LAST_ACCUSATION_DAY 와 맞춰야 한다.
 // 이 값을 조회하는 API가 없어 프론트에 그대로 하드코딩했다.
@@ -42,11 +71,41 @@ export function DayScreen({
   const containerRef = useRef<HTMLDivElement>(null)
   const gameRef = useRef<Phaser.Game | null>(null)
   const [stamina, setStamina] = useState(() => session.staminaCurrent)
-  const [gold] = useState(() => session.gold)
+  const [gold, setGold] = useState(() => session.gold)
   const [dialogueNpc, setDialogueNpc] = useState<{ npcId: number; name: string; role: string } | null>(null)
   const [escOpen, setEscOpen] = useState(false)
   const [inventoryOpen, setInventoryOpen] = useState(false)
+  const [produceShopOpen, setProduceShopOpen] = useState(false)
+  const [itemShopOpen, setItemShopOpen] = useState(false)
   const sneakersEquipped = session.sneakersEquipped ?? false
+
+  // 농장(맵 위 실제 밭 타일)/채집(맵 위 나무·덤불) 상태. Phaser 씬 콜백(onFarmTileClick/
+  // onForageTreeClick)은 마운트 시점에 한 번 캡처되므로, 최신값을 봐야 하는 부분은 ref로도
+  // 같이 들고 있는다(위 unacquiredCluesRef와 같은 이유).
+  const [farmPlots, setFarmPlots] = useState<FarmPlot[] | null>(null)
+  const plotSlotsRef = useRef<Array<FarmPlot | null>>(new Array(FARM_PLOT_SLOT_COUNT).fill(null))
+  const [seedInventory, setSeedInventory] = useState<InventorySlot[]>([])
+  const [fruitSpecies, setFruitSpecies] = useState<AvailableFruit[]>([])
+  const fruitSpeciesRef = useRef<AvailableFruit[]>([])
+  const [availableFruitsToday, setAvailableFruitsToday] = useState<AvailableFruit[]>([])
+  const availableFruitKeysRef = useRef<string[]>([])
+  const [seedPickerSlotIndex, setSeedPickerSlotIndex] = useState<number | null>(null)
+  const [seedPickerBusy, setSeedPickerBusy] = useState(false)
+  const [seedPickerError, setSeedPickerError] = useState<string | null>(null)
+
+  // 지금까지 사보타주가 발생한 장소 — 양계장/수박밭 등 실제 피해 여부를 맵 위 자산에 반영한다.
+  const [sabotageLocations, setSabotageLocations] = useState<string[]>([])
+  useEffect(() => {
+    getSabotageLocations(session.sessionId)
+      .then(setSabotageLocations)
+      .catch((err: unknown) => console.error('사보타주 발생 장소를 불러오지 못했습니다.', err))
+  }, [session.sessionId])
+  const sabotageLocationsRef = useRef<string[]>([])
+  useEffect(() => {
+    sabotageLocationsRef.current = sabotageLocations
+    const scene = gameRef.current?.scene.getScene('MainScene') as MainScene | undefined
+    scene?.syncSabotageDamage(sabotageLocations)
+  }, [sabotageLocations, session.currentDay])
 
   const canAccuse =
     session.status === 'IN_PROGRESS' &&
@@ -84,6 +143,105 @@ export function DayScreen({
   }
   useEffect(reloadUnacquiredClues, [session.sessionId])
 
+  function reloadFarmPlots() {
+    listFarmPlots(session.sessionId)
+      .then(setFarmPlots)
+      .catch((err: unknown) => console.error('밭 상태를 불러오지 못했습니다.', err))
+  }
+  function reloadSeedInventory() {
+    listInventory(session.sessionId)
+      .then((slots) => setSeedInventory(slots.filter((s) => s.itemType === 'SEED')))
+      .catch((err: unknown) => console.error('씨앗 인벤토리를 불러오지 못했습니다.', err))
+  }
+  function reloadAvailableFruitsToday() {
+    listAvailableFruits(session.sessionId)
+      .then(setAvailableFruitsToday)
+      .catch((err: unknown) => console.error('오늘 채집 가능한 과일 목록을 불러오지 못했습니다.', err))
+  }
+  useEffect(() => {
+    reloadFarmPlots()
+    reloadSeedInventory()
+    reloadAvailableFruitsToday()
+    listFruitSpecies(session.sessionId)
+      .then(setFruitSpecies)
+      .catch((err: unknown) => console.error('과일 종류 목록을 불러오지 못했습니다.', err))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [session.sessionId])
+
+  useEffect(() => {
+    plotSlotsRef.current = assignPlotsToSlots(farmPlots ?? [])
+    const scene = gameRef.current?.scene.getScene('MainScene') as MainScene | undefined
+    const view: Array<FarmPlotVisual | null> = plotSlotsRef.current.map((plot) =>
+      plot
+        ? { textureKey: cropTextureKey(plot.cropName, computeCropStage(plot, session.currentDay)), readyToHarvest: plot.readyToHarvest }
+        : null,
+    )
+    scene?.syncFarmPlots(view)
+  }, [farmPlots, session.currentDay])
+
+  useEffect(() => {
+    fruitSpeciesRef.current = fruitSpecies
+  }, [fruitSpecies])
+
+  useEffect(() => {
+    const keys = availableFruitsToday
+      .map((fruit) => FRUIT_NAME_TO_KEY[fruit.name])
+      .filter((key): key is string => !!key)
+    availableFruitKeysRef.current = keys
+    const scene = gameRef.current?.scene.getScene('MainScene') as MainScene | undefined
+    scene?.syncForageTrees(keys)
+  }, [availableFruitsToday])
+
+  function handleFarmTileClick(slotIndex: number) {
+    const plot = plotSlotsRef.current[slotIndex] ?? null
+    if (!plot) {
+      setSeedPickerError(null)
+      setSeedPickerSlotIndex(slotIndex)
+      return
+    }
+    if (plot.readyToHarvest) {
+      harvestPlot(session.sessionId, plot.farmPlotId)
+        .then((updated) => {
+          setStamina(updated.staminaCurrent)
+          setMapMessage(`${plot.cropName}을(를) 수확했습니다.`)
+          reloadFarmPlots()
+        })
+        .catch((err: unknown) => setMapMessage(err instanceof Error ? err.message : '수확에 실패했습니다.'))
+      return
+    }
+    setMapMessage(`${plot.cropName}이(가) 아직 자라는 중입니다 (${plot.readyDay}일차부터 수확 가능).`)
+  }
+
+  function handleForageTreeClick(fruitKey: string) {
+    const species = fruitSpeciesRef.current.find((fruit) => FRUIT_NAME_TO_KEY[fruit.name] === fruitKey)
+    if (!species) return
+    if (!availableFruitKeysRef.current.includes(fruitKey)) {
+      setMapMessage('오늘은 여기서 딸 수 있는 게 없습니다.')
+      return
+    }
+    forageFruit(session.sessionId, species.fruitId)
+      .then((result) => {
+        setStamina(result.staminaCurrent)
+        setMapMessage(`${result.fruitName}을(를) 채집했습니다.`)
+      })
+      .catch((err: unknown) => setMapMessage(err instanceof Error ? err.message : '채집에 실패했습니다.'))
+  }
+
+  function handlePickSeed(cropId: number) {
+    setSeedPickerBusy(true)
+    setSeedPickerError(null)
+    plantCrop(session.sessionId, cropId)
+      .then((updated) => {
+        setStamina(updated.staminaCurrent)
+        setSeedPickerSlotIndex(null)
+        setMapMessage('씨앗을 심었습니다.')
+        reloadFarmPlots()
+        reloadSeedInventory()
+      })
+      .catch((err: unknown) => setSeedPickerError(err instanceof Error ? err.message : '파종에 실패했습니다.'))
+      .finally(() => setSeedPickerBusy(false))
+  }
+
   async function handleLocationClick(spotKey: string) {
     if (spotKey === ACCUSATION_LOCATION_SPOT && accusationArmedRef.current && canAccuse) {
       setAccusationArmed(false)
@@ -93,17 +251,28 @@ export function DayScreen({
 
     if (locationBusyRef.current) return
     const target = (unacquiredCluesRef.current ?? []).find((clue) => matchesLocationSpot(clue.location, spotKey))
-    if (!target) return
+    if (target) {
+      locationBusyRef.current = true
+      try {
+        await acquireClue(session.sessionId, target.clueId)
+        setMapMessage(`${target.location}에서 단서(${topicLabel(target.topic)})를 습득했습니다.`)
+        reloadUnacquiredClues()
+      } catch (err) {
+        setMapMessage(err instanceof Error ? err.message : '단서를 습득하지 못했습니다.')
+      } finally {
+        locationBusyRef.current = false
+      }
+      return
+    }
 
-    locationBusyRef.current = true
-    try {
-      await acquireClue(session.sessionId, target.clueId)
-      setMapMessage(`${target.location}에서 단서(${topicLabel(target.topic)})를 습득했습니다.`)
-      reloadUnacquiredClues()
-    } catch (err) {
-      setMapMessage(err instanceof Error ? err.message : '단서를 습득하지 못했습니다.')
-    } finally {
-      locationBusyRef.current = false
+    // 습득할 단서가 없으면 건물 용도대로 상점을 연다.
+    if (spotKey === 'produce-shop') {
+      setProduceShopOpen(true)
+      return
+    }
+    if (spotKey === 'item-shop') {
+      setItemShopOpen(true)
+      return
     }
   }
 
@@ -188,10 +357,44 @@ export function DayScreen({
           .catch(() => {})
       },
       onLocationClick: handleLocationClick,
+      onFarmTileClick: handleFarmTileClick,
+      onForageTreeClick: handleForageTreeClick,
     }
     game.scene.start('MainScene', initData)
 
+    // 밭/채집/사보타주 파손 데이터는 API 응답이 도착하는 대로 아래 다른 effect들이 밀어주는데,
+    // 그 응답이 Phaser의 create()(이미지 60여 개 로딩)보다 먼저 끝나면 그 시점엔 씬이 아직
+    // 준비 안 돼 있어 조용히 무시된다(각 sync 메서드가 스스로 방어, MainScene.isReady() 참고).
+    // Scene의 CREATE 라이프사이클 이벤트를 직접 구독하는 방식은 scene.add()/start() 직후엔
+    // Phaser 내부적으로 아직 씬 인스턴스가 매니저에 완전히 등록되지 않아(다음 게임 스텝에서야
+    // 처리됨) getScene()이 null을 반환하는 경우가 있어 포기했다 — 대신 매 프레임 폴링으로
+    // create() 완료를 기다렸다가, 그때까지 모아둔 최신값을 한 번 더 밀어넣는다.
+    let cancelled = false
+    let rafId: number
+    const pushOnceReady = () => {
+      if (cancelled) return
+      const scene = gameRef.current?.scene.getScene('MainScene') as MainScene | undefined
+      if (!scene || !scene.isReady()) {
+        rafId = requestAnimationFrame(pushOnceReady)
+        return
+      }
+      const plotView: Array<FarmPlotVisual | null> = plotSlotsRef.current.map((plot) =>
+        plot
+          ? {
+              textureKey: cropTextureKey(plot.cropName, computeCropStage(plot, session.currentDay)),
+              readyToHarvest: plot.readyToHarvest,
+            }
+          : null,
+      )
+      scene.syncFarmPlots(plotView)
+      scene.syncForageTrees(availableFruitKeysRef.current)
+      scene.syncSabotageDamage(sabotageLocationsRef.current)
+    }
+    rafId = requestAnimationFrame(pushOnceReady)
+
     return () => {
+      cancelled = true
+      cancelAnimationFrame(rafId)
       game.destroy(true)
       gameRef.current = null
     }
@@ -200,8 +403,16 @@ export function DayScreen({
 
   useEffect(() => {
     const scene = gameRef.current?.scene.getScene('MainScene') as MainScene | undefined
-    scene?.setInputLocked(!!dialogueNpc || escOpen || inventoryOpen || advancing)
-  }, [dialogueNpc, escOpen, inventoryOpen, advancing])
+    scene?.setInputLocked(
+      !!dialogueNpc ||
+        escOpen ||
+        inventoryOpen ||
+        produceShopOpen ||
+        itemShopOpen ||
+        seedPickerSlotIndex !== null ||
+        advancing,
+    )
+  }, [dialogueNpc, escOpen, inventoryOpen, produceShopOpen, itemShopOpen, seedPickerSlotIndex, advancing])
 
   // 대화/아이템 사용/농사 등으로 stamina가 바뀔 때마다 Phaser 씬의 내부 체력값도 맞춰준다 —
   // 이동 중 체력 계산과 다른 이유로 값이 바뀐 뒤 다시 이동하면, 씬이 그 변화를 모른 채
@@ -223,11 +434,23 @@ export function DayScreen({
         setInventoryOpen(false)
         return
       }
+      if (seedPickerSlotIndex !== null) {
+        setSeedPickerSlotIndex(null)
+        return
+      }
+      if (produceShopOpen) {
+        setProduceShopOpen(false)
+        return
+      }
+      if (itemShopOpen) {
+        setItemShopOpen(false)
+        return
+      }
       setEscOpen((open) => !open)
     }
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [dialogueNpc, inventoryOpen])
+  }, [dialogueNpc, inventoryOpen, produceShopOpen, itemShopOpen, seedPickerSlotIndex])
 
   // 체력(낮 시간)이 다 떨어지면 버튼 없이 자동으로 밤으로 넘어간다. 대화창이 열려 있는 동안엔
   // 넘어가지 않고 기다린다 — 안 그러면 대화 도중에 화면이 통째로 밤으로 전환되며 대화창이
@@ -284,7 +507,11 @@ export function DayScreen({
         <div ref={containerRef} className="day-canvas-inner" />
       </div>
 
-      <p className="day-hint">방향키 / WASD로 이동, NPC에게 가까이 가서 클릭하면 대화하세요. ESC로 메뉴를 엽니다.</p>
+      <p className="day-hint">
+        방향키 / WASD로 이동, NPC에게 가까이 가서 클릭하면 대화하세요. 농산물 상점/아이템 상점 건물을
+        클릭하면 상점이 열립니다. 밭 타일에 가까이서 클릭하면 심거나 수확할 수 있고, 나무/덤불을
+        클릭하면 채집합니다. ESC로 메뉴를 엽니다.
+      </p>
 
       {dialogueNpc && (
         <DialogueBox
@@ -305,6 +532,35 @@ export function DayScreen({
           currentDay={session.currentDay}
           onStaminaChange={(restored) => setStamina((prev) => Math.min(session.staminaMax, prev + restored))}
           onClose={() => setInventoryOpen(false)}
+        />
+      )}
+
+      {seedPickerSlotIndex !== null && (
+        <SeedPickerPopup
+          seeds={seedInventory}
+          busy={seedPickerBusy}
+          errorMessage={seedPickerError}
+          onPick={handlePickSeed}
+          onClose={() => setSeedPickerSlotIndex(null)}
+        />
+      )}
+
+      {produceShopOpen && (
+        <ProduceShopPanel
+          sessionId={session.sessionId}
+          gold={gold}
+          onGoldChange={setGold}
+          onSeedPurchased={reloadSeedInventory}
+          onClose={() => setProduceShopOpen(false)}
+        />
+      )}
+
+      {itemShopOpen && (
+        <ItemShopPanel
+          sessionId={session.sessionId}
+          gold={gold}
+          onGoldChange={setGold}
+          onClose={() => setItemShopOpen(false)}
         />
       )}
 

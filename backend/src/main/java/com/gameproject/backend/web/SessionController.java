@@ -94,4 +94,14 @@ public class SessionController {
                 .map(ResponseEntity::ok)
                 .orElseGet(() -> ResponseEntity.noContent().build());
     }
+
+    /**
+     * 맵 위 시설(양계장/수박밭 등) 파손 표시용 — 지금까지 이 세션에서 사보타주가 발생한
+     * 장소 이름만(누가/무엇을/목격자 등은 제외) 중복 없이 반환한다. 범인 특정 정보가 없어
+     * NightTransitionScreen이 매일 노출하는 정보보다 더 새는 게 없다.
+     */
+    @GetMapping("/{sessionId}/sabotage/locations")
+    public ResponseEntity<List<String>> sabotageLocations(@PathVariable("sessionId") Long sessionId) {
+        return ResponseEntity.ok(sessionService.getSabotageLocations(sessionId));
+    }
 }

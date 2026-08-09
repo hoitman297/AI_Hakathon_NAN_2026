@@ -1,5 +1,8 @@
 package com.gameproject.backend.service;
 
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Executor;
+
 import org.springframework.stereotype.Service;
 
 import com.gameproject.backend.client.LlmProxyClient;
@@ -21,6 +24,7 @@ public class AccusationService {
 
     private final LlmProxyClient llmProxyClient;
     private final AccusationPersistenceService persistence;
+    private final Executor llmParallelExecutor;
 
     public AccuseResultResponse accuse(Long sessionId, Long accusedNpcId) {
         AccusationOutcome outcome = persistence.prepareAccusation(sessionId, accusedNpcId);
@@ -31,16 +35,24 @@ public class AccusationService {
             return new AccuseResultResponse(true, message, outcome.sessionStatusName());
         }
 
-        // 이벤트 연출 텍스트 생성 LLM에는 범인 정보를 전혀 넘기지 않으므로 응답이 범인을 암시할 수 없다.
-        if (outcome.needsEventDescription()) {
-            String description = llmProxyClient.generateEventContent(
-                    outcome.eventType(), outcome.eventTarget().name(), outcome.day(), accused.getName());
-            persistence.saveRandomEvent(outcome.session(), outcome.day(), outcome.eventTarget(), outcome.eventType(), description);
+        // 이벤트 연출(조건부)과 오답 반응은 서로 독립적인 LLM 호출이라 순차 대기 대신 동시에
+        // 보낸다. 이벤트 연출 텍스트 생성 LLM에는 범인 정보를 전혀 넘기지 않으므로 응답이
+        // 범인을 암시할 수 없다.
+        CompletableFuture<String> descriptionFuture = outcome.needsEventDescription()
+                ? CompletableFuture.supplyAsync(() -> llmProxyClient.generateEventContent(
+                        outcome.eventType(), outcome.eventTarget().name(), outcome.day(), accused.getName()),
+                        llmParallelExecutor)
+                : null;
+        CompletableFuture<String> reactionFuture = CompletableFuture.supplyAsync(() -> llmProxyClient.generateWrongAccusationReaction(
+                accused.getName(), accused.getRole(), accused.getAge(),
+                accused.getPersonalityDesc(), accused.getSpeechStyle(), accused.getSampleLine()),
+                llmParallelExecutor);
+
+        if (descriptionFuture != null) {
+            persistence.saveRandomEvent(outcome.session(), outcome.day(), outcome.eventTarget(), outcome.eventType(), descriptionFuture.join());
         }
 
-        String reaction = llmProxyClient.generateWrongAccusationReaction(
-                accused.getName(), accused.getRole(), accused.getAge(),
-                accused.getPersonalityDesc(), accused.getSpeechStyle(), accused.getSampleLine());
+        String reaction = reactionFuture.join();
         String message = "오답입니다. " + (reaction != null ? reaction : accused.getName() + "가 억울함을 토로합니다.");
 
         return new AccuseResultResponse(false, message, outcome.sessionStatusName());

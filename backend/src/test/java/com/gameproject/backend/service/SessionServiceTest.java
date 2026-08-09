@@ -80,7 +80,8 @@ class SessionServiceTest {
     void setUp() {
         sessionService = new SessionService(sessionRepository, npcRepository, caseAssignmentRepository,
                 affinityRepository, playerStatRepository, sabotageEventRepository,
-                culpritProfileRegistry, staminaService, gameSaveService, llmProxyClient, persistence);
+                culpritProfileRegistry, staminaService, gameSaveService, llmProxyClient, persistence,
+                Runnable::run);
 
         account = Account.builder().accountId(1L).username("u").passwordHash("h").nickname("n")
                 .createdAt(LocalDateTime.now()).build();

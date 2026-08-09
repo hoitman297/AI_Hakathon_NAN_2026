@@ -49,6 +49,29 @@ public class FarmService {
                 .toList();
     }
 
+    /**
+     * 씨앗 구매 — 농산물 상점에서 골드를 내고 씨앗을 사서 인벤토리(SEED)에 보관한다.
+     * 실제로 밭에 심는 건 {@link #plant}에서 이 씨앗을 소모하며 별도로 한다(스타듀밸리 스타일:
+     * 구매↔파종을 분리해서, 파종은 맵 위 실제 밭 타일 앞으로 걸어가서 해야 한다).
+     */
+    @Transactional
+    public void buySeed(Long sessionId, Long cropId) {
+        GameSession session = sessionService.findSession(sessionId);
+        if (session.getStatus() != SessionStatus.IN_PROGRESS) {
+            throw new IllegalStateException("이미 종료된 세션입니다.");
+        }
+        CropMaster crop = cropMasterRepository.findById(cropId)
+                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 작물입니다: " + cropId));
+
+        if (staminaService.currentStat(session).getGold() < crop.getSeedPrice()) {
+            throw new IllegalStateException("골드가 부족합니다.");
+        }
+
+        staminaService.addGold(session, -crop.getSeedPrice());
+        inventoryService.addItem(session, InventoryItemType.SEED, crop.getCropId(), 1);
+    }
+
+    /** 파종 — 인벤토리에 보관 중인 씨앗(SEED) 1개를 소모하고 스태미나를 써서 밭에 심는다. */
     @Transactional
     public void plant(Long sessionId, Long cropId) {
         GameSession session = sessionService.findSession(sessionId);
@@ -58,6 +81,7 @@ public class FarmService {
         CropMaster crop = cropMasterRepository.findById(cropId)
                 .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 작물입니다: " + cropId));
 
+        inventoryService.removeItem(session, InventoryItemType.SEED, cropId, 1);
         staminaService.consume(session, crop.getPlantOrHarvestStamina());
 
         farmPlotRepository.save(FarmPlot.builder()

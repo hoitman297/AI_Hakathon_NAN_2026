@@ -18,6 +18,9 @@ public final class GameConstants {
     public static final double MOVE_STAMINA_PER_SECOND = 0.15;
     public static final double MOVE_STAMINA_PER_SECOND_WITH_SNEAKERS = 0.12;
     public static final int DIALOGUE_STAMINA = 8;
+    /** 기획서: NPC 한 명당 하루 최대 대화(질의응답) 횟수 — 대화창을 닫았다 다시 열어도 초기화되지 않고
+     *  게임상 하루(currentDay) 단위로 누적된다. */
+    public static final int MAX_DIALOGUE_EXCHANGES_PER_NPC_PER_DAY = 3;
 
     public static final int INVENTORY_SLOT_COUNT = 7;
 

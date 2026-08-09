@@ -6,9 +6,10 @@ import { getNpcDetail } from '../api/npcApi'
 import { HeartMeter } from './HeartMeter'
 import './DialogueBox.css'
 
-// 한 번 대화창을 열 때마다 주고받을 수 있는 질의응답 횟수 제한 — 이 횟수를 채우면
-// NPC가 대화를 마무리하고, 다시 말을 걸려면 대화창을 닫았다 새로 열어야 한다.
-const MAX_EXCHANGES_PER_VISIT = 3
+// 대화창을 새로 열기 전(히스토리 로딩 전) 잠깐 보여줄 기본값 — 실제 한도는 서버가
+// /dialogue GET 응답(maxExchangesPerDay)으로 내려준다. 백엔드
+// GameConstants.MAX_DIALOGUE_EXCHANGES_PER_NPC_PER_DAY와 맞춰야 한다.
+const DEFAULT_MAX_EXCHANGES_PER_DAY = 3
 
 // 백엔드 GameConstants.DIALOGUE_STAMINA와 맞춰야 한다. 이 값을 조회하는 API가 없어
 // 프론트에 그대로 하드코딩했다(FIRST_ACCUSATION_DAY와 같은 패턴).
@@ -43,13 +44,17 @@ export function DialogueBox({
   const [sending, setSending] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [honestModeActive, setHonestModeActive] = useState(false)
-  const [exchangeCount, setExchangeCount] = useState(0)
+  // 대화창을 새로 열어도 초기화되지 않는, 서버(DB의 오늘치 대화 로그) 기준 누적 횟수 —
+  // 예전엔 이 컴포넌트가 마운트될 때마다 0으로 시작하는 로컬 state였어서, 대화창을 닫았다
+  // 다시 열면 하루 제한이 사실상 무한정 풀리는 버그가 있었다.
+  const [exchangesUsedToday, setExchangesUsedToday] = useState(0)
+  const [maxExchangesPerDay, setMaxExchangesPerDay] = useState(DEFAULT_MAX_EXCHANGES_PER_DAY)
   const [affinity, setAffinity] = useState<number | null>(null)
   // 서버 응답으로 실제 체력이 0 이하가 된 경우(정상 케이스는 아래 staminaTooLowToContinue가
   // 미리 막지만, 만일을 대비한 안전망) — 대화를 강제로 마무리하고 잠시 후 자동으로 닫는다.
   const [staminaDepleted, setStaminaDepleted] = useState(false)
   const listRef = useRef<HTMLDivElement>(null)
-  const turnLimitReached = exchangeCount >= MAX_EXCHANGES_PER_VISIT
+  const turnLimitReached = exchangesUsedToday >= maxExchangesPerDay
   // 다음 메시지를 보내면 체력이 바닥나 밤으로 넘어갈 상황이면, 보내기 전에 미리 입력을 막는다.
   const staminaTooLowToContinue = staminaCurrent - DIALOGUE_STAMINA_COST <= 0
   const conversationEnded = turnLimitReached || staminaDepleted || staminaTooLowToContinue
@@ -62,7 +67,11 @@ export function DialogueBox({
 
   useEffect(() => {
     fetchDialogueHistory(sessionId, npcId)
-      .then(setMessages)
+      .then((result) => {
+        setMessages(result.messages)
+        setExchangesUsedToday(result.exchangesUsedToday)
+        setMaxExchangesPerDay(result.maxExchangesPerDay)
+      })
       .catch((err) => setError(err instanceof Error ? err.message : '대화 기록을 불러오지 못했습니다.'))
       .finally(() => setLoadingHistory(false))
 
@@ -99,7 +108,8 @@ export function DialogueBox({
       setAffinity(result.affinityScore)
       // 서버는 정직 모드가 걸려있던 경우 이번 한 턴에 소모하고 해제한다.
       setHonestModeActive(false)
-      setExchangeCount((prev) => prev + 1)
+      setExchangesUsedToday(result.exchangesUsedToday)
+      setMaxExchangesPerDay(result.maxExchangesPerDay)
       if (result.staminaCurrent <= 0) {
         setStaminaDepleted(true)
       }
@@ -127,7 +137,7 @@ export function DialogueBox({
             </span>
             {!conversationEnded && (
               <span className="dialogue-turns-left">
-                남은 질문 {MAX_EXCHANGES_PER_VISIT - exchangeCount}/{MAX_EXCHANGES_PER_VISIT}
+                오늘 남은 대화 {maxExchangesPerDay - exchangesUsedToday}/{maxExchangesPerDay}
               </span>
             )}
           </div>
@@ -162,7 +172,7 @@ export function DialogueBox({
               </p>
             )}
             {!staminaDepleted && !staminaTooLowToContinue && turnLimitReached && (
-              <p className="dialogue-status">{npcName}이(가) 대화를 마무리했습니다. 다음에 다시 말을 걸어보세요.</p>
+              <p className="dialogue-status">{npcName}이(가) 대화를 마무리했습니다. 오늘은 더 대화할 수 없어요, 내일 다시 말을 걸어보세요.</p>
             )}
           </div>
 
