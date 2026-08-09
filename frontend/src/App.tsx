@@ -31,6 +31,10 @@ function App() {
   const [advancing, setAdvancing] = useState(false)
   const [advanceError, setAdvanceError] = useState<string | null>(null)
 
+  // 오프닝 컷씬(ArrivalScreen) 바로 다음에만 1일차 가이드 창을 띄운다 — "이어서하기"로
+  // 기존 세이브를 불러올 때는 이 플래그가 세워지지 않으므로 뜨지 않는다.
+  const [showDay1Guide, setShowDay1Guide] = useState(false)
+
   const sessionRef = useRef<SessionResponse | null>(null)
   useEffect(() => {
     sessionRef.current = session
@@ -174,7 +178,10 @@ function App() {
       {screen === 'arrival' && session && (
         <ArrivalScreen
           nickname={getPlayerProfile()?.nickname ?? '당신'}
-          onContinue={() => setScreen('day')}
+          onContinue={() => {
+            setShowDay1Guide(true)
+            setScreen('day')
+          }}
         />
       )}
 
@@ -195,6 +202,8 @@ function App() {
           onAdvanceDay={handleAdvanceDay}
           onOpenAccusation={() => setScreen('accusation')}
           onQuitToTitle={handleQuitToTitle}
+          showOpeningGuide={showDay1Guide}
+          onOpeningGuideShown={() => setShowDay1Guide(false)}
         />
       )}
 

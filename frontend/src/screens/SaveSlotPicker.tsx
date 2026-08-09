@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react'
-import { villageAssets } from '../assets/asset-manifest'
 import { listSessions, deleteSession, type SessionResponse } from '../api/sessionApi'
 import { Modal } from '../components/Modal'
 import './SaveSlotPicker.css'
+
+// 타이틀 화면과 동일한 배경을 써서 "이어서하기" 진입 시 배경이 바뀌어 보이지 않게 한다.
+const SAVE_PICKER_BACKGROUND = '/assets/ui/title/title-board-v2.png'
 
 // 백엔드 GameConstants.MAX_SAVES_PER_ACCOUNT와 맞춰야 한다. 이 값을 조회하는 API가 없어
 // 프론트에 그대로 하드코딩했다(DayScreen의 FIRST_ACCUSATION_DAY와 같은 패턴).
@@ -71,7 +73,7 @@ export function SaveSlotPicker({ onSelectSave, onStartNewGame, onBack }: SaveSlo
   const slots: (SessionResponse | null)[] = Array.from({ length: MAX_SAVES_PER_ACCOUNT }, (_, i) => saves?.[i] ?? null)
 
   return (
-    <div className="save-picker-screen" style={{ backgroundImage: `url(${villageAssets.concept})` }}>
+    <div className="save-picker-screen" style={{ backgroundImage: `url(${SAVE_PICKER_BACKGROUND})` }}>
       <div className="save-picker-overlay" />
       <div className="save-picker-content">
         <h1 className="save-picker-title">이어서하기</h1>
