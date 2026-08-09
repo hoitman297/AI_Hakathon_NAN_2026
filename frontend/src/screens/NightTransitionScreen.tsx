@@ -154,17 +154,27 @@ export function NightTransitionScreen({ sessionId, day, nextDay, onContinue }: N
           <div className="ns-stage-tag">{location}</div>
           <div className="ns-stage-badge-bottom">{meta.badge}</div>
 
-          {(location === '수박밭' || location === '자택 인근 텃밭') && (
+          {type === 'theft' && (
             <>
-              <img className="ns-crop ns-crop--potato" src="/assets/background-assets/growth/crops/potato-stage-3.png" alt="" />
-              <img className="ns-crop ns-crop--carrot" src="/assets/background-assets/growth/crops/carrot-stage-3.png" alt="" />
-              <img className="ns-crop ns-crop--strawberry" src="/assets/background-assets/growth/crops/strawberry-stage-3.png" alt="" />
+              {(location === '수박밭' || location === '자택 인근 텃밭') && (
+                <>
+                  <img className="ns-crop ns-crop--potato" src="/assets/background-assets/growth/crops/potato-stage-3.png" alt="" />
+                  <img className="ns-crop ns-crop--carrot" src="/assets/background-assets/growth/crops/carrot-stage-3.png" alt="" />
+                  <img className="ns-crop ns-crop--strawberry" src="/assets/background-assets/growth/crops/strawberry-stage-3.png" alt="" />
+                </>
+              )}
               <img className="ns-bag" src="/assets/items/bag-level-1.png" alt="" />
             </>
           )}
 
           {location === '양계장' && (
             <img className="ns-chicken" src="/assets/background-assets/objects/chicken-front.png" alt="" />
+          )}
+
+          {/* 마을회관/정자/상점/자택 등은 전용 파손(broken) 배경 에셋이 없어서, 부서진 울타리
+              소품으로 "여기서 파손 사고가 났다"는 걸 대신 표시한다. */}
+          {type === 'vandalism' && location !== '수박밭' && (
+            <img className="ns-fence-broken" src="/assets/background-assets/objects/wood-fence-broken.png" alt="" />
           )}
 
           <div className="ns-player-glow" />
