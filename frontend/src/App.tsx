@@ -7,7 +7,6 @@ import { DayScreen } from './screens/DayScreen'
 import { NightTransitionScreen } from './screens/NightTransitionScreen'
 import { AccusationScreen } from './screens/AccusationScreen'
 import { EndingScreen } from './screens/EndingScreen'
-import { VillagePreviewScreen } from './screens/VillagePreviewScreen'
 import { fetchMe, logout as logoutRequest, type AccountInfo, type AuthResult } from './api/authApi'
 import { createSession, advanceDay, type SessionResponse } from './api/sessionApi'
 import type { AccuseResult } from './api/accusationApi'
@@ -15,7 +14,7 @@ import { getAuthToken, clearAuthToken } from './api/authToken'
 import { createDayChangeAutoSave } from './game/autoSave'
 import { setPlayerProfile, type CharacterGender } from './state/playerProfile'
 
-type Screen = 'title' | 'character-create' | 'save-select' | 'day' | 'night' | 'accusation' | 'ending' | 'village-preview'
+type Screen = 'title' | 'character-create' | 'save-select' | 'day' | 'night' | 'accusation' | 'ending'
 
 function App() {
   const [screen, setScreen] = useState<Screen>('title')
@@ -157,11 +156,8 @@ function App() {
           onLogoutClick={handleLogout}
           onStartNewGame={handleStartNewGame}
           onContinue={() => setScreen('save-select')}
-          onVillagePreview={() => setScreen('village-preview')}
         />
       )}
-
-      {screen === 'village-preview' && <VillagePreviewScreen onBack={() => setScreen('title')} />}
 
       {screen === 'character-create' && (
         <CharacterCreateScreen

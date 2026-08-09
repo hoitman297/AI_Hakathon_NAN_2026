@@ -1,4 +1,6 @@
-import { villageAssets } from '../assets/asset-manifest'
+import { useEffect, useRef } from 'react'
+import Phaser from 'phaser'
+import { MainScene } from '../game/MainScene'
 import './TitleScreen.css'
 
 interface TitleScreenProps {
@@ -8,7 +10,6 @@ interface TitleScreenProps {
   onLogoutClick: () => void
   onStartNewGame: () => void
   onContinue: () => void
-  onVillagePreview: () => void
 }
 
 export function TitleScreen({
@@ -18,10 +19,44 @@ export function TitleScreen({
   onLogoutClick,
   onStartNewGame,
   onContinue,
-  onVillagePreview,
 }: TitleScreenProps) {
+  const containerRef = useRef<HTMLDivElement>(null)
+  const gameRef = useRef<Phaser.Game | null>(null)
+
+  // 로그인 없이도 걸어다닐 수 있는 마을 맵을 타이틀 화면 배경으로 그대로 띄운다
+  // (initData 없이 시작하므로 MainScene은 자유 이동만 되는 미리보기 모드로 동작한다).
+  useEffect(() => {
+    if (!containerRef.current || gameRef.current) return
+
+    gameRef.current = new Phaser.Game({
+      type: Phaser.AUTO,
+      parent: containerRef.current,
+      width: 1280,
+      height: 720,
+      backgroundColor: '#17201a',
+      pixelArt: true,
+      roundPixels: true,
+      scale: {
+        mode: Phaser.Scale.RESIZE,
+        autoCenter: Phaser.Scale.CENTER_BOTH,
+      },
+      render: {
+        antialias: false,
+        pixelArt: true,
+        roundPixels: true,
+      },
+      scene: [MainScene],
+    })
+
+    return () => {
+      gameRef.current?.destroy(true)
+      gameRef.current = null
+    }
+  }, [])
+
   return (
-    <div className="title-screen" style={{ backgroundImage: `url(${villageAssets.concept})` }}>
+    <div className="title-screen">
+      <div ref={containerRef} className="title-canvas" />
       <div className="title-overlay" />
       <div className="title-content">
         <h1 className="title-logo">마을 사보타주 추리 게임</h1>
@@ -49,16 +84,14 @@ export function TitleScreen({
           )}
         </div>
 
-        <button className="pixel-button title-preview-button" type="button" onClick={onVillagePreview}>
-          로그인 없이 마을 화면 보기
-        </button>
-
         {isLoggedIn && (
           <div className="title-account">
             {nickname}님 접속 중 · <button className="title-logout" onClick={onLogoutClick}>로그아웃</button>
           </div>
         )}
       </div>
+
+      <p className="title-help">WASD / 방향키로 마을을 둘러볼 수 있어요</p>
     </div>
   )
 }
