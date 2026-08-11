@@ -24,6 +24,9 @@ public final class GameConstants {
 
     public static final int INVENTORY_SLOT_COUNT = 7;
 
+    /** 기획서 미명시 — 시작 골드 0이면 씨앗(최저 5G)조차 못 사는 초반 경제 병목이 있어 잠정값으로 지급. */
+    public static final int STARTING_GOLD = 50;
+
     /** 계정당 동시에 보유 가능한 세이브(게임 세션) 슬롯 수. 삭제된(DELETED) 세션은 여기 안 낀다. */
     public static final int MAX_SAVES_PER_ACCOUNT = 3;
 
@@ -37,8 +40,11 @@ public final class GameConstants {
     public static final int AFFINITY_WRONG_CLOSE_PENALTY_MAGNITUDE_MIN = 10;
     public static final int AFFINITY_WRONG_CLOSE_PENALTY_MAGNITUDE_MAX = 15;
     public static final int AFFINITY_WRONG_UNRELATED_PENALTY = -5;
-    public static final int AFFINITY_GIFT_MIN = 10;
-    public static final int AFFINITY_GIFT_MAX = 15;
+    /** 선물세트 1개당 호감도 상승폭. 원래 +10~15(4개 필요)였다가 +18~25로 한 차례 올렸는데도
+     *  체감상 더 올려달라는 플레이테스트 피드백을 받아 재조정(잠정값) — 평균 +30이면 2개
+     *  (80G)로 시작(50)에서 만점(100) 근처까지 도달한다. */
+    public static final int AFFINITY_GIFT_MIN = 25;
+    public static final int AFFINITY_GIFT_MAX = 35;
 
     /** 사보타주 유형만으로 범인이 특정되는 것을 막기 위한 보조 유형 등장 확률(기획 방향성: 주 80% + 보조 20%) */
     public static final int SECONDARY_SABOTAGE_TYPE_CHANCE_PERCENT = 20;

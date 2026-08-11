@@ -58,6 +58,14 @@ public class RandomEventLog {
     @Column(columnDefinition = "TEXT")
     private String description;
 
+    @Comment("플레이어가 실제로 알림/❗을 통해 확인했는지 여부 (ClueCard.acquired와 같은 패턴)")
+    @Column(name = "is_viewed", nullable = false)
+    @Builder.Default
+    private Boolean viewed = false;
+
+    @Column(name = "viewed_at")
+    private LocalDateTime viewedAt;
+
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt;
 }

@@ -118,7 +118,7 @@ class AccusationServiceTest {
 
         AccuseResultResponse response = accusationService.accuse(100L, 2L);
 
-        assertThat(response.message()).contains("현수동가 억울함을 토로합니다.");
+        assertThat(response.message()).contains("현수동이(가) 억울함을 토로합니다.");
         assertThat(response.sessionStatus()).isEqualTo("BAD_ENDING");
     }
 

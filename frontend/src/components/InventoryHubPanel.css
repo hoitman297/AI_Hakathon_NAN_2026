@@ -162,21 +162,14 @@
 }
 
 .clue-detail-image {
+  display: block;
   margin: 0 auto 12px;
-  width: 96px;
-  height: 96px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 2.4rem;
-  border: 2px dashed var(--ink-soft);
+  width: min(220px, 100%);
   border-radius: 10px;
-  background: var(--paper-dim);
 }
 
-.clue-detail-topic {
-  font-weight: 700;
-  margin-bottom: 4px;
+.clue-detail-image--blank {
+  opacity: 0.85;
 }
 
 .clue-card-text {

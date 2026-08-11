@@ -10,7 +10,10 @@
 
 .modal-panel {
   min-width: 300px;
-  max-width: 90vw;
+  /* max-width만 90vw였을 때, 넓은 데스크톱 화면(예: 1920px)에서 긴 단서 설명문 같은 텍스트가
+     줄바꿈 없이 거의 화면 끝까지 늘어나 모달이 비정상적으로 넓어 보였다(가로 1728px까지
+     퍼짐) — 적당한 읽기 폭으로 상한을 둔다. */
+  max-width: min(520px, 90vw);
   padding: 24px 28px;
 }
 

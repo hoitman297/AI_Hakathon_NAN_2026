@@ -47,16 +47,15 @@ export interface MainSceneInitData {
 const PLAYER_SPEED = 145
 const WORLD_OBJECT_SCALE = 1
 const WALK_DIRECTIONS = ['south', 'south-east', 'east', 'north-east', 'north', 'north-west', 'west', 'south-west'] as const
-// player-boy-v2/player-girl-v2 Idle 이미지는 48x48로 만들어져 있고, 새로 추가된 player-male
-// 걷기 애니메이션 프레임은 92x92라 그대로 섞어 쓰면 걷기 시작/정지할 때마다 캐릭터 크기가
-// 튀어 보인다 — 항상 48px로 보이도록 걷기 텍스처 쪽만 이 비율로 축소한다.
+// player-male 걷기 애니메이션 프레임은 92x92라, 항상 48px로 보이도록 걷기 텍스처 쪽만
+// 이 비율로 축소한다.
 const PLAYER_IDLE_DISPLAY_SIZE = 48
 const PLAYER_WALK_FRAME_SIZE = 92
-// 여성 캐릭터는 아직 걷기 프레임 원본 에셋이 없어서, 정지 이미지(player-girl-v2)를 방향별로
-// 그대로 쓰면서 걷는 동안만 통통 튀는 스쿼시&스트레치 트윈으로 움직임을 표현한다.
-const FEMALE_WALK_BOUNCE_DURATION = 180
-const FEMALE_WALK_BOUNCE_SCALE_Y = 0.88
-const FEMALE_WALK_BOUNCE_SCALE_X = 1.06
+// 여성(walk_cycle_character2) 걷기 프레임은 48x48 원본이라 남캐(92x92, 24% 정도 여백)보다
+// 여백 없이 꽉 차게 그려져 있어, 같은 48px로 맞추면 상대적으로 작고 밋밋해 보인다는 피드백이
+// 있었다 — 남캐와 체감 크기를 맞추기 위해 여성만 살짝 더 크게 표시한다.
+const FEMALE_IDLE_DISPLAY_SIZE = 54
+const FEMALE_WALK_FRAME_SIZE = 48
 // 기획서 체력 세부 수치(✅ 확정): 이동 초당 0.15 소모, 운동화 착용 시 초당 0.12(20% 감소).
 // 백엔드 GameConstants.MOVE_STAMINA_PER_SECOND(_WITH_SNEAKERS)와 값이 일치해야 한다.
 const MOVE_STAMINA_PER_SECOND = 0.15
@@ -135,11 +134,13 @@ export class MainScene extends Phaser.Scene {
   private pendingMovedSeconds = 0
   private npcInteractRange = 0
   private locationInteractRange = 0
+  // 채집 나무/덤불은 건물보다 스프라이트가 훨씬 작아서(scale 0.07~0.09), 건물과 같은 반경(2.5칸)을
+  // 쓰면 나무 바로 옆에 서도 "너무 멀어요"로 튕기는 경우가 잦았다 — 채집 전용으로 더 넓게 잡는다.
+  private forageInteractRange = 0
   private lastDirection: (typeof WALK_DIRECTIONS)[number] = 'south'
-  // 남성은 player-male 걷기 스프라이트시트로 실제 프레임 애니메이션을 재생하고, 여성은
-  // 아직 걷기 프레임 에셋이 없어 정지 이미지 + 스쿼시&스트레치 트윈으로 움직임을 표현한다.
+  // 남성은 player-male, 여성은 walk_cycle_character2 걷기 스프라이트시트로 각각 실제
+  // 프레임 애니메이션을 재생한다(둘 다 8방향 4프레임, registerPlayerWalkAnimations 참고).
   private isFemalePlayer = false
-  private femaleWalkTween?: Phaser.Tweens.Tween
 
   constructor() {
     super('MainScene')
@@ -159,15 +160,18 @@ export class MainScene extends Phaser.Scene {
     this.load.image('terrainChunk', '/assets/world/maps/korean-countryside-chunk-01.png?v=no-road-expanded-field-v18')
     this.load.json('terrainMapData', '/assets/world/maps/korean-countryside-chunk-01.json?v=no-road-expanded-field-v18')
     WALK_DIRECTIONS.forEach((direction) => {
-      this.load.image(`player-girl-${direction}`, `/assets/characters/player-girl-v2/Idle/rotations/${direction}.png`)
-      // 남성 전용 4프레임 걷기 애니메이션(여성용은 아직 원본 에셋이 없어 정지 이미지 + 트윈으로 대체).
-      // 정지 포즈도 이 스프라이트시트의 0번 프레임을 그대로 쓴다(따로 정지 이미지 에셋을 안 씀) —
-      // 예전엔 정지 상태만 다른 화풍의 player-boy-v2 이미지를 써서 걷기 시작/정지할 때마다
-      // 캐릭터 생김새가 바뀌어 보이는 문제가 있었다.
+      // 남녀 각각 8방향 4프레임 걷기 애니메이션. 정지 포즈도 이 스프라이트시트의 0번
+      // 프레임을 그대로 쓴다(따로 정지 이미지 에셋을 안 씀) — 예전엔 정지 상태만 다른
+      // 화풍의 이미지를 써서 걷기 시작/정지할 때마다 캐릭터 생김새가 바뀌어 보이는 문제가 있었다.
       this.load.spritesheet(
         `player-walk-${direction}`,
         `/assets/characters/player-male/walk_cycle_all_directions/${direction}/${direction}_walk_sheet.png`,
         { frameWidth: PLAYER_WALK_FRAME_SIZE, frameHeight: PLAYER_WALK_FRAME_SIZE },
+      )
+      this.load.spritesheet(
+        `player-walk-girl-${direction}`,
+        `/assets/characters/walk_cycle_character2_all_directions/${direction}/${direction}_walk_sheet.png`,
+        { frameWidth: FEMALE_WALK_FRAME_SIZE, frameHeight: FEMALE_WALK_FRAME_SIZE },
       )
     })
     this.load.image('ruralBridge', '/assets/world/bridge-rural-small-v2.png')
@@ -252,6 +256,7 @@ export class MainScene extends Phaser.Scene {
     )
     this.npcInteractRange = this.mapData.tileWidth * 2
     this.locationInteractRange = this.mapData.tileWidth * 2.5
+    this.forageInteractRange = this.mapData.tileWidth * 5
     this.isFemalePlayer = getPlayerProfile()?.gender === 'female'
     this.registerPlayerWalkAnimations()
 
@@ -277,13 +282,12 @@ export class MainScene extends Phaser.Scene {
       (blocker) => !Phaser.Geom.Intersects.RectangleToRectangle(blocker, spawnSafetyArea),
     )
 
-    const [initialTexture, initialFrame] = this.isFemalePlayer
-      ? [`player-girl-south`, undefined]
-      : [`player-walk-south`, 0]
+    const initialTexture = this.isFemalePlayer ? 'player-walk-girl-south' : 'player-walk-south'
+    const initialDisplaySize = this.isFemalePlayer ? FEMALE_IDLE_DISPLAY_SIZE : PLAYER_IDLE_DISPLAY_SIZE
     this.player = this.add
-      .sprite(spawnX, spawnY, initialTexture, initialFrame)
+      .sprite(spawnX, spawnY, initialTexture, 0)
       .setDepth(spawnY)
-      .setDisplaySize(PLAYER_IDLE_DISPLAY_SIZE, PLAYER_IDLE_DISPLAY_SIZE)
+      .setDisplaySize(initialDisplaySize, initialDisplaySize)
     this.createWorldLighting()
 
     this.cursors = this.input.keyboard!.createCursorKeys()
@@ -391,10 +395,10 @@ export class MainScene extends Phaser.Scene {
   private showFloatingHint(x: number, y: number, text: string) {
     const hint = this.add
       .text(x, y, text, {
-        fontSize: '11px',
+        fontSize: '14px',
         color: '#fff8ec',
         backgroundColor: '#b23a2fcc',
-        padding: { x: 4, y: 2 },
+        padding: { x: 6, y: 3 },
       })
       .setOrigin(0.5, 1)
       .setDepth(1_000_001)
@@ -402,8 +406,8 @@ export class MainScene extends Phaser.Scene {
     this.tweens.add({
       targets: hint,
       alpha: 0,
-      delay: 700,
-      duration: 400,
+      delay: 1400,
+      duration: 500,
       onComplete: () => hint.destroy(),
     })
   }
@@ -431,18 +435,30 @@ export class MainScene extends Phaser.Scene {
     }
   }
 
-  /** 8방향 걷기 애니메이션(player-walk-*)을 씬 시작 시 한 번만 등록한다. */
+  /** 남녀 각각 8방향 걷기 애니메이션(player-walk-, player-walk-girl-)을 씬 시작 시 한 번만 등록한다. */
   private registerPlayerWalkAnimations() {
     WALK_DIRECTIONS.forEach((direction) => {
-      const key = `walk-${direction}`
-      if (this.anims.exists(key)) return
-      this.anims.create({
-        key,
-        frames: this.anims.generateFrameNumbers(`player-walk-${direction}`, { start: 0, end: 3 }),
-        frameRate: 10,
-        repeat: -1,
+      ;[
+        { key: `walk-${direction}`, texture: `player-walk-${direction}` },
+        { key: `walk-girl-${direction}`, texture: `player-walk-girl-${direction}` },
+      ].forEach(({ key, texture }) => {
+        if (this.anims.exists(key)) return
+        this.anims.create({
+          key,
+          frames: this.anims.generateFrameNumbers(texture, { start: 0, end: 3 }),
+          frameRate: 10,
+          repeat: -1,
+        })
       })
     })
+  }
+
+  private playerWalkTexturePrefix(): string {
+    return this.isFemalePlayer ? 'player-walk-girl-' : 'player-walk-'
+  }
+
+  private playerIdleDisplaySize(): number {
+    return this.isFemalePlayer ? FEMALE_IDLE_DISPLAY_SIZE : PLAYER_IDLE_DISPLAY_SIZE
   }
 
   private setPlayerDirection(dx: number, dy: number) {
@@ -452,39 +468,15 @@ export class MainScene extends Phaser.Scene {
     if (!direction) return
     this.lastDirection = direction as (typeof WALK_DIRECTIONS)[number]
 
-    if (this.isFemalePlayer) {
-      // 방향 전환마다 텍스처만 바꾼다 — 여성 정지 이미지는 8방향 모두 48x48로 크기가
-      // 같아서 setDisplaySize를 매 프레임 다시 부를 필요가 없고, 그걸 매 프레임 부르면
-      // startFemaleWalkBounce()가 돌리는 scaleX/scaleY 트윈을 매 프레임 1:1로 되돌려버려
-      // 바운스가 안 보이게 된다.
-      this.player.setTexture(`player-girl-${direction}`)
-      this.startFemaleWalkBounce()
-      return
-    }
-
-    const animKey = `walk-${direction}`
+    const animKey = this.isFemalePlayer ? `walk-girl-${direction}` : `walk-${direction}`
     // isPlaying도 같이 봐야 한다 — stopWalking()이 애니메이션을 멈추고 정지 이미지로 텍스처만
     // 바꿔도 currentAnim.key 자체는 마지막 애니메이션 키로 남아있다. key만 비교하면, 걷다가
     // 멈췄다가 같은 방향으로 다시 걸을 때 "키가 그대로니 이미 재생 중"이라고 착각해서
     // play()를 다시 안 불러 정지 이미지에서 멈춰버리는 문제가 있었다.
     if (!this.player.anims.isPlaying || this.player.anims.currentAnim?.key !== animKey) {
       this.player.play(animKey)
-      this.player.setDisplaySize(PLAYER_IDLE_DISPLAY_SIZE, PLAYER_IDLE_DISPLAY_SIZE)
+      this.player.setDisplaySize(this.playerIdleDisplaySize(), this.playerIdleDisplaySize())
     }
-  }
-
-  /** 여성 캐릭터가 걷는 동안 재생할 스쿼시&스트레치 바운스 트윈을 (아직 안 돌고 있으면) 시작한다. */
-  private startFemaleWalkBounce() {
-    if (this.femaleWalkTween?.isPlaying()) return
-    this.femaleWalkTween = this.tweens.add({
-      targets: this.player,
-      scaleY: FEMALE_WALK_BOUNCE_SCALE_Y,
-      scaleX: FEMALE_WALK_BOUNCE_SCALE_X,
-      duration: FEMALE_WALK_BOUNCE_DURATION,
-      yoyo: true,
-      repeat: -1,
-      ease: 'Sine.easeInOut',
-    })
   }
 
   /**
@@ -493,18 +485,10 @@ export class MainScene extends Phaser.Scene {
    * 캐릭터 생김새가 서로 다른 에셋이라 달라 보이지 않게 하기 위함.
    */
   private stopWalking() {
-    if (this.isFemalePlayer) {
-      if (!this.femaleWalkTween?.isPlaying()) return
-      this.femaleWalkTween.stop()
-      this.player.setTexture(`player-girl-${this.lastDirection}`)
-      this.player.setDisplaySize(PLAYER_IDLE_DISPLAY_SIZE, PLAYER_IDLE_DISPLAY_SIZE)
-      return
-    }
-
     if (!this.player.anims.isPlaying) return
     this.player.anims.stop()
-    this.player.setTexture(`player-walk-${this.lastDirection}`, 0)
-    this.player.setDisplaySize(PLAYER_IDLE_DISPLAY_SIZE, PLAYER_IDLE_DISPLAY_SIZE)
+    this.player.setTexture(`${this.playerWalkTexturePrefix()}${this.lastDirection}`, 0)
+    this.player.setDisplaySize(this.playerIdleDisplaySize(), this.playerIdleDisplaySize())
   }
 
   private createFarmAreaObjects() {
@@ -585,6 +569,13 @@ export class MainScene extends Phaser.Scene {
 
       return { soil, crop }
     })
+
+    // 8~9일차 랜덤 이벤트(밭 훼손)용 ❗ — 특정 밭 한 칸이 아니라 밭 구역 전체를 대표하는
+    // 좌표(전체 8칸의 중앙)에 띄운다. 실제로 어떤 작물이 자라는지와는 무관한 연출용 표시라
+    // farmPlotSlots(파종/수확 상호작용)와는 완전히 분리해 둔다.
+    const centerTileX = (FARM_PLOT_POSITIONS[0].x + FARM_PLOT_POSITIONS[FARM_PLOT_POSITIONS.length - 1].x) / 2
+    const centerTileY = (FARM_PLOT_POSITIONS[0].y + FARM_PLOT_POSITIONS[FARM_PLOT_POSITIONS.length - 1].y) / 2
+    this.registerClueMarker('farm-damage', centerTileX * tile, centerTileY * tile)
   }
 
   /**
@@ -625,7 +616,7 @@ export class MainScene extends Phaser.Scene {
   private handleForageTreeInteract(fruitKey: string, x: number, y: number) {
     if (!this.initData) return
     const distance = Phaser.Math.Distance.Between(this.player.x, this.player.y, x, y)
-    if (distance <= this.locationInteractRange) {
+    if (distance <= this.forageInteractRange) {
       this.initData.onForageTreeClick(fruitKey)
     } else {
       this.showFloatingHint(x, y - this.mapData.tileHeight, '너무 멀어요! 가까이 가주세요')
@@ -668,6 +659,13 @@ export class MainScene extends Phaser.Scene {
     hallImage.on('pointerout', () => hallImage.clearTint())
     hallImage.on('pointerdown', () => this.handleLocationInteract('village-hall', hall.x, hall.y))
     this.registerClueMarker('village-hall', hall.x, hall.y)
+    this.add
+      .text(hall.x, hall.y - hallImage.displayHeight - 8, '마을회관', {
+        fontFamily: 'sans-serif', fontSize: '15px', fontStyle: 'bold', color: '#fff5d6',
+        backgroundColor: '#5b3a1edd', padding: { x: 8, y: 4 },
+      })
+      .setOrigin(0.5, 1)
+      .setDepth(hall.y + 1)
 
     const pavilion = at(40, 40)
     this.add
@@ -750,7 +748,12 @@ export class MainScene extends Phaser.Scene {
 
     // Signature 1990s village props. The center line from the road to the hall
     // doors stays open while the objects form two uneven civic-yard clusters.
-    place('villageNoticeBoard', 28, 21.5, 0.075, { width: 62, height: 20 })
+    const noticeBoard = place('villageNoticeBoard', 28, 21.5, 0.075, { width: 62, height: 20 })
+    noticeBoard.setInteractive({ useHandCursor: true })
+    noticeBoard.on('pointerover', () => noticeBoard.setTint(0xfff1b5))
+    noticeBoard.on('pointerout', () => noticeBoard.clearTint())
+    noticeBoard.on('pointerdown', () => this.handleLocationInteract('village-board', noticeBoard.x, noticeBoard.y))
+    this.registerClueMarker('village-board', noticeBoard.x, noticeBoard.y)
     place('stoneFlowerBed', 14.2, 26.2, 0.065, { width: 72, height: 20 })
     place('newWildflower1', 9.5, 30.2, 0.028)
     place('broadcastSpeakerPole', 4.7, 14, 0.14, { width: 24, height: 20 })
@@ -838,6 +841,13 @@ export class MainScene extends Phaser.Scene {
     shopImage.on('pointerout', () => shopImage.clearTint())
     shopImage.on('pointerdown', () => this.handleLocationInteract('produce-shop', shop.x, shop.y))
     this.registerClueMarker('produce-shop', shop.x, shop.y)
+    this.add
+      .text(shop.x, shop.y - shopImage.displayHeight - 8, '씨앗 상점', {
+        fontFamily: 'sans-serif', fontSize: '15px', fontStyle: 'bold', color: '#fff5d6',
+        backgroundColor: '#5b3a1edd', padding: { x: 8, y: 4 },
+      })
+      .setOrigin(0.5, 1)
+      .setDepth(shop.y + 1)
     add('ruralMailbox1', 54.8, 19.2, 0.068, { width: 20, height: 14 })
 
     // Small cared-for vegetable plot left of the house.
@@ -942,7 +952,14 @@ export class MainScene extends Phaser.Scene {
 
     // Zone 3: the commercial corner. The item shop faces the northern road;
     // its small storage building sits farther east, leaving a service yard between.
-    building('itemShop', 14, 53, 0.34, 180, 55, false, 'item-shop')
+    const itemShopImage = building('itemShop', 14, 53, 0.34, 180, 55, false, 'item-shop')
+    this.add
+      .text(itemShopImage.x, itemShopImage.y - itemShopImage.displayHeight - 8, '아이템 상점', {
+        fontFamily: 'sans-serif', fontSize: '15px', fontStyle: 'bold', color: '#fff5d6',
+        backgroundColor: '#5b3a1edd', padding: { x: 8, y: 4 },
+      })
+      .setOrigin(0.5, 1)
+      .setDepth(itemShopImage.y + 1)
     prop('villageBicycle', 3.5, 55.5, 0.055, true)
     prop('newWildflower1', 24.2, 56.2, 0.027)
     prop('newWildflower4', 22.9, 57, 0.019, true)
@@ -1319,14 +1336,25 @@ export class MainScene extends Phaser.Scene {
     }
   }
 
+  /**
+   * 다리는 원래 순수 장식(클릭 판정 없음)이었는데, 백엔드 사보타주 장소 "마을 어귀 순찰"이
+   * clueLocations.ts에서 마땅히 매칭할 스팟이 없어 'village-hall' 쪽으로 흘러들어갔다 —
+   * 다리가 지도상 마을 어귀에 있는데 정작 단서 ❗는 멀리 떨어진 회관에 뜨는 위치 불일치로
+   * 플레이어가 혼란스러워했다. 다리 자체를 'bridge' 스팟으로 클릭 가능하게 만들어 분리한다.
+   */
   private createBridge() {
     const bridgeX = (this.mapData.bridge.tileX + 0.5) * this.mapData.tileWidth
     const bridgeY = this.mapData.bridge.tileY * this.mapData.tileHeight
-    this.add
+    const bridgeImage = this.add
       .image(bridgeX, bridgeY, 'ruralBridge')
       .setOrigin(0.5, 0.5)
       .setScale(0.36)
       .setDepth(10)
+      .setInteractive({ useHandCursor: true })
+    bridgeImage.on('pointerover', () => bridgeImage.setTint(0xfff1b5))
+    bridgeImage.on('pointerout', () => bridgeImage.clearTint())
+    bridgeImage.on('pointerdown', () => this.handleLocationInteract('bridge', bridgeX, bridgeY))
+    this.registerClueMarker('bridge', bridgeX, bridgeY)
   }
 
   /**
@@ -1348,7 +1376,9 @@ export class MainScene extends Phaser.Scene {
     this.watermelonField?.setTexture(damaged.has('수박밭') ? 'watermelonFieldDamaged' : 'watermelonFieldNormal')
   }
 
-  /** 장소 스팟 위에 "미습득 단서 있음" 표시를 달아둔다 — 기본은 숨김, setClueSpots가 켠다. */
+  /** 장소 스팟 위에 "미습득 단서 있음" 표시를 달아둔다 — 기본은 숨김, setClueSpots가 켠다.
+   *  건물 스프라이트가 아니라 이 ❗ 표시 자체를 눌러보는 플레이어도 많아서, 마커도 건물과
+   *  동일한 handleLocationInteract로 클릭 판정을 받게 한다(둘 중 어디를 눌러도 동작). */
   private registerClueMarker(spotKey: string, x: number, y: number) {
     const marker = this.add
       .text(x, y - this.mapData.tileHeight * 1.6, '❗', {
@@ -1357,6 +1387,9 @@ export class MainScene extends Phaser.Scene {
       .setOrigin(0.5, 1)
       .setDepth(y + 2)
       .setVisible(false)
+      .setPadding(10)
+      .setInteractive({ useHandCursor: true })
+    marker.on('pointerdown', () => this.handleLocationInteract(spotKey, x, y))
     this.tweens.add({
       targets: marker,
       y: marker.y - 6,

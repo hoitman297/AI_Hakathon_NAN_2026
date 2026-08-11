@@ -189,7 +189,6 @@
   background: #11170f;
   box-shadow: 0 10px 0 rgba(59, 43, 32, .45), 0 24px 44px rgba(0, 0, 0, .5);
   animation: ns-stage-in .55s ease-out both;
-  cursor: pointer;
 }
 
 .ns-bg {
@@ -347,14 +346,9 @@
   animation: ns-stamp-in .6s cubic-bezier(.2, 1.4, .4, 1) both;
 }
 
-.ns-click-hint {
-  position: absolute;
-  bottom: 14px;
-  right: 14px;
-  color: rgba(255, 248, 236, .45);
-  font-size: .72rem;
-  z-index: 5;
-  pointer-events: none;
+.ns-skip-button {
+  flex: 0 0 auto;
+  min-width: 140px;
 }
 
 /* ─── popup ─── */

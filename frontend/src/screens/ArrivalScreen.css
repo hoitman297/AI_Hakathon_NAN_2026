@@ -25,10 +25,35 @@
 .arrival-image {
   display: block;
   max-width: 100vw;
-  max-height: 82vh;
+  max-height: 60vh;
   width: auto;
   height: auto;
   image-rendering: pixelated;
+}
+
+/* 캡션은 이미지 위에 겹쳐 그리지 않고, 이미지 아래 일반 문서 흐름에 배치한다 —
+   절대좌표(%)로 겹치면 뷰포트 비율에 따라 두 줄이 겹쳐 보이는 문제가 있었다. */
+.arrival-caption {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  width: min(720px, 92vw);
+  padding: 0 5%;
+  text-align: center;
+  color: #fff8ec;
+}
+
+.arrival-caption-line1 {
+  margin: 0;
+  font-size: clamp(1rem, 2.1vw, 1.5rem);
+  font-weight: 700;
+}
+
+.arrival-caption-line2 {
+  margin: 0;
+  font-size: clamp(.8rem, 1.5vw, 1.1rem);
+  color: #e8ddc8;
 }
 
 .arrival-content {

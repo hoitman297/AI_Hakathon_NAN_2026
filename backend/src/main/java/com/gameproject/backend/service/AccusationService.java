@@ -53,7 +53,7 @@ public class AccusationService {
         }
 
         String reaction = reactionFuture.join();
-        String message = "오답입니다. " + (reaction != null ? reaction : accused.getName() + "가 억울함을 토로합니다.");
+        String message = "오답입니다. " + (reaction != null ? reaction : accused.getName() + "이(가) 억울함을 토로합니다.");
 
         return new AccuseResultResponse(false, message, outcome.sessionStatusName());
     }

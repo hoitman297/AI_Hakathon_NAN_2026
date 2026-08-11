@@ -2,6 +2,10 @@ import { useEffect, useRef, useState } from 'react'
 import { getNightSummary, type NightSummary } from '../api/sabotageApi'
 import './NightTransitionScreen.css'
 
+// 사보타주 알림용 긴장감 BGM 에셋(04-sabotage-alert.wav)이 팀원 커밋으로 추가돼 있었는데
+// 실제로 이 화면(사보타주 발생을 알리는 화면)에 연결된 적이 없었다.
+const SABOTAGE_BGM_SRC = '/assets/audio/bgm-samples/04-sabotage-alert.wav'
+
 interface NightTransitionScreenProps {
   sessionId: number
   day: number
@@ -48,26 +52,65 @@ export function NightTransitionScreen({ sessionId, day, nextDay, onContinue }: N
   const [summary, setSummary] = useState<NightSummary | null>(null)
   const [phase, setPhase] = useState<Phase>('loading')
   const [confirmed, setConfirmed] = useState(false)
-  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const audioRef = useRef<HTMLAudioElement>(null)
+  // 아래 effect 안에서만 최신 onContinue를 읽으려고 ref로 든다 — App.tsx가 매 렌더마다 새
+  // 화살표 함수를 내려주는데, 그걸 그대로 deps에 넣으면 이 effect(사보타주 여부 조회)가
+  // 불필요하게 다시 실행돼 API를 중복 호출하게 된다.
+  const onContinueRef = useRef(onContinue)
+  useEffect(() => {
+    onContinueRef.current = onContinue
+  }, [onContinue])
 
   useEffect(() => {
+    // 8·9일차로 넘어갈 때는 "잡히지 않은 범인이 사보타주를 일으켰습니다" 알림(DayScreen)이
+    // 그날 진입 직후 따로 뜬다 — 여기서 "오늘 밤은 무사히 지나갔다"까지 겹쳐 보이면 같은 날
+    // 두 팝업이 서로 모순돼 보인다. 그래서 이 밤에 정규 사보타주가 없었다면(대부분 그렇다,
+    // 정규 사보타주는 1~5일차 밤에만 있음) 이 화면 자체를 건너뛰고 바로 낮으로 넘어간다.
+    const skipNoSabotagePopup = nextDay === 8 || nextDay === 9
     getNightSummary(sessionId, day)
       .then(data => {
         if (!data) {
+          if (skipNoSabotagePopup) {
+            onContinueRef.current()
+            return
+          }
           setPhase('popup')
           return
         }
         setSummary(data)
         setPhase('scene')
-        timerRef.current = setTimeout(() => setPhase('popup'), 8000)
       })
       .catch(() => {
+        if (skipNoSabotagePopup) {
+          onContinueRef.current()
+          return
+        }
         setPhase('popup')
       })
-    return () => {
-      if (timerRef.current) clearTimeout(timerRef.current)
+  }, [sessionId, day, nextDay])
+
+  // 사건이 있었던 밤(scene/popup with summary)에만 긴장감 BGM 재생 — "평온했던 밤"(summary
+  // 없음)엔 안 튼다. 브라우저 자동재생 정책 때문에 마운트 시 1차 시도 + 실패하면 첫
+  // pointerdown/keydown에 이어서 재생(TitleScreen과 동일 패턴).
+  useEffect(() => {
+    if (phase === 'loading') return
+    const audio = audioRef.current
+    if (!audio || !summary) return
+
+    const play = () => {
+      audio.play()?.catch(() => undefined)
     }
-  }, [sessionId, day])
+    play()
+    window.addEventListener('pointerdown', play, { once: true })
+    window.addEventListener('keydown', play, { once: true })
+
+    return () => {
+      window.removeEventListener('pointerdown', play)
+      window.removeEventListener('keydown', play)
+      audio.pause()
+      audio.currentTime = 0
+    }
+  }, [phase, summary])
 
   const handleConfirm = () => {
     setConfirmed(true)
@@ -85,13 +128,17 @@ export function NightTransitionScreen({ sessionId, day, nextDay, onContinue }: N
   if (!summary || phase === 'popup') {
     const meta = summary ? TYPE_META[summary.sabotageType] : null
     const location = summary ? summary.location || meta!.fallbackLocation : null
-    const bodyText = meta ? `${location}에서 ${meta.badge}.` : '마을은 오늘 밤도 평온했던 것 같다.'
+    const bodyText = meta ? `${location}에서 ${meta.badge}.` : '오늘 밤은 무사히 지나갔다.'
 
     return (
       <div className="ns-root">
+        {summary && <audio ref={audioRef} src={SABOTAGE_BGM_SRC} loop />}
         <div className="ns-popup pixel-panel">
           {summary && <div className="ns-popup-stamp">사건 발생</div>}
-          <div className="ns-popup-day">{day}일차, 깊은 밤</div>
+          {/* 사건이 벌어진 건 day의 밤이지만, 플레이어가 실제로 이 소식을 듣는 건 다음날
+              아침(nextDay)이라 표시도 그 기준으로 맞춘다 — 첫 사보타주(1일차 밤)가
+              "1일차"가 아니라 "2일차"로 보여야 한다는 피드백. */}
+          <div className="ns-popup-day">{nextDay}일차, 깊은 밤</div>
           <p className="ns-popup-body">{bodyText}</p>
           <div className="ns-popup-action">
             {!confirmed ? (
@@ -120,6 +167,7 @@ export function NightTransitionScreen({ sessionId, day, nextDay, onContinue }: N
 
   return (
     <div className="ns-root">
+      <audio ref={audioRef} src={SABOTAGE_BGM_SRC} loop />
       {/* ambient sky */}
       <div className="ns-sky" aria-hidden>
         <img
@@ -146,9 +194,10 @@ export function NightTransitionScreen({ sessionId, day, nextDay, onContinue }: N
 
       {/* scene stage */}
       <div className="ns-stage-wrapper">
-        <div className="ns-day-badge">{day}일차 · 깊은 밤</div>
+        {/* ns-popup-day와 같은 이유로 nextDay 기준 표시 — 위 주석 참고. */}
+        <div className="ns-day-badge">{nextDay}일차 · 깊은 밤</div>
 
-        <div className="ns-stage" onClick={() => { if (timerRef.current) clearTimeout(timerRef.current); setPhase('popup') }}>
+        <div className="ns-stage">
           <div className="ns-bg" style={{ backgroundImage: `url('${bgSrc}')` }} />
 
           <div className="ns-stage-tag">{location}</div>
@@ -189,9 +238,11 @@ export function NightTransitionScreen({ sessionId, day, nextDay, onContinue }: N
           <div className="ns-fog-ground" aria-hidden />
 
           <div className="ns-stamp">사건 발생</div>
-
-          <div className="ns-click-hint">클릭하여 계속</div>
         </div>
+
+        <button className="pixel-button pixel-button--accent ns-skip-button" onClick={() => setPhase('popup')}>
+          넘기기
+        </button>
       </div>
     </div>
   )
